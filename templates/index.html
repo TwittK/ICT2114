@@ -1,0 +1,38 @@
+{% extends 'base.html' %} {% block title %}Home - LabComply+{% endblock %} {%
+block content %}
+</style>
+
+<div>
+    <h1>Detection Search</h1>
+</div>
+<div>
+    <form method="post">
+        <div>
+            <label>Date: <input type="date" name="date"></label>
+        </div>
+        <div>
+            <label>Object Type: <input type="text" name="object_type" placeholder="e.g., food"></label>
+        </div>
+        <div>
+            <button type="submit">Search</button>
+        </div>
+    </form>
+</div>
+
+<hr>
+
+{% if results %}
+<div>
+    <h2>Results:</h2>
+</div>
+{% for row in results %}
+<div class="result">
+    <p><strong>{{ row[1] }}</strong> (Confidence: {{ row[2] }})</p>
+    <p>{{ row[0] }}</p>
+    <!-- <img src="{{ url_for('static', filename=row[3].replace('snapshots/', '')) }}">
+                  -->
+    <img src="{{ url_for('static', filename='snapshots/' + row[3].split('/')[-1]) }}">
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
