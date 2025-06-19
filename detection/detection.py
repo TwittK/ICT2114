@@ -38,13 +38,13 @@ def find_near_or_overlapping_boxes(bev_coords, face_coords, threshold=50):
 
     matches = {i: [] for i in bev_coords}
 
-    for bev_track_id, box1 in bev_coords.items():
+    for bev_track_id, box1 in bev_coords.items(): # {id: [[x1, y1, x2, y2], (x, y)], id: [[x1, y1, x2, y2], (x, y)], ...}
         x1_a, y1_a, x2_a, y2_a = box1[0]
 
-        for face_track_id, box2 in face_coords.items():
+        for face_track_id, box2 in face_coords.items(): # {id: [[x1, y1, x2, y2], (x, y)], id: [[x1, y1, x2, y2], (x, y)], ...}
             x1_b, y1_b, x2_b, y2_b = box2[0]
 
-            """
+            '''
             checks if boxes are entirely to the left/right of each other
             x2_a < x1_b: box a is fully to the left of box b
             x2_b < x1_a: box a is fully to the right of box b
@@ -52,7 +52,7 @@ def find_near_or_overlapping_boxes(bev_coords, face_coords, threshold=50):
             checks if boxes are entirely above/below each other
             y2_a < y1_b: box a is fully above box b
             y2_b < y1_a: box a is fully below box b
-            """
+            '''
             is_separated = x2_a < x1_b or x2_b < x1_a or y2_a < y1_b or y2_b < y1_a
 
             # check near edges
@@ -71,7 +71,7 @@ def euclidean_distance(center1, center2):
 def find_nearest_faces(filtered_near_faces, bev_coords, face_coords):
     # filtered_matches: {bev1: [list of all near faces that are real], bev2: [list of all near faces that are real], ...}
     # function takes filtered_matches and finds the closest face for each food/ beverage using euclidean distance.
-    
+    # function returns a list of tuples: [(food/ beverage detected, its closest face), (food/ beverage detected, its closest face), ...]
     nearest_pairs = []
     
     for bev, faces in filtered_near_faces.items():
@@ -86,7 +86,7 @@ def find_nearest_faces(filtered_near_faces, bev_coords, face_coords):
         
         nearest_pairs.append((bev, nearest_face))
     
-    return nearest_pairs # function returns a list of tuples: [(food/ beverage detected, its closest face), (food/ beverage detected, its closest face), ...]
+    return nearest_pairs # returns list of tuples (i,j) where nearest i is j
 
 def read_frames():
     global running
@@ -102,6 +102,7 @@ def read_frames():
             if not frame_queue.full():
                 frame_queue.put(frame)
             else:
+                # Drop oldest to keep it fresh
                 try:
                     frame_queue.get_nowait()
                 except queue.Empty:
@@ -114,7 +115,7 @@ def read_frames():
 
 def detection(model, target_classes_id, conf_threshold):
     global running
-    flagged_foodbev = [] # store a list of food/beverage ids so that once it has been matched to an owner, it can't be matched to another person again
+    flagged_foodbev = []
 
     while running:
         try:
@@ -126,7 +127,7 @@ def detection(model, target_classes_id, conf_threshold):
         if frame is None or frame.size == 0:
             continue
 
-        result = model.track(frame, persist=True, classes=target_classes_id, conf=conf_threshold)
+        result = model.track(frame, persist=True, classes=target_classes_id, conf=conf_threshold, iou=0.4)
         annotated_frame = result[0].plot()
         boxes = result[0].boxes
 
@@ -136,16 +137,15 @@ def detection(model, target_classes_id, conf_threshold):
         # only process if there are at least 2 detected objects
         if len(boxes) >= 2: 
 
-            # prepare detected object's coords and center
+            # object detection pipeline
             for box in boxes:
                 track_id = int(box.id) if box.id is not None else None
                 cls_id = int(box.cls.cpu())
                 coords = box.xyxy[0].cpu().numpy()
 
-                # food/ beverages
                 if cls_id in food_beverage_class_list and track_id is not None:
                     boxes_beverage[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2)]
-                # person
+
                 elif cls_id in human_class_list and track_id is not None:
                     boxes_face[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2)]
 
@@ -158,7 +158,8 @@ def detection(model, target_classes_id, conf_threshold):
 
                 # find nearest face using euclidean distance
                 filtered_nearest_pairs = find_nearest_faces(near_faces, boxes_beverage, boxes_face) 
-
+                    
+                # for every (food/bev, face) pair in the list, draw line to the closest face
                 # (1 food/bev map to one person, 1 food/bev can map to only 1 face, 1 face can map to 1 or more food/bev)
                 for bev_idx, nearest_face_idx in filtered_nearest_pairs:
                     if bev_idx not in flagged_foodbev:
@@ -167,52 +168,62 @@ def detection(model, target_classes_id, conf_threshold):
 
                             if nearest_face:
                                 x1_face, y1_face, x2_face, y2_face = map(int, nearest_face[0])
+                                
                                 cv.putText(annotated_frame, "FLAGGED", (x1_face + 10, y1_face + 20), cv.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2, cv.LINE_AA, False)
 
-
+                                # crop person found by yolo
                                 face_only = safe_crop(frame, x1_face, y1_face, x2_face, y2_face)
-                                face_only_rgb = cv.cvtColor(face_only, cv.COLOR_BGR2RGB)
-                                
-                                # compare nearest face and see if there is a match
+
+                                # facial recognition start
                                 try:
-                                    # prepare embedding vector of closest real face 
-                                    query_embedding = DeepFace.represent(img_path=face_only_rgb, model_name="OpenFace")[0]["embedding"]
-                                    lowest_dist = math.inf
+                                    # anti spoof extract face from frame crop
+                                    face_objs = DeepFace.extract_faces(
+                                        img_path=face_only,
+                                        anti_spoofing=True
+                                    )
+                                    if (face_objs[0]['is_real'] != True):
+                                        continue
+                                    
+                                    facial_area = face_objs[0]['facial_area']
 
-                                    # perform facial recognition on each face with faces of past incompliances
-                                    for embed_uuid, ref_embedding in embeddings_db.items():
+                                    # crop only face area
+                                    face_only = safe_crop(face_only, facial_area['x'], facial_area['y'], facial_area['x'] + facial_area['w'], facial_area['y'] + facial_area['h'])
 
-                                        # calculate similarity score by using embedding vectors
-                                        cosine_sim = query_embedding @ ref_embedding
-                                        dist = 1 - cosine_sim
+                                    # covert frame to embedding vectors
+                                    query_embedding = DeepFace.represent(img_path=face_only, model_name="Facenet", max_faces=1, enforce_detection=False)[0]["embedding"]
 
-                                        # get face that looks the most similar
-                                        if dist < lowest_dist:
-                                            lowest_dist = dist
+                                    # find match in database
+                                    closest_dist = float('inf')
+                                    closet_match_id = None
+                                    for fid, ref_embedding in embeddings_db.items():
+                                        distance_vector = np.square(query_embedding - ref_embedding)
+                                        distance = np.sqrt(distance_vector.sum())
 
-                                    # found a match
-                                    if lowest_dist <= 0.45:
-                                        flagged_foodbev.append(bev_idx) # save track id of bottle
+                                        if distance < closest_dist:
+                                            closest_dist = distance
+                                            closet_match_id = fid
+
+                                    # match found
+                                    if closest_dist < 6.4:
+                                        flagged_foodbev.append(bev_idx)
                                         current_date = datetime.now().strftime("%Y%m%d")
-                                        
-                                        print(current_date)
-                                        # new incompliance with same person on a different date
-                                        if incompliance_date_map[embed_uuid] != current_date:
+
+                                        if incompliance_date_map[closet_match_id] != current_date:
+                                            flagged_foodbev.append(bev_idx) # save track id of bottle
 
                                             # update last incompliance date (temp: also add embeddings in in-memory dictionary)
-                                            incompliance_date_map[embed_uuid] = current_date
-                                            embeddings_db[embed_uuid] = np.array(query_embedding)
+                                            incompliance_date_map[closet_match_id] = current_date
+                                            embeddings_db[closet_match_id] = np.array(query_embedding)
 
                                             # get the existing uuid of face and save incompliance img into folder
-                                            save_img(face_only, embed_uuid, current_date, "faces")
-                                            save_img(annotated_frame, embed_uuid, current_date, "incompliances")
+                                            save_img(face_only, closet_match_id, current_date, "faces")
+                                            save_img(annotated_frame, closet_match_id, current_date, "incompliances")
 
-                                            print(f"[ACTION] Similar face found 🟢: {embed_uuid}. Saving incompliance snapshot and updated last incompliance date ✅")
-
+                                            print(f"[ACTION] Similar face found 🟢: {closet_match_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                                            
                                         # incompliance on the same date
                                         else:
-                                            print("[LOG] 🟣 Similar face found but already have incompliance on the same day.")
-                                        
+                                            print("🟣🟣🟣🟣")
                                     # no match
                                     else:
                                         flagged_foodbev.append(bev_idx) # save track id of bottle
@@ -233,12 +244,13 @@ def detection(model, target_classes_id, conf_threshold):
                                         save_img(face_only, new_uuid, current_date, "faces")
                                         save_img(annotated_frame, new_uuid, current_date, "incompliances")
 
-                                        print(f"[ACTION] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+                                        print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+
                                         
-                                except ValueError:
+                                except Exception as e:
                                     pass 
                             else:
-                                print("[LOG] No nearest face 🔵")
+                                print("NO nearest face 🔵")
 
                         except KeyError:
                             pass 
@@ -253,21 +265,21 @@ def detection(model, target_classes_id, conf_threshold):
 
 # create folders for faces and incompliances.
 WORKING_DIR = r"" # change working directory here
-
 os.makedirs(os.path.join(WORKING_DIR, "faces"), exist_ok=True)
 os.makedirs(os.path.join(WORKING_DIR, "incompliances"), exist_ok=True)
 os.makedirs(os.path.join(WORKING_DIR, "yolo_models"), exist_ok=True)
 
+# load yolo model and target classes
 model = YOLO(os.path.join(WORKING_DIR, "yolo_models", "yolo11s.pt"))
-print(f"[START] Loaded YOLO model")
-
 food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 human_class_list = [0]
+print(f"[START] Loaded YOLO model")
 
+
+# temporarily using json file to store embeddings to mimick database
 incompliance_date_map = {} # { "uuid": YYYYMMDD }
 embeddings_db = {}  # { "uuid": embedding_vector }
 
-# collate embeddings of all exisiting images upon start and store a dict of when the last incompliance occured for each face
 FACES_DIR = os.path.join(WORKING_DIR, "faces")
 for folder in os.listdir(os.path.join(WORKING_DIR, "faces")):
 
@@ -292,7 +304,6 @@ for folder in os.listdir(os.path.join(WORKING_DIR, "faces")):
         if uuid_part not in incompliance_date_map or last_incompliance_date > incompliance_date_map[uuid_part]:
             incompliance_date_map[uuid_part] = last_incompliance_date
 
-print(incompliance_date_map)
 print(f"[START] Set up completed")
 
 # Start threads
@@ -315,4 +326,5 @@ read_thread.join()
 inference_thread.join()
 
 cv.destroyAllWindows()
+
 print(f"[END]")
