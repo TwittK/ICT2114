@@ -5,20 +5,6 @@ from datetime import datetime
 import numpy as np
 from deepface import DeepFace
 
-# CURRENT LIMITATION: ANYONE'S FACE THAT IS NEAR TO A DRINK WILL BE FLAGGED EVEN IF DRINK WAS ALREADY FLAGGED
-# CURRENT WORKAROUND TO THIS ISSUE IS TO ONLY FLAG IF THE FACE IS SUPER CLOSE TO THE FOOD/DRINK SO THAT ONLY THE PERSON THAT BRINGS IT WILL BE FLAGGED
-
-# Camera config
-# camera_ip = "192.168.10.64"
-# username = "admin"
-# password = "Sit12345"
-# # Use 101 for main stream (better qual, but more bandwidth), 102 for sub stream
-# rtsp_url = f"rtsp://{username}:{password}@{camera_ip}/Streaming/Channels/101"
-# cap = cv.VideoCapture(rtsp_url, cv.CAP_FFMPEG)
-# if not cap.isOpened():
-#     print("Failed to connect to the RTSP stream.")
-#     exit()
-
 cap = cv.VideoCapture(0)
 cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
@@ -121,6 +107,8 @@ def get_dist_nose_to_box(pose_points, detected_food_drinks, track_id):
     # Compute distance from nose to closest point on the bbox (euclidean distance formula)
     return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
 
+
+
 def detection(model, pose_model, target_classes_id, conf_threshold):
     global running
     # flagged_foodbev = []
@@ -150,13 +138,15 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
             for box in boxes:
                 track_id = int(box.id) if box.id is not None else None
                 cls_id = int(box.cls.cpu())
+                confidence = float(box.conf.cpu())
                 coords = box.xyxy[0].cpu().numpy()
+                
                 x1, y1, x2, y2 = map(int, coords)
 
                 if cls_id in food_beverage_class_list and track_id is not None:
                     detected_food_drinks[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2)]
                     cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                    cv.putText(frame_copy, f"id: {track_id}", (x1 + 10, y1), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                    cv.putText(frame_copy, f"id: {track_id}, conf: {confidence}", (x1 + 10, y1), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
 
             pose_results = pose_model.track(frame, persist=True, conf=0.5, iou=0.4)[0]
@@ -200,11 +190,12 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                             OWNING_THRESHOLD = 100
                             if dist <= OWNING_THRESHOLD or dist_nose_to_box <= DRINKING_THRESHOLD:
                                 cv.putText(frame_copy, "NEAR DRINK", (int(p["nose"][0]), int(p["nose"][1]-10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                                
+
                                 try:
                                     face_bbox = extract_face_from_nose(p, frame)
                                     x1, y1, x2, y2 = map(int, face_bbox)
-                                    face_crop = safe_crop(frame, x1, y1, x2, y2, padding=90)
+                                    face_crop = safe_crop(frame, x1, y1, x2, y2, padding=30)
+                                    cv.imshow("face", face_crop)
                                     
                                 except ValueError:
                                     continue
@@ -212,23 +203,7 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                                 if face_crop is not None and face_crop.size > 0:
 
                                     try:
-                                        face_objs = DeepFace.extract_faces(img_path=face_crop, anti_spoofing=True)
-                                        
-                                        facial_area = face_objs[0]['facial_area']
-
-                                        if (face_objs[0]['is_real'] != True or facial_area["left_eye"] == None or facial_area["right_eye"] == None):
-                                            continue
-                                        
-                                        face_found = safe_crop(
-                                            face_crop,
-                                            facial_area["x"],
-                                            facial_area["y"],
-                                            facial_area["x"] + facial_area["w"],
-                                            facial_area["y"] + facial_area["h"],
-                                            padding=0
-                                        )
-                                        
-                                        query_embedding = DeepFace.represent(img_path=face_found, model_name="Facenet", max_faces=1, enforce_detection=False)[0]["embedding"]
+                                        query_embedding = DeepFace.represent(img_path=face_crop, model_name="Facenet", max_faces=1, enforce_detection=False)[0]["embedding"]
 
                                         # find match in database
                                         closest_dist = float('inf')
@@ -253,7 +228,7 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                                                 embeddings_db[closest_match_id] = np.array(query_embedding)
 
                                                 # get the existing uuid of face and save incompliance img into folder
-                                                save_img(face_found, closest_match_id, current_date, "faces")
+                                                save_img(face_crop, closest_match_id, current_date, "faces")
                                                 save_img(frame_copy, closest_match_id, current_date, "incompliances")
 
                                                 print(f"[ACTION] Similar face found 🟢: {closest_match_id}. Saving incompliance snapshot and updated last incompliance date ✅")
@@ -277,7 +252,7 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                                             incompliance_date_map[new_uuid] = current_date
                                             embeddings_db[new_uuid] = np.array(query_embedding)
                 
-                                            save_img(face_found, new_uuid, current_date, "faces")
+                                            save_img(face_crop, new_uuid, current_date, "faces")
                                             save_img(frame_copy, new_uuid, current_date, "incompliances")
 
                                             print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
@@ -287,7 +262,7 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                             
                             
         # display
-        frame_copy = cv.resize(frame_copy, (frame_copy.shape[1] // 2, frame_copy.shape[0] // 2))
+        # annotated_frame = cv.resize(annotated_frame, (annotated_frame.shape[1] // 2, annotated_frame.shape[0] // 2))
         cv.imshow('YOLO Webcam Detection', frame_copy)
 
         if cv.waitKey(1) & 0xFF == ord('q'):
@@ -301,7 +276,7 @@ os.makedirs(os.path.join(WORKING_DIR, "incompliances"), exist_ok=True)
 os.makedirs(os.path.join(WORKING_DIR, "yolo_models"), exist_ok=True)
 
 # load yolo model and target classes
-model = YOLO(os.path.join(WORKING_DIR, "yolo_models", "yolo11m.pt"))
+model = YOLO(os.path.join(WORKING_DIR, "yolo_models", "yolo11s.pt"))
 pose_model = YOLO("yolo_models/yolov8n-pose.pt")
 food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 print(f"[START] Loaded YOLO model")
