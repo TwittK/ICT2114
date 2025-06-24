@@ -81,8 +81,8 @@ def extract_face_from_nose(pose_points, frame):
     y2 = min(int(nose[1] + nose_to_eye_height), h)
 
     # horizontal distance of bbox based on ears
-    x1 = max(int(min(l_ear[0], r_ear[0])), 0)
-    x2 = min(int(max(l_ear[0], r_ear[0])), w)
+    x1 = max(int(min(l_ear[0], r_ear[0])), r_eye[0] - 10)
+    x2 = min(int(max(l_ear[0], r_ear[0])), l_eye[0] + 10)
 
     # check that bbox is valid
     if x2 <= x1 or y2 <= y1:
