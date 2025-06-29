@@ -1,25 +1,36 @@
 from ultralytics import YOLO
-import os, uuid, math, queue, threading, time, json
+import os, queue, threading, time
 import cv2 as cv
 from datetime import datetime
 import numpy as np
 from deepface import DeepFace
+import sqlite3, sqlite_vec
+from sqlite_vec import serialize_float32
 
 cap = cv.VideoCapture(0)
+cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
 if not cap.isOpened():
     print("[ERROR] Cannot open camera")
     exit()
 frame_queue = queue.Queue(maxsize=10)
 save_queue = queue.Queue(maxsize=10)
+process_queue = queue.Queue(maxsize=10)
 running = True
+
+detected_food_drinks_lock = threading.Lock()
+pose_points_lock = threading.Lock()
+flagged_foodbev_lock = threading.Lock()
 
 def save_img(frame_or_face, uuid_str, timestamp, faces_or_incompliance):
     filename = f"Person_{uuid_str}_{timestamp}.jpg"
-    filepath = os.path.join(WORKING_DIR, faces_or_incompliance, uuid_str, filename)
+    filepath = os.path.join(faces_or_incompliance, uuid_str, filename)
     save_queue.put((filepath, frame_or_face))
-    
+
+# Save images to disk
 def image_saver():
-    while True:
+    global running
+    while running:
         filepath, image = save_queue.get()
         if filepath is None:
             break
@@ -34,60 +45,7 @@ def safe_crop(img, x1, y1, x2, y2, padding=0):
     y2 = min(y2 + padding, h)
     return img[y1:y2, x1:x2]
 
-def find_near_or_overlapping_boxes(bev_coords, face_coords, threshold=50):
-
-    matches = {i: [] for i in bev_coords}
-
-    for bev_track_id, box1 in bev_coords.items(): # {id: [[x1, y1, x2, y2], (x, y)], id: [[x1, y1, x2, y2], (x, y)], ...}
-        x1_a, y1_a, x2_a, y2_a = box1[0]
-
-        for face_track_id, box2 in face_coords.items(): # {id: [[x1, y1, x2, y2], (x, y)], id: [[x1, y1, x2, y2], (x, y)], ...}
-            x1_b, y1_b, x2_b, y2_b = box2[0]
-
-            '''
-            checks if boxes are entirely to the left/right of each other
-            x2_a < x1_b: box a is fully to the left of box b
-            x2_b < x1_a: box a is fully to the right of box b
-
-            checks if boxes are entirely above/below each other
-            y2_a < y1_b: box a is fully above box b
-            y2_b < y1_a: box a is fully below box b
-            '''
-            is_separated = x2_a < x1_b or x2_b < x1_a or y2_a < y1_b or y2_b < y1_a
-
-            # check near edges
-            horiz_gap = max(0, max(x1_b - x2_a, x1_a - x2_b))
-            verti_gap = max(0, max(y1_b - y2_a, y1_a - y2_b))
-            near = horiz_gap <= threshold and verti_gap <= threshold
-
-            if (is_separated == False) or near:
-                matches[bev_track_id].append(face_track_id)
-
-    return matches # returns list of food/bev to face mapping {food/bev track id : [track id of faces reasonably close to it]}
-
-def euclidean_distance(center1, center2):
-    return math.sqrt((center1[0] - center2[0])**2 + (center1[1] - center2[1])**2)
-
-def find_nearest_faces(filtered_near_faces, bev_coords, face_coords):
-    # filtered_matches: {bev1: [list of all near faces that are real], bev2: [list of all near faces that are real], ...}
-    # function takes filtered_matches and finds the closest face for each food/ beverage using euclidean distance.
-    # function returns a list of tuples: [(food/ beverage detected, its closest face), (food/ beverage detected, its closest face), ...]
-    nearest_pairs = []
-    
-    for bev, faces in filtered_near_faces.items():
-        min_dist = float('inf')
-        nearest_face = None
-        
-        for face in faces:
-            dist = euclidean_distance(bev_coords[bev][1], face_coords[face][1])
-            if dist < min_dist:
-                min_dist = dist
-                nearest_face = face
-        
-        nearest_pairs.append((bev, nearest_face))
-    
-    return nearest_pairs # returns list of tuples (i,j) where nearest i is j
-
+# Read frames from camera
 def read_frames():
     global running
 
@@ -109,13 +67,59 @@ def read_frames():
                     pass
                 frame_queue.put(frame)
         except Exception as e:
-            print(f"Error putting frame into queue: {e}")
+            print(f"Error putting frame into frame queue: {e}")
 
     cap.release()
 
-def detection(model, target_classes_id, conf_threshold):
+# Estimates the facial area based on the nose, eyes and ears
+def extract_face_from_nose(pose_points, frame):
+    h, w = frame.shape[:2]
+    
+    nose = np.array(pose_points["nose"])
+    l_eye = np.array(pose_points["left_eye"])
+    r_eye = np.array(pose_points["right_eye"])
+    l_ear = np.array(pose_points["left_ear"])
+    r_ear = np.array(pose_points["right_ear"])
+    
+    # Get the vertical distance of nose to eyes
+    average_y_of_eyes = (l_eye[1] + r_eye[1]) // 2
+    nose_to_eye_height = abs(nose[1] - average_y_of_eyes) * 3
+    eye_center_y = average_y_of_eyes
+
+    # Add one unit (of nose_to_eye_height) above eye center, one below nose
+    y1 = max(int(eye_center_y - nose_to_eye_height), 0)
+    y2 = min(int(nose[1] + nose_to_eye_height) + 20, h)
+
+    # Horizontal distance of bbox based on ears
+    x1 = max(int(min(l_ear[0], r_ear[0])), r_eye[0] - 40)
+    x2 = min(int(max(l_ear[0], r_ear[0])), l_eye[0] + 40)
+
+    # check that bbox is valid
+    if x2 <= x1 or y2 <= y1:
+        raise ValueError("Invalid bounding box dimensions.")
+
+    return (x1, y1, x2, y2)
+
+def get_dist_nose_to_box(pose_points, detected_food_drinks, track_id):
+
+    # compute edge of food/drink bbox edges to nose point
+    # get nose point
+    nose = np.array(pose_points["nose"])
+
+    # get food/ drinks bounding box coords
+    food_drinks_bbox = detected_food_drinks[track_id][0]  # [x1, y1, x2, y2]
+    x1, y1, x2, y2 = food_drinks_bbox
+
+    # Clamp the nose to the bounding box (to get closest point on box edge)
+    clamped_x = np.clip(nose[0], x1, x2)
+    clamped_y = np.clip(nose[1], y1, y2)
+    
+    # Compute distance from nose to closest point on the bbox (euclidean distance formula)
+    return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
+
+# Main UI Thread
+def preprocess(model, pose_model, target_classes_id, conf_threshold):
     global running
-    flagged_foodbev = []
 
     while running:
         try:
@@ -127,194 +131,307 @@ def detection(model, target_classes_id, conf_threshold):
         if frame is None or frame.size == 0:
             continue
 
+        frame_copy = frame.copy() # copy frame for drawing bounding boxes, ids and conf scores.
         result = model.track(frame, persist=True, classes=target_classes_id, conf=conf_threshold, iou=0.4)
-        annotated_frame = result[0].plot()
         boxes = result[0].boxes
+        
+        with detected_food_drinks_lock:
+            detected_food_drinks.clear()
+        
+        # only process if there are at least 1 food/ drink detected
+        if len(boxes) >= 1: 
 
-        boxes_beverage = {}
-        boxes_face = {}
-
-        # only process if there are at least 2 detected objects
-        if len(boxes) >= 2: 
+            if datetime.now().strftime("%H:%M") == "00:00": # refresh flagged track ids daily
+                with flagged_foodbev_lock:
+                    flagged_foodbev.clear()
 
             # object detection pipeline
-            for box in boxes:
-                track_id = int(box.id) if box.id is not None else None
-                cls_id = int(box.cls.cpu())
-                coords = box.xyxy[0].cpu().numpy()
-
-                if cls_id in food_beverage_class_list and track_id is not None:
-                    boxes_beverage[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2)]
-
-                elif cls_id in human_class_list and track_id is not None:
-                    boxes_face[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2)]
-
-            # only process if theres both faces and food/beverages in frame
-            if boxes_beverage and boxes_face:
-                
-                # ensure only faces that are reasonably near to food/bev are considered (will not consider any faces that are far away for anti spoof check)
-                max_detection_dist = 50
-                near_faces = find_near_or_overlapping_boxes(boxes_beverage, boxes_face, threshold=max_detection_dist)
-
-                # find nearest face using euclidean distance
-                filtered_nearest_pairs = find_nearest_faces(near_faces, boxes_beverage, boxes_face) 
+            with detected_food_drinks_lock:
+                for box in boxes:
+                    track_id = int(box.id) if box.id is not None else None
+                    cls_id = int(box.cls.cpu())
+                    confidence = float(box.conf.cpu())
+                    coords = box.xyxy[0].cpu().numpy()
                     
-                # for every (food/bev, face) pair in the list, draw line to the closest face
-                # (1 food/bev map to one person, 1 food/bev can map to only 1 face, 1 face can map to 1 or more food/bev)
-                for bev_idx, nearest_face_idx in filtered_nearest_pairs:
-                    if bev_idx not in flagged_foodbev:
+                    x1, y1, x2, y2 = map(int, coords)
+
+                    if cls_id in food_beverage_class_list and track_id is not None:
+                        detected_food_drinks[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2), confidence, cls_id]
+                        cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                        cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1 + 10, y1), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+
+            pose_results = pose_model.track(frame, persist=True, conf=0.5, iou=0.4)[0]
+            # pose_frame = pose_results.plot() # to see keypoints of pose
+            keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
+
+            with pose_points_lock:
+                pose_points.clear()
+
+            with detected_food_drinks_lock and pose_points_lock:
+                # only process if theres both faces and food/beverages in frame
+                if detected_food_drinks and (keypoints is not None):
+                    # save landmarks for each person
+                    for person in keypoints:
                         try:
-                            nearest_face = boxes_face[nearest_face_idx]
+                            person_lm = person.cpu().numpy()
+                            pose_points.append({
+                                "nose": person_lm[0],
+                                "left_wrist": person_lm[9],
+                                "right_wrist": person_lm[10],
+                                "left_ear": person_lm[3],
+                                "right_ear": person_lm[4],
+                                "left_eye": person_lm[1],
+                                "right_eye": person_lm[2],
+                            })
+                        except Exception:
+                            continue
 
-                            if nearest_face:
-                                x1_face, y1_face, x2_face, y2_face = map(int, nearest_face[0])
-                                
-                                cv.putText(annotated_frame, "FLAGGED", (x1_face + 10, y1_face + 20), cv.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2, cv.LINE_AA, False)
-
-                                # crop person found by yolo
-                                face_only = safe_crop(frame, x1_face, y1_face, x2_face, y2_face)
-
-                                # facial recognition start
-                                try:
-                                    # anti spoof extract face from frame crop
-                                    face_objs = DeepFace.extract_faces(
-                                        img_path=face_only,
-                                        anti_spoofing=True
-                                    )
-                                    if (face_objs[0]['is_real'] != True):
-                                        continue
-                                    
-                                    facial_area = face_objs[0]['facial_area']
-
-                                    # crop only face area
-                                    face_only = safe_crop(face_only, facial_area['x'], facial_area['y'], facial_area['x'] + facial_area['w'], facial_area['y'] + facial_area['h'])
-
-                                    # covert frame to embedding vectors
-                                    query_embedding = DeepFace.represent(img_path=face_only, model_name="Facenet", max_faces=1, enforce_detection=False)[0]["embedding"]
-
-                                    # find match in database
-                                    closest_dist = float('inf')
-                                    closet_match_id = None
-                                    for fid, ref_embedding in embeddings_db.items():
-                                        distance_vector = np.square(query_embedding - ref_embedding)
-                                        distance = np.sqrt(distance_vector.sum())
-
-                                        if distance < closest_dist:
-                                            closest_dist = distance
-                                            closet_match_id = fid
-
-                                    # match found
-                                    if closest_dist < 6.4:
-                                        flagged_foodbev.append(bev_idx)
-                                        current_date = datetime.now().strftime("%Y%m%d")
-
-                                        if incompliance_date_map[closet_match_id] != current_date:
-                                            flagged_foodbev.append(bev_idx) # save track id of bottle
-
-                                            # update last incompliance date (temp: also add embeddings in in-memory dictionary)
-                                            incompliance_date_map[closet_match_id] = current_date
-                                            embeddings_db[closet_match_id] = np.array(query_embedding)
-
-                                            # get the existing uuid of face and save incompliance img into folder
-                                            save_img(face_only, closet_match_id, current_date, "faces")
-                                            save_img(annotated_frame, closet_match_id, current_date, "incompliances")
-
-                                            print(f"[ACTION] Similar face found 🟢: {closet_match_id}. Saving incompliance snapshot and updated last incompliance date ✅")
-                                            
-                                        # incompliance on the same date
-                                        else:
-                                            print("🟣🟣🟣🟣")
-                                    # no match
-                                    else:
-                                        flagged_foodbev.append(bev_idx) # save track id of bottle
-
-                                        # generate new uuid for face/person
-                                        new_uuid = str(uuid.uuid4())
-
-                                        current_date = datetime.now().strftime("%Y%m%d")
-
-                                        os.makedirs(os.path.join(WORKING_DIR, "incompliances", new_uuid), exist_ok=True)
-                                        # save cropped face area save it for matching next time
-                                        os.makedirs(os.path.join(WORKING_DIR ,"faces", new_uuid), exist_ok=True)
-
-                                        # update last incompliance date and save incompliance img
-                                        incompliance_date_map[new_uuid] = current_date
-                                        embeddings_db[new_uuid] = np.array(query_embedding)
-            
-                                        save_img(face_only, new_uuid, current_date, "faces")
-                                        save_img(annotated_frame, new_uuid, current_date, "incompliances")
-
-                                        print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
-
-                                        
-                                except Exception as e:
-                                    pass 
-                            else:
-                                print("NO nearest face 🔵")
-
-                        except KeyError:
-                            pass 
+            with detected_food_drinks_lock and pose_points_lock:   
+                if pose_points and detected_food_drinks:    
+                    try:
+                        if not process_queue.full():
+                            process_queue.put(frame)
+                        else:
+                            # Drop oldest to keep it fresh
+                            try:
+                                process_queue.get_nowait()
+                            except queue.Empty:
+                                pass
+                            process_queue.put(frame)
+                    except Exception as e:
+                        print(f"Error putting frame into process queue: {e}")
 
         # display
         # annotated_frame = cv.resize(annotated_frame, (annotated_frame.shape[1] // 2, annotated_frame.shape[0] // 2))
-        cv.imshow('YOLO Webcam Detection', annotated_frame)
+        cv.imshow('YOLO Webcam Detection', frame_copy)
 
         if cv.waitKey(1) & 0xFF == ord('q'):
             running = False
             break
 
-# create folders for faces and incompliances.
-WORKING_DIR = r"" # change working directory here
-os.makedirs(os.path.join(WORKING_DIR, "faces"), exist_ok=True)
-os.makedirs(os.path.join(WORKING_DIR, "incompliances"), exist_ok=True)
-os.makedirs(os.path.join(WORKING_DIR, "yolo_models"), exist_ok=True)
+# Associate detected food/ drinks to person
+def detection():
+    global running
 
-# load yolo model and target classes
-model = YOLO(os.path.join(WORKING_DIR, "yolo_models", "yolo11s.pt"))
+    db = sqlite3.connect("database/test.sqlite")
+    db.enable_load_extension(True)
+    sqlite_vec.load(db)
+    db.enable_load_extension(False)
+
+    while running:
+        try:
+            frame = process_queue.get(timeout=1)
+
+        except queue.Empty:
+            continue
+
+        if frame is None or frame.size == 0:
+            continue
+        
+        # shallow copy for reading in this thread
+        with detected_food_drinks_lock, pose_points_lock:
+            local_pose_points = list(pose_points)
+            local_detected_food_drinks = dict(detected_food_drinks)
+
+
+        for p in local_pose_points:
+            for track_id in local_detected_food_drinks:
+
+                with flagged_foodbev_lock:
+                    if track_id in flagged_foodbev:
+                        continue
+
+                food_drinks_bbox = local_detected_food_drinks[track_id][0] 
+                x1, y1, x2, y2 = food_drinks_bbox
+
+                try:
+                    face_bbox = extract_face_from_nose(p, frame)
+                    fx1, fy1, fx2, fy2 = map(int, face_bbox)
+
+                except ValueError:
+                    print("can't extract the face")
+                    continue
+
+                # if the top of food/ drink bbox is a percentage above the nose, ignore
+                if (y1 < p["nose"][1] * 0.95):
+                    print("Food/ drink is above the nose, ignoring.")
+                    continue 
+
+                # possible heuristics
+                # if area of food/ drink is more than 265% of the area of head, head is likely to be further away so ignore
+                # if area of food/ drink is less than 30% of the area of head, food/ drink is likely to be further away so ignore
+                area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
+                area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
+                if (area_food_drinks >= area_head * 2.65 or area_food_drinks < area_head * 0.3):
+                    print("Food/ drink not at the same depth as person, ignoring.")
+                    continue
+
+
+                dist_nose_to_box = get_dist_nose_to_box(p, local_detected_food_drinks, track_id)
+                dist = min(
+                    np.linalg.norm(p["left_wrist"] - local_detected_food_drinks[track_id][1]),
+                    np.linalg.norm(p["right_wrist"] - local_detected_food_drinks[track_id][1])
+                )
+
+                if dist <= OWNING_THRESHOLD and dist_nose_to_box <= DRINKING_THRESHOLD:
+
+                    now = time.time()
+                        
+                    # Track wrist proximity times
+                    if track_id not in wrist_proximity_history:
+                        wrist_proximity_history[track_id] = []
+
+                    wrist_proximity_history[track_id].append(now)
+
+                    # Logging detection frame per track_Id
+                    for track_id, timestamps in wrist_proximity_history.items():
+                        print(f"Track ID {track_id} has {len(timestamps)} proximity detections")
+
+                    # Keep only timestamps within the last 2 seconds
+                    recent_times = [t for t in wrist_proximity_history[track_id] if now - t <= REQUIRED_DURATION]
+                    wrist_proximity_history[track_id] = recent_times  # Prune old entries
+
+                    if len(recent_times) >= REQUIRED_COUNT:
+                        # Logging end time of wrist proximity
+                        # cv.putText(frame, "CONFIRMED NEAR DRINK", (int(p["nose"][0]), int(p["nose"][1]-10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+                        face_crop = None
+                        face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=30)
+                                                        
+                        if face_crop is not None and face_crop.size > 0:
+                            try:
+                                query_embedding = DeepFace.represent(img_path=face_crop, model_name="Facenet", max_faces=1)[0]["embedding"]
+                                
+                                # find match in database
+                                query = """ SELECT DetectionId, distance FROM Embeddings WHERE embeddings MATCH ?
+                                ORDER BY distance ASC LIMIT 1; """
+                                cursor = db.execute(query, (serialize_float32(query_embedding),)) # euclidean distance
+                                row = cursor.fetchone()
+                                
+                                closest_dist = None
+                                if row is not None:
+                                    closest_dist = row[1]
+
+                                # match found
+                                if closest_dist is not None and closest_dist < 10:
+                                    
+                                    detection_id = row[0]
+                                    current_date = datetime.now().strftime("%Y-%m-%d")
+                                    
+                                    query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.DetectionId = ?;"""
+                                    cursor = db.execute(query, (detection_id,))
+                                    result = cursor.fetchone()
+
+                                    if result:
+                                        person_id, last_incompliance = result
+                                        last_date = last_incompliance[:10] if last_incompliance else None
+
+                                        if last_date != current_date and last_date is not None:
+
+                                            # get the existing uuid of face and save incompliance img into folder
+                                            save_img(face_crop, str(person_id), current_date, "faces")
+                                            save_img(frame, str(person_id), current_date, "incompliances")
+
+                                            update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
+                                            db.execute(update_query, (current_date, person_id))
+                                            snapshot_query = """ INSERT INTO Snapshot (confidence, time_generated, object_detected, imageURL, person_id) VALUES (?, ?, ?, ?, ?) RETURNING DetectionId; """
+                                            cursor = db.execute(snapshot_query, (
+                                                local_detected_food_drinks[track_id][2],  # confidence value
+                                                current_date,
+                                                str(local_detected_food_drinks[track_id][3]),  # detected object class id
+                                                f"incompliances/{person_id}/Person_{person_id}_{current_date}.jpg",
+                                                person_id
+                                            ))
+                                            detection_id = cursor.fetchone()[0]
+                                            embeddings_query = """ INSERT INTO Embeddings (DetectionId, embeddings) VALUES (?, ?); """
+                                            db.execute(embeddings_query, (detection_id, serialize_float32(query_embedding)))
+                                            db.commit()
+
+                                            print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                                            
+                                        # incompliance on the same date
+                                        else:
+                                            print("🟣🟣🟣🟣")
+
+                                        with flagged_foodbev_lock:
+                                            flagged_foodbev.append(track_id) # save track id of bottle
+                                # no match
+                                else:
+                                    with flagged_foodbev_lock:
+                                        flagged_foodbev.append(track_id) # save track id of bottle
+
+                                    current_date = datetime.now().strftime("%Y-%m-%d")
+
+                                    cursor = db.execute(""" INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId;""", (current_date,))
+                                    person_id = cursor.fetchone()[0]
+
+                                    os.makedirs(os.path.join("incompliances", str(person_id)), exist_ok=True)
+                                    # save cropped face area save it for matching next time
+                                    os.makedirs(os.path.join("faces", str(person_id)), exist_ok=True)
+
+                                    snapshot_query = """ INSERT INTO Snapshot (confidence, time_generated, object_detected, imageURL, person_id) VALUES (?, ?, ?, ?, ?) RETURNING DetectionId; """
+                                    cursor = db.execute(snapshot_query, (
+                                        local_detected_food_drinks[track_id][2],  # confidence value
+                                        current_date,
+                                        str(local_detected_food_drinks[track_id][3]),  # detected object class id
+                                        f"incompliances/{person_id}/Person_{person_id}_{current_date}.jpg",
+                                        person_id
+                                    ))
+                                    detection_id = cursor.fetchone()[0]
+                                    embeddings_query = """ INSERT INTO Embeddings (DetectionId, embeddings) VALUES (?, ?); """
+                                    db.execute(embeddings_query, (detection_id, serialize_float32(query_embedding)))
+                                    db.commit()
+                                    
+                                    save_img(face_crop, str(person_id), current_date, "faces")
+                                    save_img(frame, str(person_id), current_date, "incompliances")
+
+                                    print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+
+                            except Exception as e:
+                                print(e)
+                                continue
+
+    db.close()                
+
+
+# Create folders for faces and incompliances
+os.makedirs("faces", exist_ok=True)
+os.makedirs("incompliances", exist_ok=True)
+os.makedirs("yolo_models", exist_ok=True)
+
+# Load yolo models for object detection and pose, as well as target classes
+model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
+pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
 food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
-human_class_list = [0]
+
 print(f"[START] Loaded YOLO model")
 
+flagged_foodbev = [] # Format: [track ids]
+pose_points = []
+detected_food_drinks = {} # Format: { track_id, [coords(List Of 4 Values), center(Tuple Of 2 Values), confidence(Float), classId(Integer)] }
 
-# temporarily using json file to store embeddings to mimick database
-incompliance_date_map = {} # { "uuid": YYYYMMDD }
-embeddings_db = {}  # { "uuid": embedding_vector }
+DRINKING_THRESHOLD = 104
+OWNING_THRESHOLD = 135
 
-FACES_DIR = os.path.join(WORKING_DIR, "faces")
-for folder in os.listdir(os.path.join(WORKING_DIR, "faces")):
-
-    folder_dir = os.path.join(FACES_DIR, folder)
-
-    for file in os.listdir(folder_dir):
-
-        # prepare file paths in correct format
-        img_path = os.path.join(folder_dir, file)
-        # remove file extension
-        filename_wo_ext = os.path.splitext(file)[0]
-        # extract uuid of face
-        uuid_part = filename_wo_ext.split("_")[1]
-
-        # calculate embeddings of face image and add them to a dict
-        embedding = DeepFace.represent(img_path=img_path, model_name="OpenFace")[0]["embedding"]
-        embeddings_db[uuid_part] = np.array(embedding)
-        
-        # extract incompliance date from filename
-        last_incompliance_date = str(filename_wo_ext).split("_")[2]
-        # update history of the latest incompliance dates of each face
-        if uuid_part not in incompliance_date_map or last_incompliance_date > incompliance_date_map[uuid_part]:
-            incompliance_date_map[uuid_part] = last_incompliance_date
+# Track wrist proximity times per person
+wrist_proximity_history = {}  # Format: {track_id: [timestamps]}
+# Constants
+REQUIRED_DURATION = 2.0  # seconds
+REQUIRED_COUNT = 7      # number of detections in that duration
 
 print(f"[START] Set up completed")
 
 # Start threads
 read_thread = threading.Thread(target=read_frames)
-inference_thread = threading.Thread(
-    target=detection, args=(model, food_beverage_class_list + human_class_list, 0.3)
-)
+inference_thread = threading.Thread(target=preprocess, args=(model, pose_model, food_beverage_class_list, 0.3))
+detection_thread = threading.Thread(target=detection)
+save_thread = threading.Thread(target=image_saver, daemon=True)
 
 read_thread.start()
 inference_thread.start()
-threading.Thread(target=image_saver, daemon=True).start()
+detection_thread.start()
+save_thread.start()
 
 try:
     while running:
@@ -324,7 +441,9 @@ except KeyboardInterrupt:
 
 read_thread.join()
 inference_thread.join()
+detection_thread.join()
 
+cap.release()
 cv.destroyAllWindows()
 
 print(f"[END]")
