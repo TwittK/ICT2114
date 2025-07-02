@@ -11,13 +11,16 @@ app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 DATABASE = "detections.sqlite"
 SNAPSHOT_FOLDER = "snapshots"
 
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'logged_in' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 def admin_required(f):
     @wraps(f)
@@ -26,7 +29,9 @@ def admin_required(f):
             flash('Admin access required!', 'error')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 @app.route('/', methods=["GET", "POST"])
 @login_required
@@ -57,28 +62,31 @@ def index():
 
     return render_template("index.html", results=results, snapshot_folder=SNAPSHOT_FOLDER)
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        email = request.form['email']
         password = request.form['password']
-        
-        user = verify_user(username, password)
-        
+
+        user = verify_user(email, password)
+
         if user:
             session['logged_in'] = True
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['email'] = user['email']
             session['role'] = user['role']
-            
+
             update_last_login(user['id'])
-            
+
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
             flash('Invalid username or password!', 'error')
-    
+
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():
@@ -86,11 +94,13 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
+
 @app.route('/admin')
 @login_required
 @admin_required
 def admin_panel():
     return render_template('admin.html')
+
 
 if __name__ == "__main__":
     init_database()
