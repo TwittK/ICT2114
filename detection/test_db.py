@@ -1,10 +1,10 @@
 import sqlite3
 import sqlite_vec
 from datetime import datetime
+import os
 
-DB_NAME = "database/test.sqlite"
-
-db = sqlite3.connect(DB_NAME)
+os.makedirs(os.path.join("database"), exist_ok=True)
+db = sqlite3.connect(os.path.join("database", "test.sqlite"))
 db.execute("PRAGMA foreign_keys = ON;")
 db.enable_load_extension(True)
 sqlite_vec.load(db)
