@@ -15,6 +15,43 @@ frame_queue = queue.Queue(maxsize=10)
 save_queue = queue.Queue(maxsize=10)
 running = True
 
+def update_incompliances_json():
+    embeddings_db = {}
+    incompliance_date_map = {}
+
+    FACES_DIR = os.path.join("static", "faces")
+    for folder in os.listdir(os.path.join("static", "faces")):
+
+        folder_dir = os.path.join(FACES_DIR, folder)
+
+        for file in os.listdir(folder_dir):
+
+            # prepare file paths in correct format
+            img_path = os.path.join(folder_dir, file)
+            # remove file extension
+            filename_wo_ext = os.path.splitext(file)[0]
+            # extract uuid of face
+            uuid_part = filename_wo_ext.split("_")[1]
+
+            # calculate embeddings of face image and add them to a dict
+            embedding = DeepFace.represent(img_path=img_path, model_name="Facenet")[0]["embedding"]
+            # embeddings_db[uuid_part] = np.array(embedding)
+
+            embeddings_db[uuid_part] = embedding
+
+            # extract incompliance date from filename
+            last_incompliance_date = str(filename_wo_ext).split("_")[2]
+            # update history of the latest incompliance dates of each face
+            if uuid_part not in incompliance_date_map or last_incompliance_date > incompliance_date_map[uuid_part]:
+                incompliance_date_map[uuid_part] = last_incompliance_date
+
+
+    with open("incompliances.json", "w") as f:
+        json.dump({
+            "embeddings": embeddings_db,
+            "dates": incompliance_date_map
+        }, f)
+
 def save_img(frame_or_face, uuid_str, timestamp, faces_or_incompliance):
     filename = f"Person_{uuid_str}_{timestamp}.jpg"
     filepath = os.path.join("static", faces_or_incompliance, uuid_str, filename)
@@ -338,6 +375,15 @@ REQUIRED_COUNT = 7      # number of detections in that duration
 incompliance_date_map = {} # { "uuid": YYYYMMDD }
 embeddings_db = {}  # { "uuid": embedding_vector }
 
+# TEMP
+with open('incompliances.json', 'r') as file:
+  db = json.load(file)
+
+for face_id, em in db['embeddings'].items():
+  embeddings_db[face_id] = np.array(em)
+
+for face_id, date in db['dates'].items():
+  incompliance_date_map[face_id] = date
 
 print(f"[START] Set up completed")
 
@@ -360,5 +406,7 @@ read_thread.join()
 
 cap.release()
 cv.destroyAllWindows()
+
+update_incompliances_json() # TEMP
 
 print(f"[END]")
