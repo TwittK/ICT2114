@@ -93,3 +93,94 @@ def create_default_admin():
     if user_count == 0:
         create_user('user', 'user@labcomply.com', 'user123', 'user')
         print("Default user account created: user/user123")
+
+
+def create_default_labs_and_cameras():
+    conn = sqlite3.connect('users.sqlite')
+    cursor = conn.cursor()
+
+    cursor.execute("""
+                   SELECT COUNT(*)
+                   FROM Lab
+                   """)
+    lab_count = cursor.fetchone()[0]
+
+    cursor.execute("""
+                   SELECT COUNT(*)
+                   FROM Camera
+                   """)
+    camera_count = cursor.fetchone()[0]
+
+    conn.close()
+
+    if lab_count == 0:
+        create_lab("E2-L6-016", "labsafety@gmail.com")
+        create_lab("E2-L6-017", "labsafety@gmail.com")
+
+    if camera_count == 0:
+        create_camera("Camera 1", 1, 1)
+        create_camera("Camera 2", 1, 1)
+
+        create_camera("Camera 1", 1, 2)
+        create_camera("Camera 2", 1, 2)
+
+
+def create_lab(lab_name, lab_safety_email):
+    conn = sqlite3.connect('users.sqlite')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+                       INSERT INTO Lab (lab_name, lab_safety_email)
+                       VALUES (?, ?)
+                       ''', (lab_name, lab_safety_email))
+
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+
+def create_camera(
+        name,
+        camera_user_id,
+        camera_lab_id,
+        resolution=1080,
+        frame_rate=30,
+        encoding='H.265',
+        camera_ip_type='static',
+        ip_address='192.168.1.100',
+        subnet_mask='255.255.255.0',
+        gateway='192.168.1.1',
+        timezone='Asia/Singapore',
+        sync_with_ntp=0,
+        ntp_server_address='pool.ntp.org',
+        time='2025-01-01T00:00:00',
+
+):
+    conn = sqlite3.connect('users.sqlite')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+                       INSERT INTO Camera (name, resolution, frame_rate,
+                                           encoding, camera_ip_type, ip_address,
+                                           subnet_mask, gateway, timezone,
+                                           sync_with_ntp, ntp_server_address, time,
+                                           camera_user_id, camera_lab_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ''', (name, resolution, frame_rate,
+                             encoding, camera_ip_type, ip_address,
+                             subnet_mask, gateway, timezone,
+                             sync_with_ntp, ntp_server_address, time,
+                             camera_user_id, camera_lab_id)
+                       )
+
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()

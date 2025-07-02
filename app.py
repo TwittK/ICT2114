@@ -1,6 +1,7 @@
 from flask import Flask, request, session, redirect, url_for, render_template, flash
 from functools import wraps
-from database import init_database, create_default_admin, verify_user, update_last_login
+from database import init_database, create_default_admin, verify_user, update_last_login, \
+    create_default_labs_and_cameras
 import sqlite3
 import os
 import secrets
@@ -105,4 +106,5 @@ def admin_panel():
 if __name__ == "__main__":
     init_database()
     create_default_admin()
+    create_default_labs_and_cameras()
     app.run(debug=True)
