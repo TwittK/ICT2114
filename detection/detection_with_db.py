@@ -7,34 +7,21 @@ from deepface import DeepFace
 import sqlite3, sqlite_vec
 from sqlite_vec import serialize_float32
 
-cap = cv.VideoCapture(0)
-cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
-if not cap.isOpened():
-    print("[ERROR] Cannot open camera")
-    exit()
-frame_queue = queue.Queue(maxsize=10)
-save_queue = queue.Queue(maxsize=10)
-process_queue = queue.Queue(maxsize=10)
-running = True
-
-detected_food_drinks_lock = threading.Lock()
-pose_points_lock = threading.Lock()
-flagged_foodbev_lock = threading.Lock()
-
 def save_img(frame_or_face, uuid_str, timestamp, faces_or_incompliance):
+    global save_queue
     filename = f"Person_{uuid_str}_{timestamp}.jpg"
-    filepath = os.path.join(faces_or_incompliance, uuid_str, filename)
+    filepath = os.path.join("static", faces_or_incompliance, uuid_str, filename)
     save_queue.put((filepath, frame_or_face))
 
 # Save images to disk
 def image_saver():
-    global running
+    global running, save_queue
     while running:
         filepath, image = save_queue.get()
         if filepath is None:
             break
         cv.imwrite(filepath, image)
+        print(f"Saved in {filepath}")
         save_queue.task_done()
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
@@ -47,7 +34,7 @@ def safe_crop(img, x1, y1, x2, y2, padding=0):
 
 # Read frames from camera
 def read_frames():
-    global running
+    global running, cap, frame_queue
 
     while running:
         ret, frame = cap.read()
@@ -120,6 +107,9 @@ def get_dist_nose_to_box(pose_points, detected_food_drinks, track_id):
 # Main UI Thread
 def preprocess(model, pose_model, target_classes_id, conf_threshold):
     global running
+    global frame_queue, process_queue
+    global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
+    global flagged_foodbev, pose_points, detected_food_drinks
 
     while running:
         try:
@@ -134,7 +124,7 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
         frame_copy = frame.copy() # copy frame for drawing bounding boxes, ids and conf scores.
         result = model.track(frame, persist=True, classes=target_classes_id, conf=conf_threshold, iou=0.4)
         boxes = result[0].boxes
-        
+
         with detected_food_drinks_lock:
             detected_food_drinks.clear()
         
@@ -155,7 +145,7 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
                     
                     x1, y1, x2, y2 = map(int, coords)
 
-                    if cls_id in food_beverage_class_list and track_id is not None:
+                    if track_id is not None:
                         detected_food_drinks[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2), confidence, cls_id]
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
                         cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1 + 10, y1), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
@@ -213,8 +203,12 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
 # Associate detected food/ drinks to person
 def detection():
     global running
+    global save_queue, process_queue
+    global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
+    global flagged_foodbev, pose_points, detected_food_drinks
+    global wrist_proximity_history
 
-    db = sqlite3.connect("database/test.sqlite")
+    db = sqlite3.connect(DB_NAME)
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
@@ -253,20 +247,23 @@ def detection():
                     print("can't extract the face")
                     continue
 
-                # if the top of food/ drink bbox is a percentage above the nose, ignore
+                # If the top of food/ drink bbox is a percentage above the nose, ignore
                 if (y1 < p["nose"][1] * 0.95):
                     print("Food/ drink is above the nose, ignoring.")
                     continue 
 
-                # possible heuristics
-                # if area of food/ drink is more than 265% of the area of head, head is likely to be further away so ignore
-                # if area of food/ drink is less than 30% of the area of head, food/ drink is likely to be further away so ignore
+                # If area of food/ drink is more than 265% of the area of head, head is likely to be further away so ignore
+                # If area of food/ drink is less than 30% of the area of head, food/ drink is likely to be further away so ignore
                 area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
                 area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
                 if (area_food_drinks >= area_head * 2.65 or area_food_drinks < area_head * 0.3):
                     print("Food/ drink not at the same depth as person, ignoring.")
                     continue
 
+                # Height of food/ drinks should not be 1.35 larger than face to be considered, otherwise ignore
+                if (y2 - y1 >= (fy2 - fy1) * 1.35):
+                    print("Food/ drink height is bigger than head, ignoring.")
+                    continue
 
                 dist_nose_to_box = get_dist_nose_to_box(p, local_detected_food_drinks, track_id)
                 dist = min(
@@ -293,11 +290,9 @@ def detection():
                     wrist_proximity_history[track_id] = recent_times  # Prune old entries
 
                     if len(recent_times) >= REQUIRED_COUNT:
-                        # Logging end time of wrist proximity
-                        # cv.putText(frame, "CONFIRMED NEAR DRINK", (int(p["nose"][0]), int(p["nose"][1]-10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
                         face_crop = None
-                        face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=30)
+                        face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=20)
                                                         
                         if face_crop is not None and face_crop.size > 0:
                             try:
@@ -314,7 +309,7 @@ def detection():
                                     closest_dist = row[1]
 
                                 # match found
-                                if closest_dist is not None and closest_dist < 10:
+                                if closest_dist is not None and closest_dist < FACE_DISTANCE_THRESHOLD:
                                     
                                     detection_id = row[0]
                                     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -366,9 +361,9 @@ def detection():
                                     cursor = db.execute(""" INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId;""", (current_date,))
                                     person_id = cursor.fetchone()[0]
 
-                                    os.makedirs(os.path.join("incompliances", str(person_id)), exist_ok=True)
+                                    os.makedirs(os.path.join("static", "incompliances", str(person_id)), exist_ok=True)
                                     # save cropped face area save it for matching next time
-                                    os.makedirs(os.path.join("faces", str(person_id)), exist_ok=True)
+                                    os.makedirs(os.path.join("static", "faces", str(person_id)), exist_ok=True)
 
                                     snapshot_query = """ INSERT INTO Snapshot (confidence, time_generated, object_detected, imageURL, person_id) VALUES (?, ?, ?, ?, ?) RETURNING DetectionId; """
                                     cursor = db.execute(snapshot_query, (
@@ -394,56 +389,84 @@ def detection():
 
     db.close()                
 
+def start_detection():
+    global running, cap
+    global frame_queue, save_queue, process_queue
+    global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
+    global flagged_foodbev, pose_points, detected_food_drinks
+    global wrist_proximity_history
 
-# Create folders for faces and incompliances
-os.makedirs("faces", exist_ok=True)
-os.makedirs("incompliances", exist_ok=True)
-os.makedirs("yolo_models", exist_ok=True)
+    cap = cv.VideoCapture(0)
 
-# Load yolo models for object detection and pose, as well as target classes
-model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
-pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
-food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
+    # cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
+    # cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
 
-print(f"[START] Loaded YOLO model")
+    if not cap.isOpened():
+        print("[ERROR] Cannot open camera")
+        exit()
+    
+    frame_queue = queue.Queue(maxsize=10)
+    save_queue = queue.Queue(maxsize=10)
+    process_queue = queue.Queue(maxsize=10)
+    running = True
 
-flagged_foodbev = [] # Format: [track ids]
-pose_points = []
-detected_food_drinks = {} # Format: { track_id, [coords(List Of 4 Values), center(Tuple Of 2 Values), confidence(Float), classId(Integer)] }
+    detected_food_drinks_lock = threading.Lock()
+    pose_points_lock = threading.Lock()
+    flagged_foodbev_lock = threading.Lock()
 
-DRINKING_THRESHOLD = 104
-OWNING_THRESHOLD = 135
+    # Create folders for faces and incompliances
+    os.makedirs(os.path.join("static", "faces"), exist_ok=True)
+    os.makedirs(os.path.join("static", "incompliances"), exist_ok=True)
+    os.makedirs("yolo_models", exist_ok=True)
 
-# Track wrist proximity times per person
-wrist_proximity_history = {}  # Format: {track_id: [timestamps]}
+    # Load yolo models for object detection and pose, as well as target classes
+    model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
+    pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
+    food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
+
+    print(f"[START] Loaded YOLO model")
+
+    flagged_foodbev = [] # Format: [track ids]
+    pose_points = []
+    detected_food_drinks = {} # Format: { track_id, [coords(List Of 4 Values), center(Tuple Of 2 Values), confidence(Float), classId(Integer)] }
+
+    # Track wrist proximity times per person
+    wrist_proximity_history = {}  # Format: {track_id: [timestamps]}
+    print(f"[START] Set up completed")
+
+    # Start threads
+    read_thread = threading.Thread(target=read_frames)
+    inference_thread = threading.Thread(target=preprocess, args=(model, pose_model, food_beverage_class_list, 0.3))
+    detection_thread = threading.Thread(target=detection)
+    save_thread = threading.Thread(target=image_saver, daemon=True)
+
+    read_thread.start()
+    inference_thread.start()
+    detection_thread.start()
+    save_thread.start()
+
+    try:
+        while running:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        running = False
+
+    read_thread.join()
+    inference_thread.join()
+    detection_thread.join()
+
+
+    cap.release()
+    cv.destroyAllWindows()
+
+    print(f"[END]")
+
 # Constants
+DRINKING_THRESHOLD = 50 # Distance thresholds
+OWNING_THRESHOLD = 100 
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 7      # number of detections in that duration
+FACE_DISTANCE_THRESHOLD = 10
+DB_NAME = "database/test.sqlite"
 
-print(f"[START] Set up completed")
-
-# Start threads
-read_thread = threading.Thread(target=read_frames)
-inference_thread = threading.Thread(target=preprocess, args=(model, pose_model, food_beverage_class_list, 0.3))
-detection_thread = threading.Thread(target=detection)
-save_thread = threading.Thread(target=image_saver, daemon=True)
-
-read_thread.start()
-inference_thread.start()
-detection_thread.start()
-save_thread.start()
-
-try:
-    while running:
-        time.sleep(1)
-except KeyboardInterrupt:
-    running = False
-
-read_thread.join()
-inference_thread.join()
-detection_thread.join()
-
-cap.release()
-cv.destroyAllWindows()
-
-print(f"[END]")
+start_detection()

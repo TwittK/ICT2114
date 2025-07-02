@@ -17,7 +17,7 @@ running = True
 
 def save_img(frame_or_face, uuid_str, timestamp, faces_or_incompliance):
     filename = f"Person_{uuid_str}_{timestamp}.jpg"
-    filepath = os.path.join(WORKING_DIR, faces_or_incompliance, uuid_str, filename)
+    filepath = os.path.join("static", faces_or_incompliance, uuid_str, filename)
     save_queue.put((filepath, frame_or_face))
     
 def image_saver():
@@ -107,11 +107,9 @@ def get_dist_nose_to_box(pose_points, detected_food_drinks, track_id):
     # Compute distance from nose to closest point on the bbox (euclidean distance formula)
     return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
 
-
-
 def detection(model, pose_model, target_classes_id, conf_threshold):
     global running
-    # flagged_foodbev = []
+    flagged_foodbev = []
 
     while running:
         try:
@@ -176,10 +174,41 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
             if pose_points and detected_food_drinks:
                 for p in pose_points:
                     for track_id in detected_food_drinks:
-                        #if track_id not in flagged_foodbev:
+                            if track_id in flagged_foodbev:
+                                continue
+
+                            food_drinks_bbox = detected_food_drinks[track_id][0] 
+                            x1, y1, x2, y2 = food_drinks_bbox
+
+                            try:
+                                face_bbox = extract_face_from_nose(p, frame)
+                                fx1, fy1, fx2, fy2 = map(int, face_bbox)
+
+                            except ValueError:
+                                continue
+                            
+
+                            # Additional rules:
+                            # If the top of food/ drink bbox is a percentage above the nose, ignore
+                            if (y1 < p["nose"][1] * 0.95):
+                                print("Food/ drink is above the nose, ignoring.")
+                                continue 
+
+                            # If area of food/ drink is more than 265% of the area of head, head is likely to be further away so ignore
+                            # If area of food/ drink is less than 30% of the area of head, food/ drink is likely to be further away so ignore
+                            area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
+                            area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
+                            if (area_food_drinks >= area_head * 2.65 or area_food_drinks < area_head * 0.3):
+                                print("Food/ drink not at the same depth as person, ignoring.")
+                                continue
+
+                            # Height of food/ drinks should not be 1.35 larger than face to be considered, otherwise ignore
+                            if (y2 - y1 >= (fy2 - fy1) * 1.35):
+                                print("Food/ drink height is bigger than head, ignoring.")
+                                continue
+
 
                             dist_nose_to_box = get_dist_nose_to_box(p, detected_food_drinks, track_id)
-
                             dist = min(
                                 dist_nose_to_box,
                                 np.linalg.norm(p["left_wrist"] - detected_food_drinks[track_id][1]),
@@ -204,19 +233,17 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                                 # Keep only timestamps within the last 2 seconds
                                 recent_times = [t for t in wrist_proximity_history[track_id] if now - t <= REQUIRED_DURATION]
                                 wrist_proximity_history[track_id] = recent_times  # Prune old entries
+                                
                                 if len(recent_times) >= REQUIRED_COUNT:
+                                    
                                     # Logging end time of wrist proximity
                                     cv.putText(frame_copy, "CONFIRMED NEAR DRINK", (int(p["nose"][0]), int(p["nose"][1]-10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-                                    try:
-                                        face_bbox = extract_face_from_nose(p, frame)
-                                        x1, y1, x2, y2 = map(int, face_bbox)
-                                        face_crop = safe_crop(frame, x1, y1, x2, y2, padding=30)
-                                        cv.imshow("face", face_crop)
-                                        
-                                    except ValueError:
-                                        continue
-                                    
+                                    # Display captured face (debugging only)
+                                    face_crop = None
+                                    face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=20)
+                                    cv.imshow("face", face_crop)
+
                                     if face_crop is not None and face_crop.size > 0:
 
                                         try:
@@ -234,8 +261,8 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                                                     closest_match_id = fid
 
                                             # match found
-                                            if closest_dist < 7.5:
-
+                                            if closest_dist < 10:
+                                                flagged_foodbev.append(track_id)
                                                 current_date = datetime.now().strftime("%Y%m%d")
 
                                                 if incompliance_date_map[closest_match_id] != current_date:
@@ -255,15 +282,15 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
                                                     print("🟣🟣🟣🟣")
                                             # no match
                                             else:
-
+                                                flagged_foodbev.append(track_id)
                                                 # generate new uuid for face/person
                                                 new_uuid = str(uuid.uuid4())
 
                                                 current_date = datetime.now().strftime("%Y%m%d")
 
-                                                os.makedirs(os.path.join(WORKING_DIR, "incompliances", new_uuid), exist_ok=True)
+                                                os.makedirs(os.path.join("static", "incompliances", new_uuid), exist_ok=True)
                                                 # save cropped face area save it for matching next time
-                                                os.makedirs(os.path.join(WORKING_DIR ,"faces", new_uuid), exist_ok=True)
+                                                os.makedirs(os.path.join("static" ,"faces", new_uuid), exist_ok=True)
 
                                                 # update last incompliance date and save incompliance img
                                                 incompliance_date_map[new_uuid] = current_date
@@ -289,13 +316,12 @@ def detection(model, pose_model, target_classes_id, conf_threshold):
             break
 
 # create folders for faces and incompliances.
-WORKING_DIR = r"C:\Users\framn\Downloads\pythonPrac\ITP" # change working directory here
-os.makedirs(os.path.join(WORKING_DIR, "faces"), exist_ok=True)
-os.makedirs(os.path.join(WORKING_DIR, "incompliances"), exist_ok=True)
-os.makedirs(os.path.join(WORKING_DIR, "yolo_models"), exist_ok=True)
+os.makedirs(os.path.join("static", "faces"), exist_ok=True)
+os.makedirs(os.path.join("static", "incompliances"), exist_ok=True)
+os.makedirs("yolo_models", exist_ok=True)
 
 # load yolo model and target classes
-model = YOLO(os.path.join(WORKING_DIR, "yolo_models", "yolo11s.pt"))
+model = YOLO(os.path.join("yolo_models", "yolo11x.pt"))
 pose_model = YOLO("yolo_models/yolov8n-pose.pt")
 food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 print(f"[START] Loaded YOLO model")
@@ -312,21 +338,12 @@ REQUIRED_COUNT = 7      # number of detections in that duration
 incompliance_date_map = {} # { "uuid": YYYYMMDD }
 embeddings_db = {}  # { "uuid": embedding_vector }
 
-with open('incompliances.json', 'r') as file:
-  db = json.load(file)
-
-for face_id, em in db['embeddings'].items():
-  embeddings_db[face_id] = np.array(em)
-
-for face_id, date in db['dates'].items():
-  incompliance_date_map[face_id] = date
-
 
 print(f"[START] Set up completed")
 
 # Start threads
 read_thread = threading.Thread(target=read_frames)
-inference_thread = threading.Thread(target=detection, args=(model, pose_model, food_beverage_class_list, 0.3))
+inference_thread = threading.Thread(target=detection, args=(model, pose_model, food_beverage_class_list, 0.3), daemon=True)
 save_thread = threading.Thread(target=image_saver, daemon=True)
 
 read_thread.start()
@@ -340,7 +357,6 @@ except KeyboardInterrupt:
     running = False
 
 read_thread.join()
-inference_thread.join()
 
 cap.release()
 cv.destroyAllWindows()
