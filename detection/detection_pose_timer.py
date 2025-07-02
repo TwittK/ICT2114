@@ -321,7 +321,7 @@ os.makedirs(os.path.join("static", "incompliances"), exist_ok=True)
 os.makedirs("yolo_models", exist_ok=True)
 
 # load yolo model and target classes
-model = YOLO(os.path.join("yolo_models", "yolo11x.pt"))
+model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
 pose_model = YOLO("yolo_models/yolov8n-pose.pt")
 food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 print(f"[START] Loaded YOLO model")
