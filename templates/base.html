@@ -19,16 +19,40 @@
         <div id="sidebar" class="bg-dark text-white p-3">
             <h4 class="mb-4">Dashboard</h4>
             <ul class="list-unstyled">
-                <li><strong>E2-L6-016</strong></li>
-                <li class="ps-3"><a href="{{ url_for('index', camera='1') }}" class="text-decoration-none text-white">Camera
-                    1</a></li>
-                <li class="ps-3"><a href="{{ url_for('index', camera='2') }}" class="text-decoration-none text-white">Camera
-                    2</a></li>
-                <li class="mt-3"><strong>E2-L6-017</strong></li>
-                <li class="ps-3"><a href="{{ url_for('index', camera='1') }}" class="text-decoration-none text-white">Camera
-                    1</a></li>
-                <li class="ps-3"><a href="{{ url_for('index', camera='2') }}" class="text-decoration-none text-white">Camera
-                    2</a></li>
+                {% for lab in labs %}
+                    <li class="mt-3">
+                        <strong>{{ lab.lab_name }}</strong>
+                    </li>
+
+                    {% if lab.cameras %}
+                        {% for camera in lab.cameras %}
+                            <li class="ps-3 d-flex align-items-center">
+                                <a href="{{ url_for('index', lab=lab.lab_name, camera=camera.camera_name) }}"
+                                   class="text-decoration-none text-white d-incline-flex align-items-center">
+                                    {{ camera.camera_name }}
+                                </a>
+                                <a href="{{ url_for('index', edit=1, delete=0) }}"
+                                   class="ms-2 icon-pencil" title="Edit">
+                                    <i class="fa-solid fa-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('index',  edit=0, delete=1) }}"
+                                   class="ms-2 icon-trash" title="Delete">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </a>
+                            </li>
+                        {% endfor %}
+
+                        {# Add button aligned left, underneath cameras #}
+                        <li class="ps-3 mt-1">
+                            <a href="{{ url_for('index', add=1, lab=lab.lab_name) }}"
+                               class="text-decoration-none icon-plus">
+                                <i class="fa-solid fa-circle-plus"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="ps-3 text-muted"><em>No cameras</em></li>
+                    {% endif %}
+                {% endfor %}
             </ul>
         </div>
     {% endif %}

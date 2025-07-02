@@ -5,6 +5,7 @@ from database import init_database, create_default_admin, verify_user, update_la
 import sqlite3
 import os
 import secrets
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
@@ -34,9 +35,55 @@ def admin_required(f):
     return decorated_function
 
 
+@app.context_processor
+def inject_labs_with_cameras():
+    conn = sqlite3.connect('users.sqlite')
+    cursor = conn.cursor()
+
+    cursor.execute("""
+                   SELECT l.LabId,
+                          l.lab_name,
+                          c.CameraId,
+                          c.name
+                   FROM Lab l
+                            LEFT JOIN Camera c ON c.camera_lab_id = l.LabId
+                   ORDER BY l.lab_name ASC, c.name ASC
+                   """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Group cameras under their labs.
+    labs = {}
+    for lab_id, lab_name, camera_id, camera_name in rows:
+        if lab_id not in labs:
+            labs[lab_id] = {
+                "lab_id": lab_id,
+                "lab_name": lab_name,
+                "cameras": []
+            }
+        # Might be None if no camera exists.
+        if camera_id:
+            labs[lab_id]["cameras"].append({
+                "camera_id": camera_id,
+                "camera_name": camera_name,
+            })
+
+    return dict(labs=list(labs.values()))
+
+
 @app.route('/', methods=["GET", "POST"])
 @login_required
 def index():
+    lab_name = request.args.get("lab")
+    camera_name = request.args.get("camera")
+    is_editing_camera = request.args.get("edit", "0") == "1"
+    is_deleting_camera = request.args.get("delete", "0") == "1"
+    is_adding_camera = request.args.get("add", "0") == "1"
+    today_str = datetime.now().strftime('%Y-%m-%dT%H:%M')
+
+    is_admin = session.get('role') == 'admin'
+
     results = []
 
     if request.method == "POST":
@@ -61,7 +108,15 @@ def index():
         results = cursor.fetchall()
         conn.close()
 
-    return render_template("index.html", results=results, snapshot_folder=SNAPSHOT_FOLDER)
+    return render_template(
+        "index.html",
+        results=results,
+        snapshot_folder=SNAPSHOT_FOLDER,
+        lab_name=lab_name,
+        camera_name=camera_name,
+        is_admin=is_admin,
+        today=today_str,
+    )
 
 
 @app.route('/login', methods=['GET', 'POST'])
