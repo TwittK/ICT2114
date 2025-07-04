@@ -28,16 +28,16 @@
                         {% for camera in lab.cameras %}
                             <li class="ps-3 d-flex align-items-center">
                                 <a href="{{ url_for('index', lab=lab.lab_name, camera=camera.camera_name) }}"
-                                   class="text-decoration-none text-white d-incline-flex align-items-center">
+                                   class="text-decoration-none text-white d-inline-flex align-items-center">
                                     {{ camera.camera_name }}
                                 </a>
-                                <a href="{{ url_for('index', edit=1, delete=0) }}"
-                                   class="ms-2 icon-pencil" title="Edit">
+                                <a href="{{ url_for('edit_camera', camera_id=camera.camera_id) }}?camera={{ camera.camera_name }}&lab={{ lab.lab_name }}"
+                                    class="ms-2 icon-pencil" title="Edit">
                                     <i class="fa-solid fa-pencil"></i>
                                 </a>
                                 <a href="{{ url_for('index',  edit=0, delete=1) }}"
                                    class="ms-2 icon-trash" title="Delete">
-                                    <i class="fa-solid fa-trash-can"></i>
+                                   <i class="fa-solid fa-trash-can"></i>
                                 </a>
                             </li>
                         {% endfor %}

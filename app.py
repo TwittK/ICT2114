@@ -77,6 +77,15 @@ def inject_labs_with_cameras():
 def index():
     lab_name = request.args.get("lab")
     camera_name = request.args.get("camera")
+
+    # ✅ Store selected camera in session
+    if camera_name:
+        session['selected_camera'] = {
+            'name': camera_name,
+            'lab': lab_name
+        }
+        print("✅ Selected camera stored in session:", session['selected_camera'])
+
     is_editing_camera = request.args.get("edit", "0") == "1"
     is_deleting_camera = request.args.get("delete", "0") == "1"
     is_adding_camera = request.args.get("add", "0") == "1"
@@ -157,6 +166,61 @@ def logout():
 def admin_panel():
     return render_template('admin.html')
 
+def get_db():
+    conn = sqlite3.connect('users.sqlite')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.route('/camera/<int:camera_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_camera(camera_id):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    camera_name = request.args.get("camera")
+    lab_name = request.args.get("lab")
+    if camera_name and lab_name:
+        session['selected_camera'] = {
+            'name': camera_name,
+            'lab': lab_name
+        }
+
+    print("Session - selected camera:", session.get('selected_camera'))
+
+    if request.method == 'POST':
+        # Grab form data
+        name = request.form['name']
+        resolution = request.form['resolution']
+        frame_rate = request.form['frame_rate']
+        encoding = request.form['encoding']
+        ip_type = request.form['camera_ip_type']
+        ip_addr = request.form['ip_address']
+        subnet = request.form['subnet_mask']
+        gateway = request.form['gateway']
+        timezone = request.form['timezone']
+        sync = int(request.form.get('sync_with_ntp', 0))
+        ntp = request.form['ntp_server_address']
+        time = request.form['manual_time']
+
+        cursor.execute('''
+            UPDATE Camera 
+            SET name=?, resolution=?, frame_rate=?, encoding=?,
+                camera_ip_type=?, ip_address=?, subnet_mask=?,
+                gateway=?, timezone=?, sync_with_ntp=?, ntp_server_address=?, time=?
+            WHERE CameraId=?
+        ''', (name, resolution, frame_rate, encoding, ip_type, ip_addr,
+              subnet, gateway, timezone, sync, ntp, time, camera_id))
+        conn.commit()
+
+        return redirect(url_for('index'))  # or return to camera page
+
+    # GET: fetch camera settings and labs for sidebar
+    cursor.execute('SELECT * FROM Camera WHERE CameraId=?', (camera_id,))
+    camera = cursor.fetchone()
+    cursor.execute('SELECT * FROM Lab')  # for lab list/sidebar
+    labs = cursor.fetchall()
+    conn.close()
+    return render_template('edit_camera.html', camera=camera)
 
 if __name__ == "__main__":
     init_database()
