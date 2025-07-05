@@ -134,7 +134,7 @@ def image_saver():
 def read_frames():
     global running, cap, frame_queue
 
-    cap = cv.VideoCapture(1)
+    cap = cv.VideoCapture(0)
     if not cap.isOpened():
         print("[ERROR] Cannot open camera")
         exit()
