@@ -1,7 +1,7 @@
 from flask import Flask, request, session, redirect, url_for, render_template, flash
 from functools import wraps
 from database import init_database, create_default_admin, verify_user, update_last_login, \
-    create_default_labs_and_cameras
+    create_default_labs_and_cameras, create_camera
 import sqlite3
 import os
 import secrets
@@ -95,7 +95,49 @@ def index():
 
     results = []
 
+    # Create default camera inside the database.
+    if is_adding_camera and lab_name:
+        user_id = session.get("user_id")
+
+        # Get the Lab_id based on Lab_name
+        conn = sqlite3.connect("users.sqlite")
+        cursor = conn.cursor()
+        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
+        lab_row = cursor.fetchone()
+        conn.close()
+
+        if not lab_row:
+            flash("Lab not found.", "danger")
+            return redirect(url_for("index"))
+
+        lab_id = lab_row[0]
+
+        # Generate a default name like "Camera 1", "Camera 2".
+        conn = sqlite3.connect("users.sqlite")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM Camera WHERE camera_lab_id = ?", (lab_id,))
+        camera_count = cursor.fetchone()[0]
+        conn.close()
+
+        default_name = f"Camera {camera_count + 1}"
+
+        # Call your existing function with only required args
+        success = create_camera(
+            name=default_name,
+            camera_user_id=user_id,
+            camera_lab_id=lab_id,
+        )
+
+        if success:
+            flash(f"{default_name} added to {lab_name}.", "success")
+        else:
+            flash("Failed to add camera.", "danger")
+
+        return redirect(url_for("index", lab=lab_name))
+
     if request.method == "POST":
+        action = request.form.get("action")
+
         date_filter = request.form.get("date")
         object_filter = request.form.get("object_type")
 
@@ -166,10 +208,12 @@ def logout():
 def admin_panel():
     return render_template('admin.html')
 
+
 def get_db():
     conn = sqlite3.connect('users.sqlite')
     conn.row_factory = sqlite3.Row
     return conn
+
 
 @app.route('/camera/<int:camera_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -203,13 +247,22 @@ def edit_camera(camera_id):
         time = request.form['manual_time']
 
         cursor.execute('''
-            UPDATE Camera 
-            SET name=?, resolution=?, frame_rate=?, encoding=?,
-                camera_ip_type=?, ip_address=?, subnet_mask=?,
-                gateway=?, timezone=?, sync_with_ntp=?, ntp_server_address=?, time=?
-            WHERE CameraId=?
-        ''', (name, resolution, frame_rate, encoding, ip_type, ip_addr,
-              subnet, gateway, timezone, sync, ntp, time, camera_id))
+                       UPDATE Camera
+                       SET name=?,
+                           resolution=?,
+                           frame_rate=?,
+                           encoding=?,
+                           camera_ip_type=?,
+                           ip_address=?,
+                           subnet_mask=?,
+                           gateway=?,
+                           timezone=?,
+                           sync_with_ntp=?,
+                           ntp_server_address=?,
+                           time=?
+                       WHERE CameraId = ?
+                       ''', (name, resolution, frame_rate, encoding, ip_type, ip_addr,
+                             subnet, gateway, timezone, sync, ntp, time, camera_id))
         conn.commit()
 
         return redirect(url_for('index'))  # or return to camera page
@@ -221,6 +274,7 @@ def edit_camera(camera_id):
     labs = cursor.fetchall()
     conn.close()
     return render_template('edit_camera.html', camera=camera)
+
 
 if __name__ == "__main__":
     init_database()
