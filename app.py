@@ -1,5 +1,7 @@
 from flask import Flask, request, session, redirect, url_for, render_template, flash
 from functools import wraps
+
+from data_source.camera_dao import CameraDAO
 from database import init_database, create_default_admin, verify_user, update_last_login, \
     create_default_labs_and_cameras, create_camera
 import sqlite3
@@ -86,7 +88,6 @@ def index():
         }
         print("✅ Selected camera stored in session:", session['selected_camera'])
 
-    is_editing_camera = request.args.get("edit", "0") == "1"
     is_deleting_camera = request.args.get("delete", "0") == "1"
     is_adding_camera = request.args.get("add", "0") == "1"
     today_str = datetime.now().strftime('%Y-%m-%dT%H:%M')
@@ -98,76 +99,19 @@ def index():
     # Create default camera inside the database.
     if is_adding_camera and lab_name:
         user_id = session.get("user_id")
+        dao = CameraDAO("users.sqlite")
 
-        # Get the Lab_id based on Lab_name
-        conn = sqlite3.connect("users.sqlite")
-        cursor = conn.cursor()
-        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
-        lab_row = cursor.fetchone()
-        conn.close()
-
-        if not lab_row:
-            flash("Lab not found.", "danger")
-            return redirect(url_for("index"))
-
-        lab_id = lab_row[0]
-
-        # Generate a default name like "Camera 1", "Camera 2".
-        conn = sqlite3.connect("users.sqlite")
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM Camera WHERE camera_lab_id = ?", (lab_id,))
-        camera_count = cursor.fetchone()[0]
-        conn.close()
-
-        default_name = f"Camera {camera_count + 1}"
-
-        # Call your existing function with only required args
-        success = create_camera(
-            name=default_name,
-            camera_user_id=user_id,
-            camera_lab_id=lab_id,
-        )
-
-        if success:
-            flash(f"{default_name} added to {lab_name}.", "success")
-        else:
-            flash("Failed to add camera.", "danger")
-
+        success, message = dao.add_default_camera(lab_name, user_id)
+        flash(message, "success" if success else "danger")
         return redirect(url_for("index", lab=lab_name))
 
     if is_deleting_camera and camera_name and lab_name:
         user_id = session.get("user_id")
+        dao = CameraDAO("users.sqlite")
 
-        conn = sqlite3.connect("users.sqlite")
-        cursor = conn.cursor()
+        success, message = dao.delete_camera(lab_name, camera_name, user_id)
 
-        # Get lab_id for the lab_name
-        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
-        lab_row = cursor.fetchone()
-        if not lab_row:
-            flash("Lab not found.", "danger")
-            conn.close()
-            return redirect(url_for("index"))
-
-        lab_id = lab_row[0]
-
-        # Delete camera by name, Lab_id, and optionally user_id (for security)
-        cursor.execute("""
-                       DELETE
-                       FROM Camera
-                       WHERE name = ?
-                         AND camera_lab_id = ?
-                         AND camera_user_id = ?
-                       """, (camera_name, lab_id, user_id))
-        conn.commit()
-        affected_rows = cursor.rowcount
-        conn.close()
-
-        if affected_rows > 0:
-            flash(f"Camera '{camera_name}' deleted successfully.", "success")
-        else:
-            flash(f"Failed to delete camera '{camera_name}'.", "danger")
-
+        flash(message, "success" if success else "danger")
         return redirect(url_for("index", lab=lab_name))
 
     if request.method == "POST":
