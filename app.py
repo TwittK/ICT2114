@@ -135,6 +135,41 @@ def index():
 
         return redirect(url_for("index", lab=lab_name))
 
+    if is_deleting_camera and camera_name and lab_name:
+        user_id = session.get("user_id")
+
+        conn = sqlite3.connect("users.sqlite")
+        cursor = conn.cursor()
+
+        # Get lab_id for the lab_name
+        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
+        lab_row = cursor.fetchone()
+        if not lab_row:
+            flash("Lab not found.", "danger")
+            conn.close()
+            return redirect(url_for("index"))
+
+        lab_id = lab_row[0]
+
+        # Delete camera by name, Lab_id, and optionally user_id (for security)
+        cursor.execute("""
+                       DELETE
+                       FROM Camera
+                       WHERE name = ?
+                         AND camera_lab_id = ?
+                         AND camera_user_id = ?
+                       """, (camera_name, lab_id, user_id))
+        conn.commit()
+        affected_rows = cursor.rowcount
+        conn.close()
+
+        if affected_rows > 0:
+            flash(f"Camera '{camera_name}' deleted successfully.", "success")
+        else:
+            flash(f"Failed to delete camera '{camera_name}'.", "danger")
+
+        return redirect(url_for("index", lab=lab_name))
+
     if request.method == "POST":
         action = request.form.get("action")
 
