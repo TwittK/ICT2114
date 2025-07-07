@@ -12,7 +12,7 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 
-DATABASE = "detections.sqlite"
+DATABASE = "users.sqlite"
 SNAPSHOT_FOLDER = "snapshots"
 
 
@@ -123,16 +123,18 @@ def index():
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
-        query = "SELECT timestamp, object_type, confidence, image_path FROM detections WHERE 1=1"
+        query = "SELECT time_generated, object_detected, confidence, imageURL FROM Snapshot WHERE 1=1"
         params = []
 
         if date_filter:
-            query += " AND DATE(timestamp) = ?"
+            query += " AND DATE(time_generated) = ?"
             params.append(date_filter)
 
         if object_filter:
-            query += " AND object_type = ?"
+            query += " AND object_detected = ?"
             params.append(object_filter)
+            
+        print("results", results)
 
         cursor.execute(query, params)
         results = cursor.fetchall()

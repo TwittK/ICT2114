@@ -14,6 +14,7 @@
         </div>
     {% endif %}
 
+    
     <form method="post" class="row g-3 align-items-end mb-4">
         <div class="col-md-6">
             <label for="date" class="form-label">Date Time:</label>
@@ -41,8 +42,7 @@
             {% for row in results %}
                 <div class="col-md-4 mb-4">
                     <div class="card shadow-sm">
-                        <img src="{{ url_for('static', filename='snapshots/' + row[3].split('/')[-1]) }}"
-                             class="card-img-top" alt="Snapshot">
+                        <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}" class="card-img-top" alt="Snapshot">
                         <div class="card-body">
                             <h6 class="card-title">{{ row[1] }} <small
                                     class="text-muted">(Confidence: {{ row[2] }})</small></h6>

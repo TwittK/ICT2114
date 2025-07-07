@@ -54,7 +54,7 @@ print(f"[START] Set up completed")
 DRINKING_THRESHOLD = 50 # Distance thresholds
 OWNING_THRESHOLD = 200
 REQUIRED_DURATION = 2.0  # seconds
-REQUIRED_COUNT = 7      # number of detections in that duration
+REQUIRED_COUNT = 3      # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
 
 app = Flask(__name__)
@@ -295,7 +295,8 @@ def detection():
     global flagged_foodbev, pose_points, detected_incompliance
     global wrist_proximity_history
 
-    db = sqlite3.connect("database/test.sqlite")
+    # db = sqlite3.connect("database/test.sqlite")
+    db = sqlite3.connect("users.sqlite")
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
@@ -359,6 +360,7 @@ def detection():
                     np.linalg.norm(p["right_wrist"] - local_incompliance[track_id][1])
                 )
 
+                print("dist_nose_to_box", dist_nose_to_box)
                 print("dist", dist)
 
                 if dist <= OWNING_THRESHOLD and dist_nose_to_box <= DRINKING_THRESHOLD:
