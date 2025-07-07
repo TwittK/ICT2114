@@ -5,7 +5,7 @@ from shared.state import save_queue, running
 def save_img(frame_or_face, uuid_str, timestamp, faces_or_incompliance):
     # global save_queue
     filename = f"Person_{uuid_str}_{timestamp}.jpg"
-    filepath = os.path.join("static", faces_or_incompliance, uuid_str, filename)
+    filepath = os.path.join("web", "static", faces_or_incompliance, uuid_str, filename)
     save_queue.put((filepath, frame_or_face))
 
 # Save images to disk

@@ -11,19 +11,22 @@ from threads.saver import image_saver
 from threads.server import run_app
 
 # Create folders for faces and incompliances
-os.makedirs(os.path.join("static", "faces"), exist_ok=True)
-os.makedirs(os.path.join("static", "incompliances"), exist_ok=True)
+os.makedirs(os.path.join("web", "static", "faces"), exist_ok=True)
+os.makedirs(os.path.join("web", "static", "incompliances"), exist_ok=True)
 os.makedirs("yolo_models", exist_ok=True)
 
-model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
+drink_model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
 pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
-food_beverage_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
+food_model = YOLO(os.path.join("yolo_models", "food.pt"))
+beverage_class_list = [39, 40, 41] # just the drinks from coco dataset
+#bread: 31, chips: 55, chocolate: 56, cookies: 67, desserts: 77, french fries: 86, hamburger: 100, ice-cream: 108, pastry: 156, waffles: 231
+food_class_list = [31, 55, 56, 67, 77, 86, 100, 108, 156, 231]
 
 if __name__ == "__main__":
 
     try:
         read_thread = threading.Thread(target=read_frames)
-        inference_thread = threading.Thread(target=preprocess, args=(model, pose_model, food_beverage_class_list, 0.3), daemon=True)
+        inference_thread = threading.Thread(target=preprocess, args=(drink_model, food_model, pose_model, beverage_class_list, food_class_list, 0.3), daemon=True)
         detection_thread = threading.Thread(target=detection)
         save_thread = threading.Thread(target=image_saver, daemon=True)
         flask_thread = threading.Thread(target=run_app, daemon=True)

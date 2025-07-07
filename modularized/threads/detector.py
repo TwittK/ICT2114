@@ -5,13 +5,13 @@ import numpy as np
 from deepface import DeepFace
 from datetime import datetime
 from threads.saver import save_img
-from shared.state import process_queue, running, detected_food_drinks_lock, pose_points_lock, pose_points, detected_food_drinks, flagged_foodbev_lock, flagged_foodbev, wrist_proximity_history
+from shared.state import process_queue, running, detected_incompliance_lock, pose_points_lock, pose_points, detected_incompliance, flagged_foodbev_lock, flagged_foodbev, wrist_proximity_history
 
 # Constants
 DRINKING_THRESHOLD = 50 # Distance thresholds
-OWNING_THRESHOLD = 100
+OWNING_THRESHOLD = 200
 REQUIRED_DURATION = 2.0  # seconds
-REQUIRED_COUNT = 7      # number of detections in that duration
+REQUIRED_COUNT = 3      # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
@@ -76,7 +76,7 @@ def detection():
     # global flagged_foodbev, pose_points, detected_food_drinks
     # global wrist_proximity_history
 
-    db = sqlite3.connect("database/test.sqlite")
+    db = sqlite3.connect("users.sqlite")
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
@@ -92,9 +92,9 @@ def detection():
             continue
         
         # shallow copy for reading in this thread
-        with detected_food_drinks_lock, pose_points_lock:
+        with detected_incompliance_lock, pose_points_lock:
             local_pose_points = list(pose_points)
-            local_detected_food_drinks = dict(detected_food_drinks)
+            local_detected_food_drinks = dict(detected_incompliance)
 
 
         for p in local_pose_points:
@@ -128,16 +128,20 @@ def detection():
                     print("Food/ drink not at the same depth as person, ignoring.")
                     continue
 
+                # Delete for the time being. My bottle bigger than my face - Deric
                 # height of food/ drinks should not be 1.35 larger than face to be considered, otherwise ignore
-                if (y2 - y1 >= (fy2 - fy1) * 1.35):
-                    print("Food/ drink height is bigger than head, ignoring.")
-                    continue
+                # if (y2 - y1 >= (fy2 - fy1) * 1.35):
+                #     print("Food/ drink height is bigger than head, ignoring.")
+                #     continue
                 
                 dist_nose_to_box = get_dist_nose_to_box(p, local_detected_food_drinks, track_id)
                 dist = min(
                     np.linalg.norm(p["left_wrist"] - local_detected_food_drinks[track_id][1]),
                     np.linalg.norm(p["right_wrist"] - local_detected_food_drinks[track_id][1])
                 )
+
+                print("dist_nose_to_box", dist_nose_to_box)
+                print("dist", dist)
 
                 if dist <= OWNING_THRESHOLD and dist_nose_to_box <= DRINKING_THRESHOLD:
 
@@ -231,9 +235,9 @@ def detection():
                                     cursor = db.execute(""" INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId;""", (current_date,))
                                     person_id = cursor.fetchone()[0]
 
-                                    os.makedirs(os.path.join("static", "incompliances", str(person_id)), exist_ok=True)
+                                    os.makedirs(os.path.join("web", "static", "incompliances", str(person_id)), exist_ok=True)
                                     # save cropped face area save it for matching next time
-                                    os.makedirs(os.path.join("static", "faces", str(person_id)), exist_ok=True)
+                                    os.makedirs(os.path.join("web", "static", "faces", str(person_id)), exist_ok=True)
 
                                     snapshot_query = """ INSERT INTO Snapshot (confidence, time_generated, object_detected, imageURL, person_id) VALUES (?, ?, ?, ?, ?) RETURNING DetectionId; """
                                     cursor = db.execute(snapshot_query, (

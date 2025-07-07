@@ -1,13 +1,57 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Live Video</title>
-</head>
-<body>
-  <div>
-    <h1>YOLO Annotated Frame Stream</h1>
-    <img src="{{ url_for('video_feed') }}" width="40%" />
-  </div>
-</body>
+{% extends 'base.html' %}
+{% block title %}Detection Search - LabComply+{% endblock %}
+{% block content %}
 
-</html>
+    <h2 class="mb-2">Detection Search</h2>
+    {% if lab_name and camera_name %}
+        <div class="alert alert-info">
+            Lab: <strong>{{ lab_name }}</strong><br>
+            Viewing camera: <strong>{{ camera_name }}</strong>
+        </div>
+    {% elif lab_name %}
+        <div class="alert alert-warning">
+            Selected Lab: <strong>{{ lab_name }}</strong>
+        </div>
+    {% endif %}
+
+    
+    <form method="post" class="row g-3 align-items-end mb-4">
+        <div class="col-md-6">
+            <label for="date" class="form-label">Date Time:</label>
+            <input type="datetime-local" class="form-control rounded-pill" name="date" id="date" value="{{ today }}">
+        </div>
+
+        <div class="col-md-6">
+            <label for="object_type" class="form-label">In-Compliance Type:</label>
+            <select name="object_type" class="form-select rounded-pill">
+                <option value="">Select Type</option>
+                <option value="Food / Drink">Food / Drink</option>
+                <option value="Mask">Mask</option>
+                <option value="Unauthorized Access">Unauthorized Access</option>
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-dark rounded-pill px-4">Search</button>
+        </div>
+    </form>
+
+    {% if results %}
+        <h4 class="mb-3">Results:</h4>
+        <div class="row">
+            {% for row in results %}
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm">
+                        <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}" class="card-img-top" alt="Snapshot">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ row[1] }} <small
+                                    class="text-muted">(Confidence: {{ row[2] }})</small></h6>
+                            <p class="card-text text-muted">{{ row[0] }}</p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+{% endblock %}

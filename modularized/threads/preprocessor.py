@@ -1,11 +1,11 @@
 import queue
 from datetime import datetime
 import cv2 as cv
-from shared.state import frame_queue, running, detected_food_drinks_lock, detected_food_drinks, flagged_foodbev_lock, flagged_foodbev, pose_points_lock, pose_points, process_queue, display_queue
+from shared.state import frame_queue, running, detected_incompliance_lock, detected_incompliance, flagged_foodbev_lock, flagged_foodbev, pose_points_lock, pose_points, process_queue, display_queue
 
 
 # Display annotated frames on dashboard
-def preprocess(model, pose_model, target_classes_id, conf_threshold):
+def preprocess(drink_model, food_model, pose_model, target_classes_id_drink, target_classes_id_food, conf_threshold):
     # global running
     # global frame_queue, process_queue, display_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
@@ -23,34 +23,60 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
 
         # perform image processing here
         frame_copy = frame.copy() # copy frame for drawing bounding boxes, ids and conf scores.
-        result = model.track(frame_copy, persist=True, classes=target_classes_id, conf=conf_threshold, iou=0.4, verbose=False)
-        boxes = result[0].boxes
 
-        with detected_food_drinks_lock:
-            detected_food_drinks.clear()
+        # Drink detection
+        result = drink_model.track(frame_copy, persist=True, classes=target_classes_id_drink, conf=conf_threshold, iou=0.4, verbose=False)
+        drink_boxes = result[0].boxes
+        
+        # Food detection
+        food_results = food_model.track(frame_copy, persist=True, classes=target_classes_id_food, conf=conf_threshold, iou=0.4, verbose=False)
+        food_boxes = food_results[0].boxes
+
+
+        with detected_incompliance_lock:
+            detected_incompliance.clear()
 
         # only process if there are at least 1 food/ drink detected
-        if len(boxes) >= 1: 
+        # if len(boxes) >= 1: 
+        if (drink_boxes and len(drink_boxes) >= 1) or (food_boxes and len(food_boxes) >= 1):
 
             if datetime.now().strftime("%H:%M") == "00:00": # refresh flagged track ids daily
                 with flagged_foodbev_lock:
                     flagged_foodbev.clear()
 
             # object detection pipeline
-            with detected_food_drinks_lock:
-                for box in boxes:
+            with detected_incompliance_lock:
+                # Process drinks
+                for box in drink_boxes:
                     track_id = int(box.id) if box.id is not None else None
                     cls_id = int(box.cls.cpu())
                     confidence = float(box.conf.cpu())
                     coords = box.xyxy[0].cpu().numpy()
+                    class_name = drink_model.names[cls_id]
+                    print(f"[Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
                     
                     x1, y1, x2, y2 = map(int, coords)
 
                     if track_id is not None:
-                        detected_food_drinks[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2), confidence, cls_id]
+                        detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2), confidence, cls_id]
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
                         cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+                # Process food 
+                for box in food_boxes:
+                    track_id = int(box.id) if box.id is not None else None
+                    cls_id = int(box.cls.cpu())
+                    confidence = float(box.conf.cpu())
+                    coords = box.xyxy[0].cpu().numpy()
+                    class_name = food_model.names[cls_id]
+                    print(f"[Food] {class_name} (ID: {cls_id}) - {confidence:.2f}")
+
+                    x1, y1, x2, y2 = map(int, coords)
+
+                    if track_id is not None:
+                        detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2), confidence, cls_id]
+                        cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv.putText(frame_copy, f"{class_name} id:{track_id} conf:{confidence:.2f}", (x1, y2 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             pose_results = pose_model.track(frame, persist=True, conf=0.5, iou=0.4, verbose=False)[0]
             keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
@@ -58,9 +84,9 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
             with pose_points_lock:
                 pose_points.clear()
 
-            with detected_food_drinks_lock and pose_points_lock:
+            with detected_incompliance_lock and pose_points_lock:
                 # only process if theres both faces and food/beverages in frame
-                if detected_food_drinks and (keypoints is not None):
+                if detected_incompliance and (keypoints is not None):
                     # save landmarks for each person
                     for person in keypoints:
                         try:
@@ -78,8 +104,8 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
                             continue
             
             # Put into process queue for the next step (mapping food/ drinks to faces)
-            with detected_food_drinks_lock and pose_points_lock:   
-                if pose_points and detected_food_drinks:    
+            with detected_incompliance_lock and pose_points_lock:   
+                if pose_points and detected_incompliance:    
                     try:
                         if not process_queue.full():
                             process_queue.put(frame)
@@ -93,7 +119,7 @@ def preprocess(model, pose_model, target_classes_id, conf_threshold):
 
                     except Exception as e:
                         print(f"Error putting frame into process queue: {e}")
-                        
+
         # Put into queue to display frames in dashboard
         if not display_queue.full():
             display_queue.put(frame_copy)
