@@ -38,25 +38,28 @@ CREATE TABLE IF NOT EXISTS Camera
     FOREIGN KEY (camera_lab_id) REFERENCES Lab (LabId) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS Person (
-    PersonId INTEGER PRIMARY KEY AUTOINCREMENT,
-    last_incompliance TIMESTAMP NOT NULL,
-    incompliance_count INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS Person
+(
+    PersonId           INTEGER PRIMARY KEY AUTOINCREMENT,
+    last_incompliance  TIMESTAMP NOT NULL,
+    incompliance_count INTEGER   NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS Snapshot (
-    DetectionId INTEGER PRIMARY KEY AUTOINCREMENT,
-    confidence FLOAT NOT NULL,
-    time_generated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    object_detected TEXT NOT NULL,
-    imageURL TEXT NOT NULL,
-    person_id INTEGER,
-    camera_id INTEGER,
-    FOREIGN KEY (person_id) REFERENCES Person(id) ON DELETE CASCADE
-    FOREIGN KEY (camera_id) REFERENCES Camera(CameraId) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS Snapshot
+(
+    DetectionId     INTEGER PRIMARY KEY AUTOINCREMENT,
+    confidence      FLOAT NOT NULL,
+    time_generated  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    object_detected TEXT  NOT NULL,
+    imageURL        TEXT  NOT NULL,
+    person_id       INTEGER,
+    camera_id       INTEGER,
+    FOREIGN KEY (person_id) REFERENCES Person (PersonId) ON DELETE CASCADE,
+    FOREIGN KEY (camera_id) REFERENCES Camera (CameraId) ON DELETE CASCADE
 );
 
-CREATE VIRTUAL TABLE IF NOT EXISTS Embeddings USING vec0 (
+CREATE VIRTUAL TABLE IF NOT EXISTS Embeddings USING vec0
+(
     DetectionId INTEGER,
-    embeddings FLOAT[128]
+    embeddings FLOAT [128]
 );

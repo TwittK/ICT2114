@@ -3,13 +3,19 @@
 Create an environment
 
 ```bat
-py -3 -m venv .venv
+py -3.10 -m venv .venv
 ```
 
 Activate the environment
 
 ```bat
 .venv\Scripts\activate
+```
+
+Deactivate the environment
+
+```bat
+.venv\Scripts\deactivate
 ```
 
 Run the Flask app

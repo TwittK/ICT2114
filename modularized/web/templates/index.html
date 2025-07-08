@@ -14,7 +14,7 @@
         </div>
     {% endif %}
 
-    
+
     <form method="post" class="row g-3 align-items-end mb-4">
         <div class="col-md-6">
             <label for="date" class="form-label">Date Time:</label>
@@ -42,7 +42,11 @@
             {% for row in results %}
                 <div class="col-md-4 mb-4">
                     <div class="card shadow-sm">
-                        <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}" class="card-img-top" alt="Snapshot">
+                        <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}"
+                             class="card-img-top"
+                             alt="Snapshot"
+                             style="cursor: pointer;"
+                             onclick="showImageModal(this.src)">
                         <div class="card-body">
                             <h6 class="card-title">{{ row[1] }} <small
                                     class="text-muted">(Confidence: {{ row[2] }})</small></h6>
@@ -55,3 +59,26 @@
     {% endif %}
 
 {% endblock %}
+
+{# Image Modal #}
+{# Used for enlarging the image #}
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <img src="" id="modalImage" class="img-fluid w-100" alt="Enlarged Snapshot">
+            </div>
+        </div>
+    </div>
+</div>
+
+{# JavaScript #}
+<script>
+    function showImageModal(src) {
+        const modalImg = document.getElementById("modalImage");
+        modalImg.src = src;
+
+        const modal = new bootstrap.Modal(document.getElementById("imageModal"));
+        modal.show();
+    }
+</script>
