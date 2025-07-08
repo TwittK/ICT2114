@@ -7,7 +7,7 @@ def read_frames():
     # global running, cap, frame_queue
     global shared_cap
 
-    shared_cap = cv2.VideoCapture(1)  # or replace with your video source
+    shared_cap = cv2.VideoCapture(0)  # or replace with your video source
     while running:
         ret, frame = shared_cap.read()
         if not ret:

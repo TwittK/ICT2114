@@ -17,7 +17,7 @@ def init_database():
     print(f"sqlite_version={sqlite_version}, vec_version={vec_version}")
 
     # Read and execute the SQL file
-    with open('init_db.sql', 'r') as sql_file:
+    with open('modularized/init_db.sql', 'r') as sql_file:
         sql_script = sql_file.read()
         cursor.executescript(sql_script)
 
