@@ -15,7 +15,7 @@ os.makedirs(os.path.join("web", "static", "faces"), exist_ok=True)
 os.makedirs(os.path.join("web", "static", "incompliances"), exist_ok=True)
 os.makedirs("yolo_models", exist_ok=True)
 
-drink_model = YOLO(os.path.join("yolo_models", "yolo11m.pt"))
+drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
 pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
 food_model = YOLO(os.path.join("yolo_models", "food.pt"))
 beverage_class_list = [39, 40, 41] # just the drinks from coco dataset
