@@ -13,10 +13,10 @@ import cv2 as cv
 from io import BytesIO
 
 # Constants
-DRINKING_THRESHOLD = 500 # Distance thresholds
-OWNING_THRESHOLD = 800
+DRINKING_THRESHOLD = 100 # Distance thresholds
+OWNING_THRESHOLD = 300
 REQUIRED_DURATION = 2.0  # seconds
-REQUIRED_COUNT = 1      # number of detections in that duration
+REQUIRED_COUNT = 2      # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
 
 INCOMPLIANCES_FDID = "D3FB23C8155040E4BE08374A418ED0CA" 
@@ -305,7 +305,7 @@ def detection():
                     np.linalg.norm(p["right_wrist"] - local_detected_food_drinks[track_id][1])
                 )
 
-                if dist <= OWNING_THRESHOLD and dist_nose_to_box <= DRINKING_THRESHOLD:
+                if dist <= OWNING_THRESHOLD or dist_nose_to_box <= DRINKING_THRESHOLD:
 
                     now = time.time()
                         
