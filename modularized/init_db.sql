@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS Person
 CREATE TABLE IF NOT EXISTS Snapshot
 (
     DetectionId     INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshotId      TEXT,
     confidence      FLOAT NOT NULL,
     time_generated  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     object_detected TEXT  NOT NULL,
@@ -58,8 +59,3 @@ CREATE TABLE IF NOT EXISTS Snapshot
     FOREIGN KEY (camera_id) REFERENCES Camera (CameraId) ON DELETE CASCADE
 );
 
-CREATE VIRTUAL TABLE IF NOT EXISTS Embeddings USING vec0
-(
-    DetectionId INTEGER,
-    embeddings FLOAT [128]
-);

@@ -2,17 +2,195 @@ import sqlite3, sqlite_vec
 from sqlite_vec import serialize_float32
 import queue, time, os
 import numpy as np
-from deepface import DeepFace
 from datetime import datetime
 from threads.saver import save_img
 from shared.state import process_queue, running, detected_incompliance_lock, pose_points_lock, pose_points, detected_incompliance, flagged_foodbev_lock, flagged_foodbev, wrist_proximity_history
+import requests
+from requests.auth import HTTPDigestAuth
+import xml.etree.ElementTree as ET
+import uuid
+import time
+import cv2 as cv
+from io import BytesIO
 
 # Constants
-DRINKING_THRESHOLD = 50 # Distance thresholds
+DRINKING_THRESHOLD = 60 # Distance thresholds
 OWNING_THRESHOLD = 200
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 3      # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
+
+INCOMPLIANCES_FDID = "D3FB23C8155040E4BE08374A418ED0CA" 
+
+def get_mode_data(frame):
+    url = "http://192.168.10.63/ISAPI/Intelligent/analysisImage/face"
+
+    success, encoded_image = cv.imencode(".jpg", frame)
+    if not success:
+        print("❌ Failed to encode frame")
+        return None
+
+    image_data = encoded_image.tobytes()
+
+    # Set headers
+    headers = {
+        "Content-Type": "application/octet-stream"
+    }
+
+    response = requests.post(
+        url,
+        data=image_data,
+        headers=headers,
+        auth=HTTPDigestAuth("admin", "Sit12345")
+    )
+    print("Status Code:", response.status_code)
+    if response.ok:
+        # print("Response Body:\n", response.text)
+        
+        ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
+
+        try:
+            root = ET.fromstring(response.text)
+
+            # Find modeData using the namespace
+            mode_data_elem = root.find(".//isapi:modeData", namespaces=ns)
+
+            if mode_data_elem is not None:
+                # print("✅ modeData found:\n", mode_data_elem.text)
+                modeData = mode_data_elem.text
+            else:
+                print("❌ modeData not found.")
+                return None
+
+        except ET.ParseError as e:
+            print("❌ XML parsing error:", e)
+            return None
+    else:
+        print("❌ Request failed:", response.status_code, response.reason)
+        return None
+
+    return modeData
+    
+def get_face_comparison(modeData, FDID):
+    if (modeData is not None):
+        randomUUID = uuid.uuid4()
+
+        # Build the XML payload
+        xml_payload = f"""<?xml version="1.0" encoding="utf-8"?>
+        <FDSearchDescription>
+            <FDID>{FDID}</FDID>
+            <OccurrencesInfo>
+                <enabled>true</enabled>
+                <occurrences>0</occurrences>
+                <occurrencesSearchType>greaterThanOrEqual</occurrencesSearchType>
+            </OccurrencesInfo>
+            <FaceModeList>
+                <FaceMode>
+                    <ModeInfo>
+                        <similarity>80</similarity>
+                        <modeData>{modeData}</modeData>
+                    </ModeInfo>
+                </FaceMode>
+            </FaceModeList>
+            <searchID>{randomUUID}</searchID>
+            <maxResults>1</maxResults>
+            <searchResultPosition>0</searchResultPosition>
+        </FDSearchDescription>
+        """
+        
+        # Set headers
+        headers = {
+            "Content-Type": "application/xml"
+        }
+
+        # Send the POST request
+        response = requests.post(
+            "http://192.168.10.63/ISAPI/Intelligent/FDLib/FDSearch?security=1&iv=6e130e2ec9c415ed9b8dd80e732b9d82",
+            data=xml_payload.encode('utf-8'),
+            headers=headers,
+            auth=HTTPDigestAuth("admin", "Sit12345")
+        )
+
+        # Print the response
+        print("Status Code:", response.status_code)
+        # print("Response Body:\n", response.text)
+
+        root = ET.fromstring(response.text)
+        ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
+        numOfMatches = root.find(".//isapi:numOfMatches", namespaces=ns)
+
+        print(f"Searching in Face Database ID: {FDID}")
+
+        if numOfMatches is not None and int(numOfMatches.text) >= 1:
+            print("Matches found:\n", numOfMatches.text)
+            matchesFound = numOfMatches.text
+
+            personID = root.find(".//isapi:PID", namespaces=ns)
+            # print(f"PID: {personID.text}")
+
+            # name = root.find(".//isapi:name", namespaces=ns)
+            # print(f"Name: {name.text}")
+
+        else:
+            print("No matches found.")
+            return None
+    else:
+        print("ModeData is None.")
+        return None
+
+    return matchesFound, personID.text
+
+def insert_into_face_db(frame, FDID, name):
+
+    randomUUID = uuid.uuid4()
+
+    success, encoded_image = cv.imencode(".jpg", frame)
+    if not success:
+        print("❌ Failed to encode frame")
+        return None
+
+    image_data = encoded_image.tobytes()
+
+    # Build the XML payload
+    xml_payload = f"""
+    <?xml version='1.0' encoding='UTF-8'?>
+    <PictureUploadData>
+        <FDID>{FDID}</FDID>
+        <FaceAppendData>
+            <name>{name}</name>
+            <bornTime>2000-01-01</bornTime>
+            <enable>true</enable>
+            <customHumanID>{randomUUID}</customHumanID>
+        </FaceAppendData>
+    </PictureUploadData>
+    """
+    # <picURL>{image_filepath}</picURL>
+    # Set headers
+    headers = {
+        "Content-Type": "application/xml"
+    }
+    image_file = BytesIO(image_data)
+
+    files = {
+        'FaceAppendData': ('FaceAppendData.xml', xml_payload, 'application/xml'),
+        'importImage': ('image.jpg', image_file, 'application/octet-stream')
+    }
+    # Send the POST request
+    response = requests.post(
+        f"http://192.168.10.63/ISAPI/Intelligent/FDLib/pictureUpload?type=concurrent",
+        files=files,
+        auth=HTTPDigestAuth("admin", "Sit12345")
+    )
+
+    # Print the response
+    print("Status Code:", response.status_code)
+    # print("Response Body:\n", response.text)
+
+    root = ET.fromstring(response.text)
+    pid = root.text
+
+    return pid
+
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
     h, w, _ = img.shape
@@ -140,8 +318,8 @@ def detection():
                     np.linalg.norm(p["right_wrist"] - local_detected_food_drinks[track_id][1])
                 )
 
-                print("dist_nose_to_box", dist_nose_to_box)
-                print("dist", dist)
+                # print("dist_nose_to_box", dist_nose_to_box)
+                # print("dist", dist)
 
                 if dist <= OWNING_THRESHOLD and dist_nose_to_box <= DRINKING_THRESHOLD:
 
@@ -170,33 +348,26 @@ def detection():
                                                         
                         if face_crop is not None and face_crop.size > 0:
                             try:
-                                query_embedding = DeepFace.represent(img_path=face_crop, model_name="Facenet", max_faces=1)[0]["embedding"]
-                                
-                                # find match in database
-                                query = """ SELECT DetectionId, distance FROM Embeddings WHERE embeddings MATCH ?
-                                ORDER BY distance ASC LIMIT 1; """
-                                cursor = db.execute(query, (serialize_float32(query_embedding),)) # euclidean distance
-                                row = cursor.fetchone()
-                                
-                                closest_dist = None
-                                if row is not None:
-                                    closest_dist = row[1]
+                                modeData = get_mode_data(frame)
+                                matchesFound = get_face_comparison(modeData, INCOMPLIANCES_FDID)
 
                                 # match found
-                                if closest_dist is not None and closest_dist < FACE_DISTANCE_THRESHOLD:
+                                # if closest_dist is not None and closest_dist < FACE_DISTANCE_THRESHOLD:
+                                if matchesFound is not None:
                                     
-                                    detection_id = row[0]
-                                    current_date = datetime.now().strftime("%Y-%m-%d")
+                                    # detection_id = row[0]
+                                    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     
-                                    query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.DetectionId = ?;"""
-                                    cursor = db.execute(query, (detection_id,))
+                                    query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.snapshotId = ?;"""
+                                    cursor = db.execute(query, (matchesFound[1],))
                                     result = cursor.fetchone()
 
                                     if result:
                                         person_id, last_incompliance = result
                                         last_date = last_incompliance[:10] if last_incompliance else None
+                                        today = current_date[:10]
 
-                                        if last_date != current_date and last_date is not None:
+                                        if last_date != today and last_date is not None:
 
                                             # get the existing uuid of face and save incompliance img into folder
                                             save_img(face_crop, str(person_id), current_date, "faces")
@@ -204,17 +375,20 @@ def detection():
 
                                             update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
                                             db.execute(update_query, (current_date, person_id))
-                                            snapshot_query = """ INSERT INTO Snapshot (confidence, time_generated, object_detected, imageURL, person_id) VALUES (?, ?, ?, ?, ?) RETURNING DetectionId; """
-                                            cursor = db.execute(snapshot_query, (
+                                            db.commit()
+
+                                            snapshotId = insert_into_face_db(frame, INCOMPLIANCES_FDID, person_id)
+
+                                            snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?)"""
+                                            db.execute(snapshot_query, (
+                                                snapshotId, # snapshotId = PID from NVR (1 PID for every unique image)
                                                 local_detected_food_drinks[track_id][2],  # confidence value
                                                 current_date,
                                                 str(local_detected_food_drinks[track_id][3]),  # detected object class id
                                                 f"incompliances/{person_id}/Person_{person_id}_{current_date}.jpg",
-                                                person_id
+                                                person_id,
+                                                1 # temp camera id
                                             ))
-                                            detection_id = cursor.fetchone()[0]
-                                            embeddings_query = """ INSERT INTO Embeddings (DetectionId, embeddings) VALUES (?, ?); """
-                                            db.execute(embeddings_query, (detection_id, serialize_float32(query_embedding)))
                                             db.commit()
 
                                             print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
@@ -230,7 +404,7 @@ def detection():
                                     with flagged_foodbev_lock:
                                         flagged_foodbev.append(track_id) # save track id of bottle
 
-                                    current_date = datetime.now().strftime("%Y-%m-%d")
+                                    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                                     cursor = db.execute(""" INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId;""", (current_date,))
                                     person_id = cursor.fetchone()[0]
@@ -238,18 +412,18 @@ def detection():
                                     os.makedirs(os.path.join("web", "static", "incompliances", str(person_id)), exist_ok=True)
                                     # save cropped face area save it for matching next time
                                     os.makedirs(os.path.join("web", "static", "faces", str(person_id)), exist_ok=True)
+                                    snapshotId = insert_into_face_db(frame, INCOMPLIANCES_FDID, person_id)
 
-                                    snapshot_query = """ INSERT INTO Snapshot (confidence, time_generated, object_detected, imageURL, person_id) VALUES (?, ?, ?, ?, ?) RETURNING DetectionId; """
-                                    cursor = db.execute(snapshot_query, (
+                                    snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
+                                    db.execute(snapshot_query, (
+                                        snapshotId,
                                         local_detected_food_drinks[track_id][2],  # confidence value
                                         current_date,
                                         str(local_detected_food_drinks[track_id][3]),  # detected object class id
                                         f"incompliances/{person_id}/Person_{person_id}_{current_date}.jpg",
-                                        person_id
+                                        person_id,
+                                        1 # temp camera id
                                     ))
-                                    detection_id = cursor.fetchone()[0]
-                                    embeddings_query = """ INSERT INTO Embeddings (DetectionId, embeddings) VALUES (?, ?); """
-                                    db.execute(embeddings_query, (detection_id, serialize_float32(query_embedding)))
                                     db.commit()
                                     
                                     save_img(face_crop, str(person_id), current_date, "faces")
