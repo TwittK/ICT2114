@@ -7,6 +7,6 @@ static/faces
 static/incompliances
 yolo_models
 database
-/modularized/web/static/faces
-/modularized/web/static/incompliances
-modularized/users.sqlite
+/modularized/web/static/faces/
+/modularized/web/static/incompliances/
+/modularized/users.sqlite
