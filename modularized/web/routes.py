@@ -13,6 +13,13 @@ SNAPSHOT_FOLDER = "snapshots"
 
 app = Flask(__name__)
 
+class_id_to_label = {
+    39: "Bottle",
+    40: "Wine Glass",
+    41: "Cup",
+}
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -130,11 +137,31 @@ def index():
         if object_filter:
             query += " AND object_detected = ?"
             params.append(object_filter)
-            
+
         print("results", results)
 
         cursor.execute(query, params)
-        results = cursor.fetchall()
+
+        # Fetch all raw results from the database
+        raw_results = cursor.fetchall()
+
+        # Replace class ID with label using mapping.
+        results = []
+        for row in raw_results:
+            time_generated = row[0]
+            object_detected = row[1]
+            confidence = row[2]
+            image_url = row[3]
+
+            # Try to interpret as int (e.g., if stored as string class ID)
+            try:
+                label = class_id_to_label.get(int(object_detected), object_detected)
+            except ValueError:
+                # If it's already a string label
+                label = object_detected
+
+            results.append((time_generated, label, confidence, image_url))
+
         conn.close()
 
     return render_template(
@@ -253,9 +280,11 @@ def edit_camera(camera_id):
     conn.close()
     return render_template('edit_camera.html', camera=camera)
 
+
 @app.route('/video_feed')
 def video_feed():
     print("[STREAM] Client connected to /video_feed")
+
     def generate_stream():
         # global display_queue
         while running:
@@ -270,4 +299,5 @@ def video_feed():
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
     return Response(generate_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')

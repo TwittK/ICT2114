@@ -43,14 +43,23 @@
                 <div class="col-md-4 mb-4">
                     <div class="card shadow-sm">
                         <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}"
-                             class="card-img-top"
+                             class="card-img-top snapshot-img"
                              alt="Snapshot"
                              style="cursor: pointer;"
-                             onclick="showImageModal(this.src)">
+                             data-label="{{ row[1] }}"
+                             data-confidence="{{ row[2] }}"
+                             data-datetime="{{ row[0] }}"
+                        >
                         <div class="card-body">
-                            <h6 class="card-title">{{ row[1] }} <small
-                                    class="text-muted">(Confidence: {{ row[2] }})</small></h6>
-                            <p class="card-text text-muted">{{ row[0] }}</p>
+                            <h6 class="card-title">
+                                {{ row[1] }}
+                                <small class="text-muted">
+                                    (Confidence: {{ row[2] }})
+                                </small>
+                            </h6>
+                            <p class="card-text text-muted">
+                                {{ row[0] }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -58,27 +67,59 @@
         </div>
     {% endif %}
 
-{% endblock %}
-
-{# Image Modal #}
-{# Used for enlarging the image #}
-<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-body p-0">
-                <img src="" id="modalImage" class="img-fluid w-100" alt="Enlarged Snapshot">
+    {# Image Modal #}
+    {# Used for enlarging the image #}
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <img src="" id="modalImage" class="img-fluid w-100 mb-2" alt="Enlarged Snapshot">
+                    <div class="p-3">
+                        <h5 id="modalLabel"></h5>
+                        <p class="mb-1 text-muted" id="modalConfidence"></p>
+                        <p class="mb-0 text-muted" id="modalDatetime"></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
+{% endblock %}
 
-{# JavaScript #}
-<script>
-    function showImageModal(src) {
-        const modalImg = document.getElementById("modalImage");
-        modalImg.src = src;
+{% block scripts %}
+    {# JavaScript #}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const images = document.querySelectorAll('.snapshot-img');
 
-        const modal = new bootstrap.Modal(document.getElementById("imageModal"));
-        modal.show();
-    }
-</script>
+            images.forEach(img => {
+                img.addEventListener('click', function () {
+                    // Populate the image source
+                    const modalImg = document.getElementById("modalImage");
+                    // Should not be null
+                    console.log(document.getElementById("modalImage"));
+
+                    // Check if element exists before using it.
+                    if (!modalImg) {
+                        console.error("Modal image element not found.")
+                        return;
+                    }
+
+                    modalImg.src = this.src;
+
+                    // Populate the metadata
+                    const label = this.dataset.label;
+                    const confidence = this.dataset.confidence;
+                    const datetime = this.dataset.datetime;
+
+                    document.getElementById("modalLabel").textContent = label || "Unknown";
+                    document.getElementById("modalConfidence").textContent = `Confidence: ${confidence || 'N/A'}`;
+                    document.getElementById("modalDatetime").textContent = `Detected: ${datetime || 'N/A'}`;
+
+                    // Show the modal.
+                    const modal = new bootstrap.Modal(document.getElementById("imageModal"));
+                    modal.show();
+                })
+            });
+        })
+    </script>
+{% endblock %}
