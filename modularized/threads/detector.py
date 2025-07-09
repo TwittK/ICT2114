@@ -13,8 +13,8 @@ import cv2 as cv
 from io import BytesIO
 
 # Constants
-DRINKING_THRESHOLD = 100 # Distance thresholds
-OWNING_THRESHOLD = 300
+DRINKING_THRESHOLD = 400 # Distance thresholds
+OWNING_THRESHOLD = 600
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 2      # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
@@ -418,5 +418,7 @@ def detection():
                             except Exception as e:
                                 print(e)
                                 continue
+                else:
+                    print("Pose not near drink, skipping.")
 
     db.close()                
