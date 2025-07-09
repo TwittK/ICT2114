@@ -6,7 +6,7 @@ from shared.state import frame_queue, running, detected_incompliance_lock, detec
 
 
 # Display annotated frames on dashboard
-def preprocess(drink_model, food_model, pose_model, target_classes_id_drink, target_classes_id_food, conf_threshold):
+def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
     # global running
     # global frame_queue, process_queue, display_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
@@ -26,19 +26,13 @@ def preprocess(drink_model, food_model, pose_model, target_classes_id_drink, tar
         frame_copy = frame.copy()  # copy frame for drawing bounding boxes, ids and conf scores.
 
         # Drink detection
-        result = drink_model.track(frame_copy, persist=True, classes=target_classes_id_drink, conf=conf_threshold,
+        result = drink_model.track(frame_copy, persist=True, classes=target_classes_id, conf=conf_threshold,
                                    iou=0.4, verbose=False)
         drink_boxes = result[0].boxes
-
-        # # Food detection
-        # food_results = food_model.track(frame_copy, persist=True, classes=target_classes_id_food, conf=conf_threshold, iou=0.4, verbose=False)
-        # food_boxes = food_results[0].boxes
 
         with detected_incompliance_lock:
             detected_incompliance.clear()
 
-        # only process if there are at least 1 food/ drink detected
-        # if len(boxes) >= 1: 
         if (drink_boxes and len(drink_boxes) >= 1):
             # or (food_boxes and len(food_boxes) >= 1)):
 
@@ -55,7 +49,7 @@ def preprocess(drink_model, food_model, pose_model, target_classes_id_drink, tar
                     confidence = float(box.conf.cpu())
                     coords = box.xyxy[0].cpu().numpy()
                     class_name = drink_model.names[cls_id]
-                    print(f"[Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
+                    print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
 
                     x1, y1, x2, y2 = map(int, coords)
 
@@ -66,25 +60,6 @@ def preprocess(drink_model, food_model, pose_model, target_classes_id_drink, tar
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
                         cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10),
                                    cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-                # # Process food
-                # for box in food_boxes:
-                #     track_id = int(box.id) if box.id is not None else None
-                #     cls_id = int(box.cls.cpu())
-                #     confidence = float(box.conf.cpu())
-                #     coords = box.xyxy[0].cpu().numpy()
-                #     class_name = food_model.names[cls_id]
-                #     print(f"[Food] {class_name} (ID: {cls_id}) - {confidence:.2f}")
-                #
-                #     x1, y1, x2, y2 = map(int, coords)
-                #
-                #     if track_id is not None:
-                #         detected_incompliance[track_id] = [coords,
-                #                                            ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2),
-                #                                            confidence, cls_id]
-                #         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                #         cv.putText(frame_copy, f"{class_name} id:{track_id} conf:{confidence:.2f}", (x1, y2 - 10),
-                #                    cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             pose_results = pose_model.track(frame, persist=True, conf=0.5, iou=0.4, verbose=False)[0]
             keypoints = pose_results.keypoints.xy if pose_results.keypoints else []

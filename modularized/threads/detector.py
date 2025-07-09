@@ -1,5 +1,4 @@
-import sqlite3, sqlite_vec
-from sqlite_vec import serialize_float32
+import sqlite3
 import queue, time, os
 import numpy as np
 from datetime import datetime
@@ -14,10 +13,10 @@ import cv2 as cv
 from io import BytesIO
 
 # Constants
-DRINKING_THRESHOLD = 60 # Distance thresholds
-OWNING_THRESHOLD = 200
+DRINKING_THRESHOLD = 500 # Distance thresholds
+OWNING_THRESHOLD = 800
 REQUIRED_DURATION = 2.0  # seconds
-REQUIRED_COUNT = 3      # number of detections in that duration
+REQUIRED_COUNT = 1      # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
 
 INCOMPLIANCES_FDID = "D3FB23C8155040E4BE08374A418ED0CA" 
@@ -152,7 +151,7 @@ def insert_into_face_db(frame, FDID, name):
     image_data = encoded_image.tobytes()
 
     # Build the XML payload
-    xml_payload = f"""
+    xml_payload = f"""\
     <?xml version='1.0' encoding='UTF-8'?>
     <PictureUploadData>
         <FDID>{FDID}</FDID>
@@ -165,32 +164,28 @@ def insert_into_face_db(frame, FDID, name):
     </PictureUploadData>
     """
     # <picURL>{image_filepath}</picURL>
-    # Set headers
-    headers = {
-        "Content-Type": "application/xml"
-    }
     image_file = BytesIO(image_data)
 
     files = {
         'FaceAppendData': ('FaceAppendData.xml', xml_payload, 'application/xml'),
         'importImage': ('image.jpg', image_file, 'application/octet-stream')
     }
-    # Send the POST request
-    response = requests.post(
-        f"http://192.168.10.63/ISAPI/Intelligent/FDLib/pictureUpload?type=concurrent",
-        files=files,
-        auth=HTTPDigestAuth("admin", "Sit12345")
-    )
+    try:
+        # Send the POST request
+        response = requests.post(
+            f"http://192.168.10.63/ISAPI/Intelligent/FDLib/pictureUpload?type=concurrent",
+            files=files,
+            auth=HTTPDigestAuth("admin", "Sit12345")
+        )
+        root = ET.fromstring(response.text)
+        pid = root.text
 
-    # Print the response
-    print("Status Code:", response.status_code)
-    # print("Response Body:\n", response.text)
-
-    root = ET.fromstring(response.text)
-    pid = root.text
-
-    return pid
-
+        print("[FACE] 🔴 Inserted face into library")
+        return pid
+    
+    except Exception:
+        print("[ERROR] Error inserting cropped face snapshot into NVR.")
+        return None
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
     h, w, _ = img.shape
@@ -220,11 +215,12 @@ def extract_face_from_nose(pose_points, frame):
     y2 = min(int(nose[1] + nose_to_eye_height) + 20, h)
 
     # Horizontal distance of bbox based on ears
-    x1 = max(int(min(l_ear[0], r_ear[0])), r_eye[0] - 40)
-    x2 = min(int(max(l_ear[0], r_ear[0])), l_eye[0] + 40)
+    x1 = int(min(l_ear[0], r_eye[0] - 40))
+    x2 = int(max(r_ear[0], l_eye[0] + 40))
 
     # check that bbox is valid
     if x2 <= x1 or y2 <= y1:
+        print(x1, y1, x2, y2)
         raise ValueError("Invalid bounding box dimensions.")
 
     return (x1, y1, x2, y2)
@@ -255,9 +251,6 @@ def detection():
     # global wrist_proximity_history
 
     db = sqlite3.connect("users.sqlite")
-    db.enable_load_extension(True)
-    sqlite_vec.load(db)
-    db.enable_load_extension(False)
 
     while running:
         try:
@@ -290,7 +283,7 @@ def detection():
                     fx1, fy1, fx2, fy2 = map(int, face_bbox)
 
                 except ValueError:
-                    # print("can't extract the face")
+                    print("can't extract the face")
                     continue
 
                 # if the top of food/ drink bbox is a percentage above the nose, ignore
@@ -298,18 +291,12 @@ def detection():
                     print("Food/ drink is above the nose, ignoring.")
                     continue 
 
-                # if area of food/ drink is more than 265% of the area of head, head is likely to be further away so ignore
-                # if area of food/ drink is less than 30% of the area of head, food/ drink is likely to be further away so ignore
-                area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
-                area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
-                if (area_food_drinks >= area_head * 2.65 or area_food_drinks < area_head * 0.3):
-                    print("Food/ drink not at the same depth as person, ignoring.")
-                    continue
-
-                # Delete for the time being. My bottle bigger than my face - Deric
-                # height of food/ drinks should not be 1.35 larger than face to be considered, otherwise ignore
-                # if (y2 - y1 >= (fy2 - fy1) * 1.35):
-                #     print("Food/ drink height is bigger than head, ignoring.")
+                # if area of food/ drink is more than 4 times the area of head, head is likely to be further away so ignore
+                # if area of food/ drink is less than 10% of the area of head, food/ drink is likely to be further away so ignore
+                # area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
+                # area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
+                # if (area_food_drinks >= area_head * 4 or area_food_drinks < area_head * 0.1):
+                #     print("Food/ drink not at the same depth as person, ignoring.")
                 #     continue
                 
                 dist_nose_to_box = get_dist_nose_to_box(p, local_detected_food_drinks, track_id)
@@ -317,9 +304,6 @@ def detection():
                     np.linalg.norm(p["left_wrist"] - local_detected_food_drinks[track_id][1]),
                     np.linalg.norm(p["right_wrist"] - local_detected_food_drinks[track_id][1])
                 )
-
-                # print("dist_nose_to_box", dist_nose_to_box)
-                # print("dist", dist)
 
                 if dist <= OWNING_THRESHOLD and dist_nose_to_box <= DRINKING_THRESHOLD:
 
@@ -340,9 +324,6 @@ def detection():
                     wrist_proximity_history[track_id] = recent_times  # Prune old entries
 
                     if len(recent_times) >= REQUIRED_COUNT:
-                        # Logging end time of wrist proximity
-                        # cv.putText(frame, "CONFIRMED NEAR DRINK", (int(p["nose"][0]), int(p["nose"][1]-10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
                         face_crop = None
                         face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=30)
                                                         
@@ -352,10 +333,8 @@ def detection():
                                 matchesFound = get_face_comparison(modeData, INCOMPLIANCES_FDID)
 
                                 # match found
-                                # if closest_dist is not None and closest_dist < FACE_DISTANCE_THRESHOLD:
                                 if matchesFound is not None:
                                     
-                                    # detection_id = row[0]
                                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     
                                     query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.snapshotId = ?;"""
@@ -369,30 +348,32 @@ def detection():
 
                                         if last_date != today and last_date is not None:
 
-                                            # get the existing uuid of face and save incompliance img into folder
-                                            save_img(face_crop, str(person_id), current_date, "faces")
-                                            save_img(frame, str(person_id), current_date, "incompliances")
+                                            face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5), cv.INTER_LINEAR)
+                                            snapshotId = insert_into_face_db(face_crop, INCOMPLIANCES_FDID, person_id)
 
-                                            update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
-                                            db.execute(update_query, (current_date, person_id))
-                                            db.commit()
+                                            if snapshotId:
+                                                update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
+                                                db.execute(update_query, (current_date, person_id))
+                                                db.commit()
 
-                                            snapshotId = insert_into_face_db(frame, INCOMPLIANCES_FDID, person_id)
+                                                snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?)"""
+                                                db.execute(snapshot_query, (
+                                                    snapshotId, # snapshotId = PID from NVR (1 PID for every unique image)
+                                                    local_detected_food_drinks[track_id][2],  # confidence value
+                                                    current_date,
+                                                    str(local_detected_food_drinks[track_id][3]),  # detected object class id
+                                                    f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
+                                                    person_id,
+                                                    1 # temp camera id
+                                                ))
+                                                db.commit()
+                                                
+                                                # get the existing uuid of face and save incompliance img into folder
+                                                # save_img(face_crop, str(person_id), today, "faces")
+                                                save_img(frame, str(person_id), today, "incompliances")
 
-                                            snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?)"""
-                                            db.execute(snapshot_query, (
-                                                snapshotId, # snapshotId = PID from NVR (1 PID for every unique image)
-                                                local_detected_food_drinks[track_id][2],  # confidence value
-                                                current_date,
-                                                str(local_detected_food_drinks[track_id][3]),  # detected object class id
-                                                f"incompliances/{person_id}/Person_{person_id}_{current_date}.jpg",
-                                                person_id,
-                                                1 # temp camera id
-                                            ))
-                                            db.commit()
-
-                                            print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
-                                            
+                                                print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                                                
                                         # incompliance on the same date
                                         else:
                                             print(f"[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
@@ -405,31 +386,34 @@ def detection():
                                         flagged_foodbev.append(track_id) # save track id of bottle
 
                                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    today = current_date[:10]
 
                                     cursor = db.execute(""" INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId;""", (current_date,))
                                     person_id = cursor.fetchone()[0]
+                                    
+                                    face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5), cv.INTER_LINEAR)
+                                    snapshotId = insert_into_face_db(face_crop, INCOMPLIANCES_FDID, person_id)
 
                                     os.makedirs(os.path.join("web", "static", "incompliances", str(person_id)), exist_ok=True)
                                     # save cropped face area save it for matching next time
-                                    os.makedirs(os.path.join("web", "static", "faces", str(person_id)), exist_ok=True)
-                                    snapshotId = insert_into_face_db(frame, INCOMPLIANCES_FDID, person_id)
 
-                                    snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
-                                    db.execute(snapshot_query, (
-                                        snapshotId,
-                                        local_detected_food_drinks[track_id][2],  # confidence value
-                                        current_date,
-                                        str(local_detected_food_drinks[track_id][3]),  # detected object class id
-                                        f"incompliances/{person_id}/Person_{person_id}_{current_date}.jpg",
-                                        person_id,
-                                        1 # temp camera id
-                                    ))
-                                    db.commit()
-                                    
-                                    save_img(face_crop, str(person_id), current_date, "faces")
-                                    save_img(frame, str(person_id), current_date, "incompliances")
+                                    if snapshotId:
+                                        snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
+                                        db.execute(snapshot_query, (
+                                            snapshotId,
+                                            local_detected_food_drinks[track_id][2],  # confidence value
+                                            current_date,
+                                            str(local_detected_food_drinks[track_id][3]),  # detected object class id
+                                            f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
+                                            person_id,
+                                            1 # temp camera id
+                                        ))
+                                        db.commit()
+                                        
+                                        # save_img(face_crop, str(person_id), today, "faces")
+                                        save_img(frame, str(person_id), today, "incompliances")
 
-                                    print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+                                        print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
 
                             except Exception as e:
                                 print(e)

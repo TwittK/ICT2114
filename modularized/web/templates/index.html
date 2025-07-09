@@ -18,7 +18,7 @@
     <form method="post" class="row g-3 align-items-end mb-4">
         <div class="col-md-6">
             <label for="date" class="form-label">Date Time:</label>
-            <input type="datetime-local" class="form-control rounded-pill" name="date" id="date" value="{{ today }}">
+            <input type="date" class="form-control rounded-pill" name="date" id="date" value="{{ today }}">
         </div>
 
         <div class="col-md-6">
@@ -48,7 +48,7 @@
                              style="cursor: pointer;"
                              data-label="{{ row[1] }}"
                              data-confidence="{{ row[2] }}"
-                             data-datetime="{{ row[0] }}"
+                             data-date="{{ row[0] }}"
                         >
                         <div class="card-body">
                             <h6 class="card-title">
@@ -77,7 +77,7 @@
                     <div class="p-3">
                         <h5 id="modalLabel"></h5>
                         <p class="mb-1 text-muted" id="modalConfidence"></p>
-                        <p class="mb-0 text-muted" id="modalDatetime"></p>
+                        <p class="mb-0 text-muted" id="modalDate"></p>
                     </div>
                 </div>
             </div>
@@ -109,11 +109,11 @@
                     // Populate the metadata
                     const label = this.dataset.label;
                     const confidence = this.dataset.confidence;
-                    const datetime = this.dataset.datetime;
+                    const date = this.dataset.date;
 
                     document.getElementById("modalLabel").textContent = label || "Unknown";
                     document.getElementById("modalConfidence").textContent = `Confidence: ${confidence || 'N/A'}`;
-                    document.getElementById("modalDatetime").textContent = `Detected: ${datetime || 'N/A'}`;
+                    document.getElementById("modalDate").textContent = `Detected: ${date || 'N/A'}`;
 
                     // Show the modal.
                     const modal = new bootstrap.Modal(document.getElementById("imageModal"));
