@@ -11,6 +11,8 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
     # global frame_queue, process_queue, display_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
     # global flagged_foodbev, pose_points, detected_food_drinks
+    
+    last_cleared_day = None
 
     while running:
         try:
@@ -36,9 +38,11 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
         if (drink_boxes and len(drink_boxes) >= 1):
             # or (food_boxes and len(food_boxes) >= 1)):
 
-            if datetime.now().strftime("%H:%M") == "00:00":  # refresh flagged track ids daily
+            current_day = datetime.now().date()
+            if current_day != last_cleared_day:
                 with flagged_foodbev_lock:
                     flagged_foodbev.clear()
+                last_cleared_day = current_day
 
             # object detection pipeline
             with detected_incompliance_lock:
@@ -53,7 +57,7 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
 
                     x1, y1, x2, y2 = map(int, coords)
 
-                    if track_id is not None:
+                    if track_id is not None and track_id not in flagged_foodbev:
                         detected_incompliance[track_id] = [coords,
                                                            ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2),
                                                            confidence, cls_id]
