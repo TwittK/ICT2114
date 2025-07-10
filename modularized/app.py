@@ -17,19 +17,23 @@ os.makedirs("yolo_models", exist_ok=True)
 
 drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
 pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
-target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55] 
+target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
-# [39, 40, 41] 
+# [39, 40, 41]
 # just the drinks from coco dataset
-#bread: 31, chips: 55, chocolate: 56, cookies: 67, desserts: 77, french fries: 86, hamburger: 100, ice-cream: 108, pastry: 156, waffles: 231
+# bread: 31, chips: 55, chocolate: 56, cookies: 67, desserts: 77, french fries: 86, hamburger: 100, ice-cream: 108, pastry: 156, waffles: 231
 # food_class_list = [31, 55, 56, 67, 77, 86, 100, 108, 156, 231]
 
 if __name__ == "__main__":
 
     try:
-        read_thread = threading.Thread(target=read_frames)
-        inference_thread = threading.Thread(target=preprocess, args=(drink_model, pose_model, target_class_list, 0.3), daemon=True)
-        detection_thread = threading.Thread(target=detection)
+        read_thread = threading.Thread(target=read_frames, daemon=True)
+        inference_thread = threading.Thread(
+            target=preprocess,
+            args=(drink_model, pose_model, target_class_list, 0.3),
+            daemon=True,
+        )
+        detection_thread = threading.Thread(target=detection, daemon=True)
         save_thread = threading.Thread(target=image_saver, daemon=True)
         flask_thread = threading.Thread(target=run_app, daemon=True)
 
@@ -46,11 +50,9 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             running = False
 
-        read_thread.join()
-        detection_thread.join()
+        # read_thread.join()
+        # inference_thread.join()
 
     finally:
         running = False
-        cap.release()
-
         print(f"[END]")

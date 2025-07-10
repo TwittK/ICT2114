@@ -1,8 +1,18 @@
 import queue
 from datetime import datetime
 import cv2 as cv
-from shared.state import frame_queue, running, detected_incompliance_lock, detected_incompliance, flagged_foodbev_lock, \
-    flagged_foodbev, pose_points_lock, pose_points, process_queue, display_queue
+from shared.state import (
+    frame_queue,
+    running,
+    detected_incompliance_lock,
+    detected_incompliance,
+    flagged_foodbev_lock,
+    flagged_foodbev,
+    pose_points_lock,
+    pose_points,
+    process_queue,
+    display_queue,
+)
 
 
 # Display annotated frames on dashboard
@@ -11,6 +21,8 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
     # global frame_queue, process_queue, display_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
     # global flagged_foodbev, pose_points, detected_food_drinks
+
+    last_cleared_day = None
 
     while running:
         try:
@@ -23,20 +35,29 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
             continue
 
         # perform image processing here
-        frame_copy = frame.copy()  # copy frame for drawing bounding boxes, ids and conf scores.
+        frame_copy = (
+            frame.copy()
+        )  # copy frame for drawing bounding boxes, ids and conf scores.
 
         # Drink detection
-        result = drink_model.track(frame_copy, persist=True, classes=target_classes_id, conf=conf_threshold,
-                                   iou=0.4, verbose=False)
+        result = drink_model.track(
+            frame_copy,
+            persist=True,
+            classes=target_classes_id,
+            conf=conf_threshold,
+            iou=0.4,
+            verbose=False,
+        )
         drink_boxes = result[0].boxes
 
         with detected_incompliance_lock:
             detected_incompliance.clear()
 
-        if (drink_boxes and len(drink_boxes) >= 1):
+        if drink_boxes and len(drink_boxes) >= 1:
             # or (food_boxes and len(food_boxes) >= 1)):
 
-            if datetime.now().strftime("%H:%M") == "00:00":  # refresh flagged track ids daily
+            current_day = datetime.now().date()
+            if last_cleared_day != current_day:  # refresh flagged track ids daily
                 with flagged_foodbev_lock:
                     flagged_foodbev.clear()
 
@@ -49,21 +70,37 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
                     confidence = float(box.conf.cpu())
                     coords = box.xyxy[0].cpu().numpy()
                     class_name = drink_model.names[cls_id]
-                    print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
+                    # print(
+                    #     f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}"
+                    # )
 
                     x1, y1, x2, y2 = map(int, coords)
 
-                    if track_id is not None:
-                        detected_incompliance[track_id] = [coords,
-                                                           ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2),
-                                                           confidence, cls_id]
+                    if track_id is not None and track_id not in flagged_foodbev:
+                        detected_incompliance[track_id] = [
+                            coords,
+                            (
+                                (coords[0] + coords[2]) // 2,
+                                (coords[1] + coords[3]) // 2,
+                            ),
+                            confidence,
+                            cls_id,
+                        ]
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                        cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10),
-                                   cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv.putText(
+                            frame_copy,
+                            f"id: {track_id}, conf: {confidence:.2f}",
+                            (x1, y1 - 10),
+                            cv.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (0, 0, 255),
+                            2,
+                        )
 
-            pose_results = pose_model.track(frame, persist=True, conf=0.5, iou=0.4, verbose=False)[0]
+            pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[
+                0
+            ]
             keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
-
             with pose_points_lock:
                 pose_points.clear()
 
@@ -74,15 +111,17 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
                     for person in keypoints:
                         try:
                             person_lm = person.cpu().numpy()
-                            pose_points.append({
-                                "nose": person_lm[0],
-                                "left_wrist": person_lm[9],
-                                "right_wrist": person_lm[10],
-                                "left_ear": person_lm[3],
-                                "right_ear": person_lm[4],
-                                "left_eye": person_lm[1],
-                                "right_eye": person_lm[2],
-                            })
+                            pose_points.append(
+                                {
+                                    "nose": person_lm[0],
+                                    "left_wrist": person_lm[9],
+                                    "right_wrist": person_lm[10],
+                                    "left_ear": person_lm[3],
+                                    "right_ear": person_lm[4],
+                                    "left_eye": person_lm[1],
+                                    "right_eye": person_lm[2],
+                                }
+                            )
                         except Exception:
                             continue
 
