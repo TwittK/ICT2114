@@ -72,13 +72,11 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
                     confidence = float(box.conf.cpu())
                     coords = box.xyxy[0].cpu().numpy()
                     class_name = drink_model.names[cls_id]
-                    # print(
-                    #     f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}"
-                    # )
+                    print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
 
                     x1, y1, x2, y2 = map(int, coords)
 
-                    if track_id is not None and track_id not in flagged_foodbev:
+                    if track_id is not None:
 
                         # Draw bounding boxes on frame
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
@@ -101,19 +99,21 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
                                 pass
                             display_queue.put(frame_copy)
 
-                        # Check if it's a water bottle or not
-                        object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
-                        results = classif_model(object_crop, verbose=False)
-                        pred = results[0]
-                        label = pred.names[pred.probs.top1]
+                        if track_id not in flagged_foodbev:
 
-                        # Discard saving coordinates if it's a water bottle
-                        if label == "water_bottle":
-                            print("Water bottle, skipping")
-                            continue
-                            
-                        # Save coordinates
-                        detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2,), confidence,cls_id]
+                            # Check if it's a water bottle or not
+                            object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
+                            results = classif_model(object_crop, verbose=False)
+                            pred = results[0]
+                            label = pred.names[pred.probs.top1]
+
+                            # Discard saving coordinates if it's a water bottle
+                            if label == "water_bottle":
+                                print("🚫 Water bottle, skipping")
+                                continue
+                                
+                            # Save coordinates
+                            detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2,), confidence,cls_id]
 
 
 
