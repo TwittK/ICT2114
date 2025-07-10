@@ -23,8 +23,8 @@ import cv2 as cv
 from io import BytesIO
 
 # Constants
-NOSE_THRESHOLD = 250  # Distance thresholds
-WRIST_THRESHOLD = 100
+NOSE_THRESHOLD = 300  # Distance thresholds
+WRIST_THRESHOLD = 170
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 3  # number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
@@ -110,7 +110,7 @@ def get_face_comparison(modeData, FDID):
 
         # Send the POST request
         response = requests.post(
-            "http://{NVR_IP}/ISAPI/Intelligent/FDLib/FDSearch?security=1&iv=6e130e2ec9c415ed9b8dd80e732b9d82",
+            f"http://{NVR_IP}/ISAPI/Intelligent/FDLib/FDSearch?security=1&iv=6e130e2ec9c415ed9b8dd80e732b9d82",
             data=xml_payload.encode("utf-8"),
             headers=headers,
             auth=HTTPDigestAuth("admin", "Sit12345"),

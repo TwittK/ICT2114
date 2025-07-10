@@ -24,8 +24,6 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
 
     last_cleared_day = None
 
-    last_cleared_day = None
-
     while running:
         try:
             frame = frame_queue.get(timeout=1)
