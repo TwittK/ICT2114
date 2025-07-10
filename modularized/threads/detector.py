@@ -529,5 +529,7 @@ def detection():
                             except Exception as e:
                                 print(e)
                                 continue
+                else:
+                    print("Pose not near drink, skipping.")
 
     db.close()

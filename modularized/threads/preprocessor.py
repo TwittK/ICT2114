@@ -24,6 +24,8 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
 
     last_cleared_day = None
 
+    last_cleared_day = None
+
     while running:
         try:
             frame = frame_queue.get(timeout=1)
@@ -60,6 +62,7 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
             if last_cleared_day != current_day:  # refresh flagged track ids daily
                 with flagged_foodbev_lock:
                     flagged_foodbev.clear()
+                last_cleared_day = current_day
 
             # object detection pipeline
             with detected_incompliance_lock:
