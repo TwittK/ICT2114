@@ -80,18 +80,7 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
 
                     if track_id is not None and track_id not in flagged_foodbev:
 
-                        # Check if it's a water bottle or not
-                        object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
-                        results = classif_model(object_crop, verbose=False)
-                        pred = results[0]
-                        label = pred.names[pred.probs.top1]
-
-                        if label == "water_bottle":
-                            print("Water bottle, skipping")
-                            continue
-                            
-                        # Save coordinates
-                        detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2,), confidence,cls_id]
+                        # Draw bounding boxes on frame
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
                         cv.putText(
                             frame_copy,
@@ -102,7 +91,6 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
                             (0, 0, 255),
                             2,
                         )
-
                         # Put into queue to display frames in dashboard 
                         if not display_queue.full():
                             display_queue.put(frame_copy)
@@ -112,6 +100,23 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
                             except queue.Empty:
                                 pass
                             display_queue.put(frame_copy)
+
+                        # Check if it's a water bottle or not
+                        object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
+                        results = classif_model(object_crop, verbose=False)
+                        pred = results[0]
+                        label = pred.names[pred.probs.top1]
+
+                        # Discard saving coordinates if it's a water bottle
+                        if label == "water_bottle":
+                            print("Water bottle, skipping")
+                            continue
+                            
+                        # Save coordinates
+                        detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2,), confidence,cls_id]
+
+
+
 
 
             pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[0]
