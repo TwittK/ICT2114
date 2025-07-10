@@ -17,6 +17,7 @@ os.makedirs("yolo_models", exist_ok=True)
 
 drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
 pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
+classif_model = YOLO(os.path.join("yolo_models", "yolov8n-cls.pt"))
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
 # [39, 40, 41]
@@ -30,7 +31,7 @@ if __name__ == "__main__":
         read_thread = threading.Thread(target=read_frames, daemon=True)
         inference_thread = threading.Thread(
             target=preprocess,
-            args=(drink_model, pose_model, target_class_list, 0.3),
+            args=(drink_model, pose_model, target_class_list, 0.3, classif_model),
             daemon=True,
         )
         detection_thread = threading.Thread(target=detection, daemon=True)

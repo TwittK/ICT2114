@@ -13,10 +13,11 @@ from shared.state import (
     process_queue,
     display_queue,
 )
+from detector import safe_crop
 
 
 # Display annotated frames on dashboard
-def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
+def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, classif_model):
     # global running
     # global frame_queue, process_queue, display_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
@@ -78,15 +79,19 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
                     x1, y1, x2, y2 = map(int, coords)
 
                     if track_id is not None and track_id not in flagged_foodbev:
-                        detected_incompliance[track_id] = [
-                            coords,
-                            (
-                                (coords[0] + coords[2]) // 2,
-                                (coords[1] + coords[3]) // 2,
-                            ),
-                            confidence,
-                            cls_id,
-                        ]
+
+                        # Check if it's a water bottle or not
+                        object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
+                        results = classif_model(object_crop, verbose=False)
+                        pred = results[0]
+                        label = pred.names[pred.probs.top1]
+
+                        if label == "water_bottle":
+                            print("Water bottle, skipping")
+                            continue
+                            
+                        # Save coordinates
+                        detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2,), confidence,cls_id]
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
                         cv.putText(
                             frame_copy,
@@ -98,9 +103,18 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
                             2,
                         )
 
-            pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[
-                0
-            ]
+                        # Put into queue to display frames in dashboard 
+                        if not display_queue.full():
+                            display_queue.put(frame_copy)
+                        else:
+                            try:
+                                display_queue.get_nowait()
+                            except queue.Empty:
+                                pass
+                            display_queue.put(frame_copy)
+
+
+            pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[0]
             keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
             with pose_points_lock:
                 pose_points.clear()
@@ -142,13 +156,3 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
 
                     except Exception as e:
                         print(f"Error putting frame into process queue: {e}")
-
-        # Put into queue to display frames in dashboard
-        if not display_queue.full():
-            display_queue.put(frame_copy)
-        else:
-            try:
-                display_queue.get_nowait()
-            except queue.Empty:
-                pass
-            display_queue.put(frame_copy)
