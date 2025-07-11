@@ -21,6 +21,7 @@ import uuid
 import time
 import cv2 as cv
 from io import BytesIO
+import shared.state as shared_state
 
 # Constants
 NOSE_THRESHOLD = 300  # Distance thresholds
@@ -263,7 +264,7 @@ def detection():
 
     db = sqlite3.connect("users.sqlite")
 
-    while running:
+    while shared_state.running:
         try:
             frame = process_queue.get(timeout=1)
 

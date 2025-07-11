@@ -3,7 +3,6 @@ from datetime import datetime
 import cv2 as cv
 from shared.state import (
     frame_queue,
-    running,
     detected_incompliance_lock,
     detected_incompliance,
     flagged_foodbev_lock,
@@ -14,7 +13,7 @@ from shared.state import (
     display_queue,
 )
 from detector import safe_crop
-
+import shared.state as shared_state
 
 # Display annotated frames on dashboard
 def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, classif_model):
@@ -25,7 +24,7 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
 
     last_cleared_day = None
 
-    while running:
+    while shared_state.running:
         try:
             frame = frame_queue.get(timeout=1)
 
