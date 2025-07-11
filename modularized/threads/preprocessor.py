@@ -89,15 +89,6 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
                             (0, 0, 255),
                             2,
                         )
-                        # Put into queue to display frames in dashboard 
-                        if not display_queue.full():
-                            display_queue.put(frame_copy)
-                        else:
-                            try:
-                                display_queue.get_nowait()
-                            except queue.Empty:
-                                pass
-                            display_queue.put(frame_copy)
 
                         if track_id not in flagged_foodbev:
 
@@ -115,9 +106,17 @@ def preprocess(drink_model, pose_model, target_classes_id, conf_threshold, class
                             # Save coordinates
                             detected_incompliance[track_id] = [coords, ((coords[0] + coords[2]) // 2, (coords[1] + coords[3]) // 2,), confidence,cls_id]
 
+        # Put into queue to display frames in dashboard 
+        if not display_queue.full():
+            display_queue.put(frame_copy)
+        else:
+            try:
+                display_queue.get_nowait()
+            except queue.Empty:
+                pass
+            display_queue.put(frame_copy)
 
-
-
+        if detected_incompliance and len(detected_incompliance) >= 1:
 
             pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[0]
             keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
