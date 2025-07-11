@@ -3,22 +3,17 @@ import cv2
 import time
 from shared.state import frame_queue, running, cap as shared_cap
 
-NVR_IP = "192.168.1.63"
 
-
-def read_frames():
+def read_frames(use_ip_camera, camera_ip, channel):
     # global running, cap, frame_queue
     global shared_cap
 
-    use_ip_camera = True
-
     if use_ip_camera:
-        # # Camera config
-        # camera_ip = "192.168.10.64"
+        # Camera config
         username = "admin"
         password = "Sit12345"
-        # last digit: Use 1 for main stream (better qual, but more bandwidth), 2 for sub stream
-        rtsp_url = f"rtsp://{username}:{password}@{NVR_IP}/Streaming/channels/1501"
+        # last digit of channel: Use 1 for main stream (better qual, but more bandwidth), 2 for sub stream
+        rtsp_url = f"rtsp://{username}:{password}@{camera_ip}/Streaming/Channels/{channel}"
 
         # Initialize IP camera instead of webcam
         shared_cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
@@ -29,7 +24,7 @@ def read_frames():
             print(f"Attempted URL: {rtsp_url}")
             return
 
-        print(f"✅ Successfully connected to IP camera: {NVR_IP}")
+        print(f"✅ Successfully connected to IP camera: {camera_ip}")
     else:
         shared_cap = cv2.VideoCapture(0)  # to test with webcam
 
