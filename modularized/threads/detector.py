@@ -14,13 +14,8 @@ from shared.state import (
     flagged_foodbev,
     wrist_proximity_history,
 )
-import requests
-from requests.auth import HTTPDigestAuth
-import xml.etree.ElementTree as ET
-import uuid
 import time
 import cv2 as cv
-from io import BytesIO
 import shared.state as shared_state
 from threads.emailservice import EmailService  
 from threads.nvr import NVR

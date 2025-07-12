@@ -2,7 +2,6 @@ import requests
 from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
 import uuid
-import time
 import cv2 as cv
 from io import BytesIO
 import os
