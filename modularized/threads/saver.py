@@ -11,4 +11,4 @@ async def save_img(frame_or_face, uuid_str, timestamp, faces_or_incompliance):
     filepath = os.path.join(folder, filename)
 
     await asyncio.to_thread(cv.imwrite, filepath, frame_or_face)
-    print(f"Saved {folder}/{filename} asynchronously")
+    print(f"Saved {folder}\{filename} asynchronously")
