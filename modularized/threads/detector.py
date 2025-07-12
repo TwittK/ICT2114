@@ -1,4 +1,3 @@
-import sqlite3
 import queue, time, os
 import numpy as np
 from datetime import datetime
@@ -15,10 +14,10 @@ from shared.state import (
     wrist_proximity_history,
 )
 import time
-import cv2 as cv
 import shared.state as shared_state
 from threads.emailservice import EmailService  
 from threads.nvr import NVR
+from threads.process_incompliance import ProcessIncompliance
 
 # Constants
 NOSE_THRESHOLD = 300  # Distance thresholds
@@ -83,18 +82,18 @@ def get_dist_nose_to_box(pose_points, detected_food_drinks, track_id):
     # Compute distance from nose to closest point on the bbox (euclidean distance formula)
     return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
 
-# Associate detected food/ drinks to person
+
+# Associate detected food/ drinks to personsss
 def detection():
-    # global running
+    # global runningsssssssssssssssssssssssss
     # global save_queue, process_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
     # global flagged_foodbev, pose_points, detected_food_drinks
     # global wrist_proximity_history
 
-    db = sqlite3.connect("users.sqlite")
-
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
+    process_incompliance = ProcessIncompliance("users.sqlite")
 
     while shared_state.running:
         try:
@@ -184,61 +183,26 @@ def detection():
 
                                     print("Match found")
                                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    today = current_date[:10]
 
-                                    query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.snapshotId = ?;"""
-                                    cursor = db.execute(query, (matchesFound[1],))
-                                    result = cursor.fetchone()
+                                    person_id = process_incompliance.match_found_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, frame, current_date, today)
 
-                                    if result:
-                                        person_id, last_incompliance = result
-                                        last_date = (last_incompliance[:10] if last_incompliance else None)
-                                        today = current_date[:10]
+                                    if person_id is not None:
+                                                        
+                                        # Save frame locally
+                                        save_img(frame, str(person_id), today, "incompliances",)
+                            
+                                        # Send Email for Second Incompliance Detected
+                                        email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
+                                        
+                                        print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                                        
+                                    # Incompliance on the same date
+                                    else:
+                                        print(f"[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
 
-                                        if last_date != today and last_date is not None:
-
-                                            face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-                                            snapshotId = nvr.insert_into_face_db(face_crop, person_id)
-
-                                            if snapshotId:
-                                                print("[FACE] 🔴 Inserted face into library")
-                                                update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
-                                                db.execute(
-                                                    update_query,
-                                                    (current_date, person_id),
-                                                )
-                                                db.commit()
-
-                                                snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?)"""
-                                                db.execute(
-                                                    snapshot_query,
-                                                    (
-                                                        snapshotId,  # snapshotId = PID from NVR (1 PID for every unique image)
-                                                        local_detected_food_drinks[track_id][2],  # confidence value
-                                                        current_date,
-                                                        str(local_detected_food_drinks[track_id][3]),  # detected object class id
-                                                        f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
-                                                        person_id,
-                                                        1,  # temp camera id
-                                                    ),
-                                                )
-                                                db.commit()
-
-                                                # Save frame locally
-                                                save_img(frame, str(person_id), today, "incompliances",)
-
-                                                print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
-                                                
-                                                # Send Email for Second Incompliance Detected
-                                                email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
-
-                                        # Incompliance on the same date
-                                        else:
-                                            print(
-                                                f"[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring."
-                                            )
-
-                                        with flagged_foodbev_lock:
-                                            flagged_foodbev.append(track_id)
+                                    with flagged_foodbev_lock:
+                                        flagged_foodbev.append(track_id)
 
                                 # No match
                                 elif matchesFound is not None and int(matchesFound[0]) < 1:
@@ -249,39 +213,14 @@ def detection():
                                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     today = current_date[:10]
 
-                                    cursor = db.execute(
-                                        """ INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId;""",
-                                        (current_date,),
-                                    )
-                                    person_id = cursor.fetchone()[0]
-
-                                    face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-                                    # snapshotId = nvr.insert_into_face_db(face_crop, person_id)
-
+                                    person_id = process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, frame, current_date, today)
+                                    
+                                    # Save frame locally in new folder
                                     os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
-                                    snapshotId = 1
-                                    if snapshotId:
-                                        print("[FACE] 🔴 Inserted face into library")
-                                        snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
-                                        db.execute(
-                                            snapshot_query,
-                                            (
-                                                snapshotId,
-                                                local_detected_food_drinks[track_id][2],  # confidence value
-                                                current_date,
-                                                str(local_detected_food_drinks[track_id][3]),  # detected object class id
-                                                f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
-                                                person_id,
-                                                1,  # temp camera id
-                                            ),
-                                        )
-                                        db.commit()
-                                        
-                                        # Save frame locally
-                                        save_img(frame, str(person_id), today, "incompliances",)
-
-                                        print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
-                                        time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
+                                    save_img(frame, str(person_id), today, "incompliances",)
+                                    
+                                    print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+                                    time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
 
                             except Exception as e:
                                 print(e)
@@ -289,4 +228,4 @@ def detection():
                 else:
                     print("Pose not near drink, skipping.")
 
-    db.close()
+    process_incompliance.close_connection()
