@@ -51,7 +51,7 @@ class ProcessIncompliance:
 
     return None        
   
-  # When NO face match is found in exisiting incompliance
+  # When NO face match is found in exisiting incompliance (a new person does incompliance)
   def no_match_new_incompliance(self, nvr, local_detected_food_drinks, track_id, face_crop, current_date, today):
 
     # Insert new record of a person into the database
@@ -61,9 +61,10 @@ class ProcessIncompliance:
 
     # Save face into NVR face library
     face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-    snapshotId = nvr.insert_into_face_db(face_crop, person_id)
+    #snapshotId = nvr.insert_into_face_db(face_crop, person_id)
 
     # Save incompliance snapshot and record details in database
+    snapshotId = 1
     if snapshotId:
       print("[FACE] 🔴 Inserted face into library")
       snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
@@ -84,4 +85,4 @@ class ProcessIncompliance:
     return person_id
   
   def close_connection(self):
-      self.db.close()
+    self.db.close()
