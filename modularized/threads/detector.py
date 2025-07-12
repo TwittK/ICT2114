@@ -175,11 +175,12 @@ def detection():
 
                         if face_crop is not None and face_crop.size > 0:
                             try:
-                                modeData = nvr.get_mode_data(frame)
-                                matchesFound = nvr.get_face_comparison(modeData)
+                                # modeData = nvr.get_mode_data(frame)
+                                # matchesFound = nvr.get_face_comparison(modeData)
+                                matchesFound = (0, "fdsjf342")
 
                                 # match found
-                                if matchesFound is not None and int(matchesFound) >= 1:
+                                if matchesFound is not None and int(matchesFound[0]) >= 1:
 
                                     print("Match found")
                                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -240,7 +241,7 @@ def detection():
                                             flagged_foodbev.append(track_id)
 
                                 # No match
-                                elif matchesFound is not None and int(matchesFound) < 1:
+                                elif matchesFound is not None and int(matchesFound[0]) < 1:
                                     print("No match found")
                                     with flagged_foodbev_lock:
                                         flagged_foodbev.append(track_id)
@@ -255,10 +256,10 @@ def detection():
                                     person_id = cursor.fetchone()[0]
 
                                     face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-                                    snapshotId = nvr.insert_into_face_db(face_crop, person_id)
+                                    # snapshotId = nvr.insert_into_face_db(face_crop, person_id)
 
                                     os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
-
+                                    snapshotId = 1
                                     if snapshotId:
                                         print("[FACE] 🔴 Inserted face into library")
                                         snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""

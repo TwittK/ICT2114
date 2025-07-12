@@ -27,7 +27,7 @@ target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 if __name__ == "__main__":
 
     try:
-        read_thread = threading.Thread(target=read_frames, args=(True, "192.168.10.64", "101"))
+        read_thread = threading.Thread(target=read_frames, args=(False, "192.168.10.64", "101"))
         inference_thread = threading.Thread(
             target=preprocess,
             args=(drink_model, pose_model, target_class_list, 0.3),
