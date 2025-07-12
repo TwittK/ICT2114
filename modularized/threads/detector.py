@@ -22,6 +22,7 @@ import time
 import cv2 as cv
 from io import BytesIO
 import shared.state as shared_state
+from threads.emailservice import EmailService  
 
 # Constants
 NOSE_THRESHOLD = 300  # Distance thresholds
@@ -264,6 +265,8 @@ def detection():
 
     db = sqlite3.connect("users.sqlite")
 
+    email_service = EmailService()
+
     while shared_state.running:
         try:
             frame = process_queue.get(timeout=1)
@@ -438,6 +441,9 @@ def detection():
                                                 print(
                                                     f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅"
                                                 )
+                                                
+                                                # Send Email for Second Incompliance Detected
+                                                email_service.send_incompliance_email("recipient@example.com", f"Person {person_id}")                                                    
 
                                         # incompliance on the same date
                                         else:
