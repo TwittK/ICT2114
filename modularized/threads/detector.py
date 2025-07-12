@@ -19,7 +19,6 @@ import cv2 as cv
 import shared.state as shared_state
 from threads.emailservice import EmailService  
 from threads.nvr import NVR
-import asyncio
 
 # Constants
 NOSE_THRESHOLD = 300  # Distance thresholds
@@ -180,7 +179,7 @@ def detection():
                                 matchesFound = nvr.get_face_comparison(modeData)
 
                                 # match found
-                                if matchesFound is not None and int(matchesFound[0]) >= 1:
+                                if matchesFound is not None and int(matchesFound) >= 1:
 
                                     print("Match found")
                                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -224,7 +223,7 @@ def detection():
                                                 db.commit()
 
                                                 # Save frame locally
-                                                asyncio.run(save_img(frame, str(person_id), today, "incompliances",))
+                                                save_img(frame, str(person_id), today, "incompliances",)
 
                                                 print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
                                                 
@@ -241,7 +240,7 @@ def detection():
                                             flagged_foodbev.append(track_id)
 
                                 # No match
-                                elif matchesFound is not None and int(matchesFound[0]) < 1:
+                                elif matchesFound is not None and int(matchesFound) < 1:
                                     print("No match found")
                                     with flagged_foodbev_lock:
                                         flagged_foodbev.append(track_id)
@@ -278,7 +277,7 @@ def detection():
                                         db.commit()
                                         
                                         # Save frame locally
-                                        asyncio.run(save_img(frame, str(person_id), today, "incompliances",))
+                                        save_img(frame, str(person_id), today, "incompliances",)
 
                                         print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
