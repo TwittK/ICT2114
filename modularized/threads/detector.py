@@ -443,7 +443,7 @@ def detection():
                                                 )
                                                 
                                                 # Send Email for Second Incompliance Detected
-                                                email_service.send_incompliance_email("recipient@example.com", f"Person {person_id}")                                                    
+                                                email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
 
                                         # incompliance on the same date
                                         else:
