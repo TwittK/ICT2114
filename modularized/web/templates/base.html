@@ -84,10 +84,22 @@
                     <div class="navbar-nav ms-auto">
                         {% if session['logged_in'] %}
                             <div class="nav-item dropdown">
+                                {% set name = session.get('username', 'Unknown') %}
+                                {% if name %}
+                                    {% set first = name[0] | upper %}
+                                    {% set rest = name[1:] %}
+                                {% else %}
+                                    {% set first = '' %}
+                                    {% set rest = '' %}
+                                {% endif %}
+
+
                                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#"
                                    id="userProfileDropdown"
                                    role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <span class="me-2">Hi, Admin</span>
+                                    <span class="me-2">
+                                        Hi, {{ first }}{{ rest }}
+                                    </span>
                                     <i class="fas fa-user"></i>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userProfileDropdown">
