@@ -1,7 +1,6 @@
 # app.py
 import threading
 import os, time
-from ultralytics import YOLO
 import shared.state as shared_state
 
 from threads.reader import read_frames
@@ -15,8 +14,6 @@ os.makedirs(os.path.join("web", "static", "faces"), exist_ok=True)
 os.makedirs(os.path.join("web", "static", "incompliances"), exist_ok=True)
 os.makedirs("yolo_models", exist_ok=True)
 
-drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
-pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
 # [39, 40, 41]
@@ -27,10 +24,10 @@ target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 if __name__ == "__main__":
 
     try:
-        read_thread = threading.Thread(target=read_frames, args=(True, "192.168.10.64", "101"))
+        read_thread = threading.Thread(target=read_frames, args=(False, "192.168.10.64", "101"))
         inference_thread = threading.Thread(
             target=preprocess,
-            args=(drink_model, pose_model, target_class_list, 0.3),
+            args=(target_class_list, 0.3),
             daemon=True,
         )
         detection_thread = threading.Thread(target=detection)

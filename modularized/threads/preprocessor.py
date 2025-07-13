@@ -1,6 +1,7 @@
-import queue
+import queue, os
 from datetime import datetime
 import cv2 as cv
+from ultralytics import YOLO
 from shared.state import (
     frame_queue,
     detected_incompliance_lock,
@@ -15,12 +16,14 @@ from shared.state import (
 import shared.state as shared_state
 
 # Display annotated frames on dashboard
-def preprocess(drink_model, pose_model, target_classes_id, conf_threshold):
+def preprocess(target_classes_id, conf_threshold):
     # global running
     # global frame_queue, process_queue, display_queue
     # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
     # global flagged_foodbev, pose_points, detected_food_drinks
 
+    drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
+    pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
     last_cleared_day = None
 
     while shared_state.running:
