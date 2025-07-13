@@ -61,10 +61,9 @@ class ProcessIncompliance:
 
     # Save face into NVR face library
     face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-    #snapshotId = nvr.insert_into_face_db(face_crop, person_id)
+    snapshotId = nvr.insert_into_face_db(face_crop, person_id)
 
     # Save incompliance snapshot and record details in database
-    snapshotId = 1
     if snapshotId:
       print("[FACE] 🔴 Inserted face into library")
       snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""

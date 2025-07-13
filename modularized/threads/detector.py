@@ -183,9 +183,9 @@ def detection():
                     today = current_date[:10]
 
                     # Facial Recognition
-                    # modeData = nvr.get_mode_data(frame)
-                    # matchesFound = nvr.get_face_comparison(modeData)
-                    matchesFound = (0, "fdsjf342")
+                    modeData = nvr.get_mode_data(frame)
+                    matchesFound = nvr.get_face_comparison(modeData)
+                    # matchesFound = (0, "fdsjf342")
 
                     # Match found
                     if matchesFound is not None and int(matchesFound[0]) >= 1:
