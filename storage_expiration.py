@@ -25,7 +25,7 @@ class StorageExpiration:
             self.expiration_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d %H:%M:%S")
             self.conn = sqlite3.connect(self.db_path)
             self.cursor = self.conn.cursor()
-            logging.info("Database connection opened.")
+            logging.info("[START] Database connection opened.")
 
         except sqlite3.Error as e:
             logging.exception("Error fetching expired snapshots.")
@@ -48,7 +48,7 @@ class StorageExpiration:
     def delete_expired(self):
 
         # Fetch all incompliance records that are earlier than 12 months ago.
-        self.cursor.execute("""SELECT DetectionId, snapshotId, imageURL FROM Snapshot WHERE time_generated < ?""", (self.expiration_date,))
+        self.cursor.execute("""SELECT DetectionId, snapshotId, imageURL FROM Snapshot WHERE datetime(time_generated) < datetime(?)""", (self.expiration_date,))
         expired_snapshots = self.cursor.fetchall()
         logging.info(f"Found {len(expired_snapshots)} expired snapshot(s).")
 
@@ -68,7 +68,7 @@ class StorageExpiration:
             logging.info(f"Deleted DB record ID: {DetectionId}")
 
         try:
-            self.cursor.execute("""DELETE FROM Person WHERE last_incompliance < ?""", (self.expiration_date,))
+            self.cursor.execute("""DELETE FROM Person WHERE datetime(last_incompliance) < datetime(?)""", (self.expiration_date,))
             logging.info("Deleted expired entries from Person table.")
 
             self.conn.commit()
@@ -79,11 +79,10 @@ class StorageExpiration:
     def close(self):
         self.cursor.close()
         self.conn.close()
-        logging.info("Database connection closed.")
+        logging.info("[END] Database connection closed.")
 
 
 expiration_routine = StorageExpiration('users.sqlite', "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
 expiration_routine.open()
 expiration_routine.delete_expired()
 expiration_routine.close()
-
