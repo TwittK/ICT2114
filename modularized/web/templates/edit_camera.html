@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
 
+<div class="alert alert-info">
+  <i class="fa-solid fa-info-circle"></i> <strong>Admin Access:</strong> Only administrators can modify camera settings.
+</div>
+
 <h2>Camera Settings — {{ camera['name'] }}</h2>
 
 <ul class="nav nav-tabs" id="cameraTab" role="tablist">
@@ -63,20 +67,24 @@
     <div class="tab-pane fade" id="time" role="tabpanel">
       <label>Timezone:
         <select name="timezone" class="form-select">
-          <option value="Asia/Singapore" {{ 'selected' if camera['timezone']=='Asia/Singapore' }}>Asia/Singapore</option>
+          <option value="Asia/Singapore" {{ 'selected' if camera['timezone']=='Asia/Singapore' }}>Asia/Singapore
+          </option>
           <option value="UTC" {{ 'selected' if camera['timezone']=='UTC' }}>UTC</option>
         </select>
       </label>
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="sync_with_ntp" value="1" {% if camera['sync_with_ntp'] %}checked{% endif %}>
+        <input class="form-check-input" type="checkbox" name="sync_with_ntp" value="1" {% if camera['sync_with_ntp']
+          %}checked{% endif %}>
         <label class="form-check-label">Sync with NTP</label>
       </div>
-      <label>NTP Server:<input name="ntp_server_address" class="form-control" value="{{ camera['ntp_server_address'] }}"></label>
-      <label>Manual Time:<input type="datetime-local" name="manual_time" class="form-control" value="{{ camera['time'] }}"></label>
+      <label>NTP Server:<input name="ntp_server_address" class="form-control"
+          value="{{ camera['ntp_server_address'] }}"></label>
+      <label>Manual Time:<input type="datetime-local" name="manual_time" class="form-control"
+          value="{{ camera['time'] }}"></label>
     </div>
   </div>
 
-  <button type="submit" class="btn btn-primary mt-3">Save</button>
+  <button type="submit" class="btn btn-primary mt-3">Save Changes</button>
   <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Cancel</a>
 </form>
 {% endblock %}

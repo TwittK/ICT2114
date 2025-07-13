@@ -100,22 +100,29 @@ def index():
 
     results = []
 
-    # Create default camera inside the database.
-    if is_adding_camera and lab_name:
+    # Create default camera inside the database - ADMIN ONLY
+    if is_adding_camera and lab_name and is_admin:
         user_id = session.get("user_id")
         dao = CameraDAO("users.sqlite")
 
         success, message = dao.add_default_camera(lab_name, user_id)
         flash(message, "success" if success else "danger")
         return redirect(url_for("index", lab=lab_name))
+    elif is_adding_camera and not is_admin:
+        flash("Admin access required to add cameras!", "error")
+        return redirect(url_for("index", lab=lab_name))
 
-    if is_deleting_camera and camera_name and lab_name:
+    # Delete camera - ADMIN ONLY
+    if is_deleting_camera and camera_name and lab_name and is_admin:
         user_id = session.get("user_id")
         dao = CameraDAO("users.sqlite")
 
         success, message = dao.delete_camera(lab_name, camera_name, user_id)
 
         flash(message, "success" if success else "danger")
+        return redirect(url_for("index", lab=lab_name))
+    elif is_deleting_camera and not is_admin:
+        flash("Admin access required to delete cameras!", "error")
         return redirect(url_for("index", lab=lab_name))
 
     if request.method == "POST":
@@ -222,6 +229,7 @@ def get_db():
 
 @app.route('/camera/<int:camera_id>/edit', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def edit_camera(camera_id):
     conn = get_db()
     cursor = conn.cursor()
@@ -270,11 +278,17 @@ def edit_camera(camera_id):
                              subnet, gateway, timezone, sync, ntp, time, camera_id))
         conn.commit()
 
-        return redirect(url_for('index'))  # or return to camera page
+        flash('Camera settings updated successfully!', 'success')
+        return redirect(url_for('index'))
 
     # GET: fetch camera settings and labs for sidebar
     cursor.execute('SELECT * FROM Camera WHERE CameraId=?', (camera_id,))
     camera = cursor.fetchone()
+    
+    if not camera:
+        flash('Camera not found!', 'error')
+        return redirect(url_for('index'))
+    
     cursor.execute('SELECT * FROM Lab')  # for lab list/sidebar
     labs = cursor.fetchall()
     conn.close()
