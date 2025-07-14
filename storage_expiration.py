@@ -31,9 +31,9 @@ class StorageExpiration:
             logging.exception("Error fetching expired snapshots.")
 
     def nvr_delete_face(self, pid):
-        url = ""
+        url = f"http://{self.nvr_ip}/ISAPI/Intelligent/FDLib/{self.fdid}/picture/{pid}"
         try:
-            response = requests.post(url, auth=HTTPDigestAuth(self.username, self.password))
+            response = requests.delete(url, auth=HTTPDigestAuth(self.username, self.password))
 
             if (response.status == 200):
                 logging.info(f"Successfully deleted face from NVR: {pid}")
