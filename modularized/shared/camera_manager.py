@@ -9,20 +9,20 @@ target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 # food_class_list = [31, 55, 56, 67, 77, 86, 100, 108, 156, 231]
 
 
-def remove_camera(camera_id):
-  if camera_id not in cameras.camera_pool:
-    print(f"[ERROR] Camera {camera_id} is not running.")
-    return False
+# def remove_camera(camera_id):
+#   if camera_id not in cameras.camera_pool:
+#     print(f"[ERROR] Camera {camera_id} is not running.")
+#     return False
 
-  camera = cameras.camera_pool[camera_id]["camera"]
-  camera.running = False
+#   camera = cameras.camera_pool[camera_id]["camera"]
+#   camera.running = False
 
-  for name, thread in cameras.camera_pool[camera_id]["threads"].items():
-    thread.join()
-    print(f"[INFO] {name} thread for {camera_id} joined.")
+#   for name, thread in cameras.camera_pool[camera_id]["threads"].items():
+#     thread.join()
+#     print(f"[INFO] {name} thread for {camera_id} joined.")
 
-  del cameras.camera_pool[camera_id]
-  return True
+#   del cameras.camera_pool[camera_id]
+#   return True
 
 
 class CameraManager:
