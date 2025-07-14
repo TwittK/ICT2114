@@ -53,7 +53,7 @@ class CameraManager:
       rows = cursor.fetchall()
 
     for camera_id, ip_address in rows:
-      self.add_new_camera(camera_id, ip_address, "101", False)
+      self.add_new_camera(camera_id, ip_address, "101", True)
 
     self._initialized = True
 
