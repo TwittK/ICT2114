@@ -7,7 +7,7 @@ import time
 from threads.emailservice import EmailService  
 from threads.nvr import NVR
 from threads.process_incompliance import ProcessIncompliance
-from threads.camera import Camera
+from shared.camera import Camera
 
 # Constants
 NOSE_THRESHOLD = 300  # Distance thresholds

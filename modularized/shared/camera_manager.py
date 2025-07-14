@@ -65,7 +65,7 @@ class CameraManager:
     from threads.preprocessor import preprocess
     from threads.detector import detection
     from threads.saver import image_saver
-    from threads.camera import Camera
+    from shared.camera import Camera
 
     camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
 

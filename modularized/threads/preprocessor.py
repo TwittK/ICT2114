@@ -2,7 +2,7 @@ import queue, os
 from datetime import datetime, timedelta
 import cv2 as cv
 from ultralytics import YOLO
-from threads.camera import Camera
+from shared.camera import Camera
 
 # Display annotated frames on dashboard
 def preprocess(context: Camera, target_classes_id, conf_threshold):

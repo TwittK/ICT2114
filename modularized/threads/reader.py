@@ -1,7 +1,7 @@
 # threads/reader.py
 import cv2
 import time
-from threads.camera import Camera
+from shared.camera import Camera
 
 
 def read_frames(context: Camera):

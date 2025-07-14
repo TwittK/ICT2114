@@ -1,6 +1,6 @@
 import cv2 as cv
 import os
-import threads.camera as Camera
+import shared.camera as Camera
 
 def save_img(context: Camera, frame, uuid_str, timestamp):
 
