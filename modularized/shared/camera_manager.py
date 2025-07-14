@@ -48,12 +48,15 @@ class CameraManager:
     
     self.camera_pool = {}
     self.db = sqlite3.connect(db_path)
+
+    # Select all existing cameras in database 
     with self.db as conn:
       cursor = conn.execute("SELECT CameraId, ip_address FROM Camera;")
       rows = cursor.fetchall()
 
+    # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
-      self.add_new_camera(camera_id, ip_address, "101", True)
+      self.add_new_camera(camera_id, ip_address, "101", True) 
 
     self._initialized = True
 
@@ -66,6 +69,7 @@ class CameraManager:
 
     camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
 
+    # Start all threads for detection
     read_thread = threading.Thread(target=read_frames, args=(camera,))
     preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3), daemon=True)
     detection_thread = threading.Thread(target=detection, args=(camera,))
