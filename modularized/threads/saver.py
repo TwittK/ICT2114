@@ -1,19 +1,19 @@
 import cv2 as cv
 import os
-import shared.state as shared_state
+import threads.camera as Camera
 
-def save_img(frame, uuid_str, timestamp):
-    # global save_queue
+def save_img(context: Camera, frame, uuid_str, timestamp):
+
     filename = f"Person_{uuid_str}_{timestamp}.jpg"
     filepath = os.path.join("web", "static", "incompliances", uuid_str, filename)
-    shared_state.save_queue.put((filepath, frame))
+    context.save_queue.put((filepath, frame))
 
 # Save images to disk
-def image_saver():
-    # global running, save_queue
-    while shared_state.running:
+def image_saver(context: Camera):
 
-        item = shared_state.save_queue.get()
+    while context.running:
+
+        item = context.save_queue.get()
         if item is None:
             break
 
@@ -21,4 +21,4 @@ def image_saver():
         
         cv.imwrite(filepath, frame)
         print(f"Saved in {filepath}")
-        shared_state.save_queue.task_done()
+        context.save_queue.task_done()

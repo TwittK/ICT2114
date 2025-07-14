@@ -95,10 +95,10 @@ class NVR:
         personID = root.find(".//isapi:PID", namespaces=ns)
 
       else:
-        return 0
+        return (0, None)
       
     else:
-      return None
+      return (None, None)
 
     return matchesFound, personID.text
   

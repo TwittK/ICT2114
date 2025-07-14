@@ -2,22 +2,12 @@ import queue, time, os
 import numpy as np
 from datetime import datetime
 from threads.saver import save_img
-from shared.state import (
-    process_queue,
-    running,
-    detected_incompliance_lock,
-    pose_points_lock,
-    pose_points,
-    detected_incompliance,
-    flagged_foodbev_lock,
-    flagged_foodbev,
-    wrist_proximity_history,
-)
+
 import time
-import shared.state as shared_state
 from threads.emailservice import EmailService  
 from threads.nvr import NVR
 from threads.process_incompliance import ProcessIncompliance
+from threads.camera import Camera
 
 # Constants
 NOSE_THRESHOLD = 300  # Distance thresholds
@@ -82,25 +72,20 @@ def get_dist_nose_to_box(pose_points, food_drinks_bbox):
     return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
 
 # Helper function to keep track of track id
-def flag_track_id(track_id):
-    with flagged_foodbev_lock:
-        flagged_foodbev.append(track_id)
+def flag_track_id(context, track_id):
+    with context.flagged_foodbev_lock:
+        context.flagged_foodbev.append(track_id)
 
 # Mapping detected food/ drinks to person
-def detection():
-    # global running
-    # global save_queue, process_queue
-    # global detected_food_drinks_lock, pose_points_lock, flagged_foodbev_lock
-    # global flagged_foodbev, pose_points, detected_food_drinks
-    # global wrist_proximity_history
+def detection(context: Camera):
 
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
-    process_incompliance = ProcessIncompliance("users.sqlite")
+    process_incompliance = ProcessIncompliance("users.sqlite", context.camera_id)
 
-    while shared_state.running:
+    while context.running:
         try:
-            frame = process_queue.get(timeout=1)
+            frame = context.process_queue.get(timeout=1)
 
         except queue.Empty:
             continue
@@ -109,15 +94,15 @@ def detection():
             continue
 
         # Shallow copy for reading in this thread
-        with detected_incompliance_lock, pose_points_lock:
-            local_pose_points = list(pose_points)
-            local_detected_food_drinks = dict(detected_incompliance)
+        with context.detected_incompliance_lock, context.pose_points_lock:
+            local_pose_points = list(context.pose_points)
+            local_detected_food_drinks = dict(context.detected_incompliance)
 
         for p in local_pose_points:
             for track_id in local_detected_food_drinks:
 
-                with flagged_foodbev_lock:
-                    if track_id in flagged_foodbev:
+                with context.flagged_foodbev_lock:
+                    if track_id in context.flagged_foodbev:
                         continue
 
                 food_drinks_bbox = local_detected_food_drinks[track_id][0]
@@ -155,18 +140,18 @@ def detection():
                 now = time.time()
 
                 # Track wrist proximity times
-                if track_id not in wrist_proximity_history:
-                    wrist_proximity_history[track_id] = []
+                if track_id not in context.wrist_proximity_history:
+                    context.wrist_proximity_history[track_id] = []
 
-                wrist_proximity_history[track_id].append(now)
+                context.wrist_proximity_history[track_id].append(now)
 
                 # Logging detection frame per track_Id
-                for track_id, timestamps in wrist_proximity_history.items():
+                for track_id, timestamps in context.wrist_proximity_history.items():
                     print(f"Track ID {track_id} has {len(timestamps)} proximity detections")
 
                 # Keep only timestamps within the last 2 seconds
-                recent_times = [t for t in wrist_proximity_history[track_id] if now - t <= REQUIRED_DURATION]
-                wrist_proximity_history[track_id] = (recent_times)  # Prune old entries
+                recent_times = [t for t in context.wrist_proximity_history[track_id] if now - t <= REQUIRED_DURATION]
+                context.wrist_proximity_history[track_id] = (recent_times)  # Prune old entries
 
                 if len(recent_times) < REQUIRED_COUNT:
                     continue
@@ -185,19 +170,22 @@ def detection():
                     # Facial Recognition
                     modeData = nvr.get_mode_data(frame)
                     matchesFound = nvr.get_face_comparison(modeData)
+                    
                     # matchesFound = (0, "fdsjf342")
+                    if matchesFound[0] == None:
+                        continue
 
                     # Match found
-                    if matchesFound is not None and int(matchesFound[0]) >= 1:
+                    if int(matchesFound[0]) >= 1:
 
                         print("Match found")
-                        person_id = process_incompliance.match_found_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date, today)
+                        person_id = process_incompliance.match_found_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
 
                         # Incompliance on different date
                         if person_id is not None:
                                             
                             # Save frame locally
-                            save_img(frame, str(person_id), today)
+                            save_img(context, frame, str(person_id), today)
                 
                             # Send Email for Second Incompliance Detected
                             email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
@@ -208,18 +196,18 @@ def detection():
                         else:
                             print(f"[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
 
-                        flag_track_id(track_id)
+                        flag_track_id(context, track_id)
 
                     # No match found
-                    elif matchesFound is not None and int(matchesFound[0]) < 1:
+                    elif int(matchesFound[0]) < 1:
                         print("No match found")
-                        flag_track_id(track_id)
+                        flag_track_id(context, track_id)
 
-                        person_id = process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date, today)
+                        person_id = process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
                         
                         # Save frame locally in new folder
                         os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
-                        save_img(frame, str(person_id), today)
+                        save_img(context, frame, str(person_id), today)
                         
                         print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances

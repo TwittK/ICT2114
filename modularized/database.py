@@ -124,14 +124,14 @@ def create_default_labs_and_cameras():
 
     if lab_count == 0:
         create_lab("E2-L6-016", "labsafety@gmail.com")
-        create_lab("E2-L6-017", "labsafety@gmail.com")
+        # create_lab("E2-L6-017", "labsafety@gmail.com")
 
     if camera_count == 0:
         create_camera("Camera 1", 1, 1)
-        create_camera("Camera 2", 1, 1)
+        # create_camera("Camera 2", 1, 1)
 
-        create_camera("Camera 1", 1, 2)
-        create_camera("Camera 2", 1, 2)
+        # create_camera("Camera 1", 1, 2)
+        # create_camera("Camera 2", 1, 2)
 
 
 def create_lab(lab_name, lab_safety_email):

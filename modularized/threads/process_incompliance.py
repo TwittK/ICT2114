@@ -2,12 +2,16 @@ import cv2 as cv
 import sqlite3
 
 class ProcessIncompliance:
-  def __init__(self, db_path):
+  def __init__(self, db_path, camera_id):
     self.db_path = db_path
+    self.camera_id = camera_id
     self.db = sqlite3.connect(self.db_path)
 
+  def get_date(self, current_date):
+    return current_date[:10]
+
   # When face match is found in exisiting incompliance
-  def match_found_new_incompliance(self, matchesFound, nvr, local_detected_food_drinks, track_id, face_crop, current_date, today):
+  def match_found_new_incompliance(self, matchesFound, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
 
     # Get the matching person_id and the last incompliance date
     query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.snapshotId = ?;"""
@@ -19,6 +23,7 @@ class ProcessIncompliance:
       last_date = (last_incompliance[:10] if last_incompliance else None)
 
       # Current incompliance must happen on a different date
+      today = self.get_date(current_date)
       if last_date != today and last_date is not None:
 
         face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
@@ -39,7 +44,7 @@ class ProcessIncompliance:
               str(local_detected_food_drinks[track_id][3]),  # detected object class id
               f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
               person_id,
-              1,  # temp camera id
+              self.camera_id
             ),
           )
           self.db.commit()
@@ -47,12 +52,14 @@ class ProcessIncompliance:
           return person_id
         
         else:
-              return None # Incompliance on the same date detected, skipping
+          return None # Incompliance on the same date detected, skipping
 
     return None        
   
   # When NO face match is found in exisiting incompliance (a new person does incompliance)
-  def no_match_new_incompliance(self, nvr, local_detected_food_drinks, track_id, face_crop, current_date, today):
+  def no_match_new_incompliance(self, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
+
+    today = self.get_date(current_date)
 
     # Insert new record of a person into the database
     query = " INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId; "
@@ -76,7 +83,7 @@ class ProcessIncompliance:
           str(local_detected_food_drinks[track_id][3]),  # detected object class id
           f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
           person_id,
-          1,  # temp camera id
+          self.camera_id,  # temp camera id
         ),
       )
       self.db.commit()
