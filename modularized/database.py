@@ -104,6 +104,22 @@ def create_default_admin():
         print("Default user account created: user/user123")
 
 
+def auto_discover_cameras():
+    """Auto-discover cameras on the network"""
+    from shared.camera_discovery import CameraDiscovery
+    
+    print("🔍 Auto-discovering cameras...")
+    discovery = CameraDiscovery()
+    
+    # Option 1: Scan specific IP addresses
+    known_camera_ips = [
+        "192.168.1.64",
+        "192.168.1.65"
+    ]
+    
+    discovery.auto_populate_database(known_camera_ips, lab_name="E2-L6-016", user_id=1)
+
+
 def create_default_labs_and_cameras():
     conn = sqlite3.connect('users.sqlite')
     cursor = conn.cursor()
@@ -127,11 +143,17 @@ def create_default_labs_and_cameras():
         create_lab("E2-L6-017", "labsafety@gmail.com")
 
     if camera_count == 0:
-        create_camera("Camera 1", 1, 1, ip_address="192.168.1.64")
-        create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
+        # Use auto-discovery instead of hardcoded cameras
+        auto_discover_cameras()
 
-        # create_camera("Camera 1", 1, 2)
-        # create_camera("Camera 2", 1, 2)
+    # if camera_count == 0:
+    #     # settings_info = get_settings("ip_address="192.168.1.64")
+
+    #     create_camera("Camera 1", 1, 1, ip_address="192.168.1.64")
+    #     create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
+
+    #     # create_camera("Camera 1", 1, 2)
+    #     # create_camera("Camera 2", 1, 2)
 
 
 def create_lab(lab_name, lab_safety_email):
