@@ -179,7 +179,7 @@ def detection(context: Camera):
                     if int(matchesFound[0]) >= 1:
 
                         print("Match found")
-                        person_id = process_incompliance.match_found_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
+                        person_id = process_incompliance.match_found_new_incompliance(matchesFound, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
 
                         # Incompliance on different date
                         if person_id is not None:
@@ -195,6 +195,8 @@ def detection(context: Camera):
                         # Incompliance on the same date
                         else:
                             print(f"[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
+                            # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
+
 
                         flag_track_id(context, track_id)
 
@@ -211,6 +213,8 @@ def detection(context: Camera):
                         
                         print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
+                        # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
+
 
                 except Exception as e:
                     print(e)

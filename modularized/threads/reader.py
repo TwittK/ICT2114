@@ -11,7 +11,8 @@ def read_frames(context: Camera):
         username = "admin"
         password = "Sit12345"
         # last digit of channel: Use 1 for main stream (better qual, but more bandwidth), 2 for sub stream
-        rtsp_url = f"rtsp://{username}:{password}@{context.camera_ip}/Streaming/Channels/{context.channel}"
+        # rtsp_url = f"rtsp://{username}:{password}@{context.camera_ip}/Streaming/Channels/{context.channel}"
+        rtsp_url = f"rtsp://{username}:{password}@{context.ip_address}/Streaming/Channels/{context.channel}"
 
         # Initialize IP camera instead of webcam
         context.cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
@@ -22,7 +23,7 @@ def read_frames(context: Camera):
             print(f"Attempted URL: {rtsp_url}")
             return
 
-        print(f"✅ Successfully connected to IP camera: {context.camera_ip}")
+        print(f"✅ Successfully connected to IP camera: {context.ip_address}")
     else:
         context.cap = cv2.VideoCapture(0)  # to test with webcam
 

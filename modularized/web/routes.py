@@ -79,6 +79,30 @@ def inject_labs_with_cameras():
     return dict(labs=list(labs.values()))
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+
+        user = verify_user(email, password)
+
+        if user:
+            session['logged_in'] = True
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['email'] = user['email']
+            session['role'] = user['role']
+
+            update_last_login(user['id'])
+
+            flash('Login successful!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password!', 'error')
+
+    return render_template('login.html')
+
 @app.route('/', methods=["GET", "POST"])
 @login_required
 def index():
@@ -135,18 +159,33 @@ def index():
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
-        query = "SELECT time_generated, object_detected, confidence, imageURL FROM Snapshot WHERE 1=1"
+        # Updated query to join Camera table and filter by camera name
+        query = """
+            SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL 
+            FROM Snapshot s
+            LEFT JOIN Camera c ON s.camera_id = c.CameraId
+            WHERE 1=1
+        """
         params = []
 
+        # Add camera filter if a camera is selected
+        if camera_name:
+            query += " AND c.name = ?"
+            params.append(camera_name)
+
         if date_filter:
-            query += " AND DATE(time_generated) = ?"
+            query += " AND DATE(s.time_generated) = ?"
             params.append(date_filter)
 
         if object_filter:
-            query += " AND object_detected = ?"
+            query += " AND s.object_detected = ?"
             params.append(object_filter)
 
-        print("results", results)
+        query += " ORDER BY s.time_generated DESC"
+
+        print("Camera filter:", camera_name)
+        print("Query:", query)
+        print("Params:", params)
 
         cursor.execute(query, params)
 
@@ -182,30 +221,6 @@ def index():
         today=today_str,
     )
 
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-
-        user = verify_user(email, password)
-
-        if user:
-            session['logged_in'] = True
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['email'] = user['email']
-            session['role'] = user['role']
-
-            update_last_login(user['id'])
-
-            flash('Login successful!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password!', 'error')
-
-    return render_template('login.html')
 
 
 @app.route('/logout')
