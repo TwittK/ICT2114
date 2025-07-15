@@ -28,7 +28,7 @@ food_class_list = [31, 55, 56, 67, 77, 86, 100, 108, 156, 231]
 if __name__ == "__main__":
 
     try:
-        read_thread = threading.Thread(target=read_frames, args=(False, "192.168.10.64", "101"))
+        read_thread = threading.Thread(target=read_frames, args=(True, "192.168.1.64", "101"))
         inference_thread = threading.Thread(
             target=preprocess,
             args=(drink_model, pose_model, target_class_list, 0.3, classif_model),
