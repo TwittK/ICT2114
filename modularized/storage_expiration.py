@@ -52,11 +52,11 @@ class StorageExpiration:
         expired_snapshots = self.cursor.fetchall()
         logging.info(f"Found {len(expired_snapshots)} expired snapshot(s).")
 
-        # TODO: Delete from NVR, Snapshot table and local images of incompliances.
+        # Delete from NVR, Snapshot table and local images of incompliances.
         for DetectionId, snapshotId, imageURL in expired_snapshots:
             
-            # TODO: insert request to delete image from face library in NVR
-            #self.nvr_delete_face(snapshotId)
+            # Request to delete image from face library in NVR
+            self.nvr_delete_face(snapshotId)
 
             if imageURL and os.path.exists(imageURL):
                 os.remove(imageURL)
