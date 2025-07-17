@@ -27,7 +27,7 @@ def read_frames(context: Camera):
     else:
         context.cap = cv2.VideoCapture(0)  # to test with webcam
 
-    while context.running:
+    while context.running.is_set():
         ret, frame = (context.cap).read()
         if not ret:
             print("Failed to read frame from IP camera")

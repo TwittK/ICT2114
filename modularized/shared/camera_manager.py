@@ -48,7 +48,7 @@ class CameraManager:
     for camera_id, camera_info in self.camera_pool.items():
       camera = camera_info.get("camera")
       if camera:
-        camera.running = False
+        camera.running.clear()
 
       threads = camera_info.get("threads", {})
       for thread_name, thread in threads.items():
@@ -62,7 +62,7 @@ class CameraManager:
   
     camera = self.camera_pool[camera_id]["camera"]
     if camera:
-      camera.running = False
+      camera.running.clear()
 
     camera_threads = self.camera_pool[camera_id]["threads"]
     for thread_name, thread in camera_threads.items():

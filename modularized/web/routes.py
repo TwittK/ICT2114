@@ -165,7 +165,7 @@ def index():
         success, message = dao.delete_camera(lab_name, camera_name, user_id)
 
         flash(message, "success" if success else "danger")
-        return redirect(url_for("index", lab=lab_name))
+        return redirect(url_for("index") if success else url_for("index", lab=lab_name))
     elif is_deleting_camera and not is_admin:
         flash("Admin access required to delete cameras!", "error")
         return redirect(url_for("index", lab=lab_name))

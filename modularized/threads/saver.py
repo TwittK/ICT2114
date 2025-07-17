@@ -11,7 +11,7 @@ def save_img(context: Camera, frame, uuid_str, timestamp):
 # Save images to disk
 def image_saver(context: Camera):
 
-    while context.running:
+    while context.running.is_set():
         
         try:
             item = context.save_queue.get(timeout=1)

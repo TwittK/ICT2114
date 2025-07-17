@@ -83,7 +83,7 @@ def detection(context: Camera):
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance("users.sqlite", context.camera_id)
 
-    while context.running:
+    while context.running.is_set():
         try:
             frame = context.process_queue.get(timeout=1)
 

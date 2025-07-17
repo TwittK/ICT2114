@@ -20,7 +20,9 @@ class Camera:
     self.cap = None
 
     # Shared flags and locks
-    self.running = True
+    self.running = threading.Event()
+    self.running.set()
+    
     self.detected_incompliance_lock = threading.Lock()
     self.pose_points_lock = threading.Lock()
     self.flagged_foodbev_lock = threading.Lock()

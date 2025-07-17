@@ -11,7 +11,7 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
     pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
     last_cleared = datetime.min
 
-    while context.running:
+    while context.running.is_set():
         
         try:
             frame = context.frame_queue.get(timeout=1)
