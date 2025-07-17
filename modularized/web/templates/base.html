@@ -2,104 +2,117 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>{% block title %}LabComply{% endblock %}</title>
 
     <!-- External Styles -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"/>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
 
 <body>
-    <div class="d-flex" id="wrapper">
-        <!-- Sidebar -->
-        {% if session['logged_in'] %}
+<div class="d-flex" id="wrapper">
+    <!-- Sidebar -->
+    {% if session['logged_in'] %}
         <div id="sidebar" class="bg-dark text-white p-3">
             <h4 class="mb-4">Dashboard</h4>
+
             <ul class="list-unstyled">
+                {# Loop through all the labs and display on sidemenu#}
                 {% for lab in labs %}
-                <li class="mt-3">
-                    <strong>{{ lab.lab_name }}</strong>
-                </li>
+                    {# Lab name #}
+                    <li class="mt-3"><strong>{{ lab.lab_name }}</strong></li>
 
-                {% if lab.cameras %}
-                {% for camera in lab.cameras %}
-                <li class="ps-3 d-flex align-items-center">
-                    <a href="{{ url_for('index', lab=lab.lab_name, camera=camera.camera_name) }}"
-                        class="text-decoration-none text-white d-inline-flex align-items-center">
-                        {{ camera.camera_name }}
-                    </a>
-                    {% if session.get('role') == 'admin' %}
-                    <a href="{{ url_for('edit_camera', camera_id=camera.camera_id) }}?camera={{ camera.camera_name }}&lab={{ lab.lab_name }}"
-                        class="ms-2 icon-pencil" title="Edit">
-                        <i class="fa-solid fa-pencil"></i>
-                    </a>
-                    <a href="{{ url_for('index',  edit=0, delete=1, camera=camera.camera_name, lab=lab.lab_name) }}"
-                        class="ms-2 icon-trash" title="Delete">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </a>
+                    {# Check if there are camera for the lab. #}
+                    {% if lab.cameras|length > 0 %}
+                        {# Cameras exist: list them here #}
+                        {# Loop through all cameras in lab #}
+                        {% for camera in lab.cameras %}
+                            <li class="ps-3 d-flex align-items-center">
+                                {# Link to camera #}
+                                <a href="{{ url_for('index', lab=lab.lab_name, camera=camera.camera_name) }}"
+                                   class="text-decoration-none text-white d-inline-flex align-items-center">
+                                    {{ camera.camera_name }}
+                                </a>
+
+                                {# Admin buttons #}
+                                {% if session.get('role') == 'admin' %}
+                                    {# Edit camera #}
+                                    <a href="{{ url_for('edit_camera', camera_id=camera.camera_id) }}?camera={{ camera.camera_name }}&lab={{ lab.lab_name }}"
+                                       class="ms-2 icon-pencil" title="Edit">
+                                        <i class="fa-solid fa-pencil"></i>
+                                    </a>
+                                    {# Delete camera #}
+                                    <a href="{{ url_for('index',  edit=0, delete=1, camera=camera.camera_name, lab=lab.lab_name) }}"
+                                       class="ms-2 icon-trash" title="Delete">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </a>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    {% else %}
+                        {# No camera found #}
+                        <li class="ps-3"><em>No cameras</em></li>
                     {% endif %}
-                </li>
-                {% endfor %}
 
-                {# Add button aligned left, underneath cameras (only for admins) #}
-                {% if session.get('role') == 'admin' %}
-                <li class="ps-3 mt-1">
-                    <a href="{{ url_for('index', add=1, lab=lab.lab_name) }}" class="text-decoration-none icon-plus">
-                        <i class="fa-solid fa-circle-plus"></i>
-                    </a>
-                </li>
-                {% endif %}
-                {% else %}
-                <li class="ps-3 text-muted"><em>No cameras</em></li>
-                {% endif %}
+                    {# Add button for camera. #}
+                    {# Check if user is admin #}
+                    {% if session.get('role') == 'admin' %}
+                        <li class="ps-3 mt-1">
+                            <a href="{{ url_for('index', add=1, lab=lab.lab_name) }}"
+                               class="text-decoration-none icon-plus">
+                                <i class="fa-solid fa-circle-plus"></i>
+                            </a>
+                        </li>
+                    {% endif %}
                 {% endfor %}
             </ul>
         </div>
-        {% endif %}
+        {# endif login#}
+    {% endif %}
 
-        <!-- Page Content -->
-        <div id="page-content" class="flex-grow-1">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom px-4">
-                <div class="container-fluid d-flex align-items-center justify-content-between">
+    <!-- Page Content -->
+    <div id="page-content" class="flex-grow-1">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom px-4">
+            <div class="container-fluid d-flex align-items-center justify-content-between">
 
-                    <div class="d-flex align-items-center">
-                        <a class="navbar-brand" href="{{ url_for('index') }}">
-                            <span class="fa-solid fa-flask"></span>
-                            LabComply
-                        </a>
-                        <div class="navbar-center d-flex flex-row flex-md-row justify-content-start text-start">
-                            <span id="current-time" class="me-3"></span>
-                            <span id="current-date"></span>
-                        </div>
+                <div class="d-flex align-items-center">
+                    <a class="navbar-brand" href="{{ url_for('index') }}">
+                        <span class="fa-solid fa-flask"></span>
+                        LabComply
+                    </a>
+                    <div class="navbar-center d-flex flex-row flex-md-row justify-content-start text-start">
+                        <span id="current-time" class="me-3"></span>
+                        <span id="current-date"></span>
                     </div>
+                </div>
 
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                         data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
+                    <span class="navbar-toggler-icon"></span>
+                </button>
 
-                    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
 
-                        <div class="navbar-nav ms-auto">
-                            {% if session['logged_in'] %}
+                    <div class="navbar-nav ms-auto">
+                        {% if session['logged_in'] %}
                             <div class="nav-item dropdown">
                                 {% set name = session.get('username', 'Unknown') %}
                                 {% if name %}
-                                {% set first = name[0] | upper %}
-                                {% set rest = name[1:] %}
+                                    {% set first = name[0] | upper %}
+                                    {% set rest = name[1:] %}
                                 {% else %}
-                                {% set first = '' %}
-                                {% set rest = '' %}
+                                    {% set first = '' %}
+                                    {% set rest = '' %}
                                 {% endif %}
 
 
                                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#"
-                                    id="userProfileDropdown" role="button" data-bs-toggle="dropdown"
-                                    aria-expanded="false">
+                                   id="userProfileDropdown" role="button" data-bs-toggle="dropdown"
+                                   aria-expanded="false">
                                     <span class="me-2">
                                         Hi, {{ first }}{{ rest }}
                                     </span>
@@ -110,14 +123,14 @@
                             </div>
                             <div class="nav-item">
                                 <a href="{{ url_for('logout') }}" class="nav-link d-flex align-items-center"
-                                    title="Logout">
+                                   title="Logout">
                                     <i class="fa-solid fa-right-from-bracket"></i>
                                 </a>
                             </div>
-                            {% else %}
+                        {% else %}
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button"
-                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                   data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fa-solid fa-caret-down me-2"></i>
                                     <span class="me-2">Login</span>
                                     <i class="fas fa-user"></i>
@@ -126,23 +139,23 @@
                                     <li><a class="dropdown-item" href="{{ url_for('login') }}">Login</a></li>
                                 </ul>
                             </div>
-                            {% endif %}
-                        </div>
+                        {% endif %}
                     </div>
-            </nav>
+                </div>
+        </nav>
 
-            <div class="container-fluid">
-                {% block content %}{% endblock %}
-            </div>
+        <div class="container-fluid">
+            {% block content %}{% endblock %}
         </div>
     </div>
+</div>
 
-    <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.7.2.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.7.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
 
-    {% block scripts %}{% endblock %}
+{% block scripts %}{% endblock %}
 
 </body>
 

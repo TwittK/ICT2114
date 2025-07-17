@@ -76,6 +76,11 @@ def inject_labs_with_cameras():
                 "camera_name": camera_name,
             })
 
+    # Ensure all labs have a 'cameras' key, at least empty list.
+    for lab in labs.values():
+        if "cameras" not in lab or lab["cameras"] is None:
+            lab["cameras"] = []
+
     return dict(labs=list(labs.values()))
 
 
@@ -102,6 +107,7 @@ def login():
             flash('Invalid username or password!', 'error')
 
     return render_template('login.html')
+
 
 @app.route('/', methods=["GET", "POST"])
 @login_required
@@ -161,11 +167,11 @@ def index():
 
         # Updated query to join Camera table and filter by camera name
         query = """
-            SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL 
-            FROM Snapshot s
-            LEFT JOIN Camera c ON s.camera_id = c.CameraId
-            WHERE 1=1
-        """
+                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
+                FROM Snapshot s
+                         LEFT JOIN Camera c ON s.camera_id = c.CameraId
+                WHERE 1 = 1 \
+                """
         params = []
 
         # Add camera filter if a camera is selected
@@ -220,7 +226,6 @@ def index():
         is_admin=is_admin,
         today=today_str,
     )
-
 
 
 @app.route('/logout')
@@ -300,11 +305,11 @@ def edit_camera(camera_id):
     # GET: fetch camera settings and labs for sidebar
     cursor.execute('SELECT * FROM Camera WHERE CameraId=?', (camera_id,))
     camera = cursor.fetchone()
-    
+
     if not camera:
         flash('Camera not found!', 'error')
         return redirect(url_for('index'))
-    
+
     cursor.execute('SELECT * FROM Lab')  # for lab list/sidebar
     labs = cursor.fetchall()
     conn.close()
@@ -318,7 +323,7 @@ def video_feed(camera_id):
     camera_id = int(camera_id)
     if camera_id not in cam_manager.camera_pool:
         return f"Camera {camera_id} not found.", 404
-    
+
     camera = cam_manager.camera_pool[camera_id]["camera"]
     print(f"[STREAM] Client connected to /video_feed/{camera_id}")
 
