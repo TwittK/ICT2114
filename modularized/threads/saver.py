@@ -1,5 +1,5 @@
 import cv2 as cv
-import os
+import os, queue
 import shared.camera as Camera
 
 def save_img(context: Camera, frame, uuid_str, timestamp):
@@ -12,8 +12,12 @@ def save_img(context: Camera, frame, uuid_str, timestamp):
 def image_saver(context: Camera):
 
     while context.running:
+        
+        try:
+            item = context.save_queue.get(timeout=1)
+        except queue.Empty:
+            continue
 
-        item = context.save_queue.get()
         if item is None:
             break
 

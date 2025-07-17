@@ -128,7 +128,7 @@ def create_default_labs_and_cameras():
 
     if camera_count == 0:
         create_camera("Camera 1", 1, 1, ip_address="192.168.1.64")
-        create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
+        # create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
 
         # create_camera("Camera 1", 1, 2)
         # create_camera("Camera 2", 1, 2)

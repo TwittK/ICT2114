@@ -147,7 +147,21 @@ def index():
     if is_deleting_camera and camera_name and lab_name and is_admin:
         user_id = session.get("user_id")
         dao = CameraDAO("users.sqlite")
-
+        
+        # Retrieve camera id
+        id_success, camera_id = dao.get_camera_id(lab_name, camera_name, user_id)
+        if not id_success:
+            flash("Camera not found in database.", "danger")
+            return redirect(url_for("index", lab=lab_name))
+        
+        # Remove camera from manager
+        camera_manager = CameraManager('users.sqlite')
+        remove_success = camera_manager.remove_camera(camera_id)
+        if not remove_success:
+            flash("Failed to stop camera threads properly.", "danger")
+            return redirect(url_for("index", lab=lab_name))
+        
+        # Delete camera from database
         success, message = dao.delete_camera(lab_name, camera_name, user_id)
 
         flash(message, "success" if success else "danger")

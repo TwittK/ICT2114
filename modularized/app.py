@@ -24,9 +24,11 @@ if __name__ == "__main__":
 
         while True:
             time.sleep(1)
-
+        # time.sleep(4)
+        
     except KeyboardInterrupt:
         print("[INFO] Shutting down.")
 
     finally:
+        camera_manager.shutdown_all_cameras()
         print(f"[END] Exited cleanly.")
