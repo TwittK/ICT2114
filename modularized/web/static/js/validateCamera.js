@@ -36,6 +36,8 @@ function validateCamera() {
     <span class="visually-hidden" role="status">Loading...</span>
   `;
 
+  document.getElementById("deviceInfoData").value = ""; // Clear hidden device info
+  
   // Validate if IP of camera exists in NVR
   fetch("/check_ip", {
     method: "POST",
@@ -57,17 +59,21 @@ function validateCamera() {
 
     } else {
       messageDiv.textContent = "Camera not found in NVR.";
+      setTimeout(function() {
+        messageDiv.textContent = '';
+      }, 7000); 
       messageDiv.classList.remove("text-success");
       messageDiv.classList.add("text-danger");
-      document.getElementById("deviceInfoData").value = "";
     }
   })
   .catch(error => {
     console.error("Error:", error);
     messageDiv.textContent = "Server error. Please try again.";
+    setTimeout(function() {
+      messageDiv.textContent = '';
+    }, 7000); 
     messageDiv.classList.remove("text-success");
     messageDiv.classList.add("text-danger");
-    document.getElementById("deviceInfoData").value = "";
   })
   .finally(() => {
     searchIcon.innerHTML = "🔍";
