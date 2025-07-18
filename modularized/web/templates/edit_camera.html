@@ -119,10 +119,11 @@
                       <label class="form-label fw-semibold">
                         <i class="fa-solid fa-network-wired me-1"></i> IP Configuration:
                       </label>
-                      <select name="camera_ip_type" class="form-select" id="ipTypeSelect">
+                      <select name="camera_ip_type" class="form-select" id="ipTypeSelect" disabled>
                         <option value="static" {{ 'selected' if camera['camera_ip_type']=='static' }}>Static IP</option>
                         <option value="dhcp" {{ 'selected' if camera['camera_ip_type']=='dhcp' }}>DHCP</option>
                       </select>
+                      <input type="hidden" name="camera_ip_type" value="{{ camera['camera_ip_type'] }}">
                       <small class="form-text text-muted">Current: {{ camera['camera_ip_type']|title }}</small>
                     </div>
                   </div>
@@ -134,7 +135,7 @@
                       <div class="mb-3">
                         <label class="form-label fw-semibold">IP Address:</label>
                         <input name="ip_address" class="form-control" value="{{ camera['ip_address'] }}"
-                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" readonly>
                         <small class="form-text text-muted">Current: {{ camera['ip_address'] }}</small>
                       </div>
                     </div>
@@ -143,7 +144,7 @@
                       <div class="mb-3">
                         <label class="form-label fw-semibold">Subnet Mask:</label>
                         <input name="subnet_mask" class="form-control" value="{{ camera['subnet_mask'] }}"
-                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" readonly>
                         <small class="form-text text-muted">Current: {{ camera['subnet_mask'] }}</small>
                       </div>
                     </div>
@@ -152,7 +153,7 @@
                       <div class="mb-3">
                         <label class="form-label fw-semibold">Gateway:</label>
                         <input name="gateway" class="form-control" value="{{ camera['gateway'] }}"
-                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" readonly>
                         <small class="form-text text-muted">Current: {{ camera['gateway'] }}</small>
                       </div>
                     </div>
