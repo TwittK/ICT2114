@@ -382,6 +382,7 @@ def edit_camera(camera_id):
             # Optionally, try to apply settings to actual camera via API
             try:
                 apply_camera_settings(camera_id, {
+                    'name': name,
                     'resolution': resolution,
                     'frame_rate': frame_rate,
                     'encoding': encoding,
@@ -446,6 +447,61 @@ def edit_camera(camera_id):
     conn.close()
     return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted, user_role_management=user_role_management)
 
+def apply_device_settings(camera_ip, settings):
+    """Apply device settings (name) to camera"""
+    try:
+        from shared.camera_discovery import CameraDiscovery
+        discovery = CameraDiscovery()
+        
+        # Update device name if provided
+        if 'name' in settings:
+            device_name = settings['name']
+            
+            # Create new device info XML following the working pattern
+            ET.register_namespace('', "http://www.hikvision.com/ver20/XMLSchema")
+            
+            # Check camera namespace first
+            check_url = f"http://{camera_ip}/ISAPI/System/deviceInfo"
+            check_response = requests.get(check_url, auth=HTTPDigestAuth(discovery.username, discovery.password))
+            
+            if check_response.status_code != 200:
+                raise Exception(f"Failed to check device info: {check_response.status_code}")
+            
+            # Determine namespace and create appropriate XML
+            if "hikvision.com" in check_response.text:
+                device_info = ET.Element("DeviceInfo", xmlns="http://www.hikvision.com/ver20/XMLSchema")
+                ET.register_namespace('', "http://www.hikvision.com/ver20/XMLSchema")
+            else:
+                device_info = ET.Element("DeviceInfo", xmlns="http://www.isapi.org/ver20/XMLSchema")
+                ET.register_namespace('', "http://www.isapi.org/ver20/XMLSchema")
+            
+            device_name_elem = ET.SubElement(device_info, "deviceName")
+            device_name_elem.text = device_name
+            
+            # Convert to XML
+            xml_data = ET.tostring(device_info, encoding='utf-8')
+            
+            # Send PUT request to update device name
+            url = f"http://{camera_ip}/ISAPI/System/deviceInfo"
+            headers = {"Content-Type": "application/xml"}
+            
+            response = requests.put(
+                url,
+                data=xml_data,
+                headers=headers,
+                auth=HTTPDigestAuth(discovery.username, discovery.password)
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ Device name updated to '{device_name}' successfully.")
+            else:
+                print(f"❌ Failed to update device name. Status: {response.status_code} - {response.reason}")
+                print("Response:", response.text)
+                raise Exception(f"Failed to update device name: {response.status_code} - {response.text}")
+        
+    except Exception as e:
+        raise Exception(f"Failed to apply device settings to {camera_ip}: {str(e)}")
+
 def apply_camera_settings(camera_id, settings):
 
     conn = sqlite3.connect(DATABASE)
@@ -457,6 +513,7 @@ def apply_camera_settings(camera_id, settings):
 
     """Apply all camera settings to the physical camera"""
     try:
+        print("TRYING ISAPI UPDATE")
         # Get camera IP address from database
         cursor = conn.cursor()
         
@@ -471,6 +528,12 @@ def apply_camera_settings(camera_id, settings):
         
         if not camera_ip:
             raise Exception(f"No IP address configured for camera {camera_id}")
+        
+        # Apply device settings (name)
+        device_settings = {k: v for k, v in settings.items() 
+                          if k in ['name']}
+        if device_settings:
+            apply_device_settings(camera_ip, device_settings)
         
         # Apply stream settings (resolution, frame rate, encoding)
         stream_settings = {k: v for k, v in settings.items() 
@@ -494,7 +557,7 @@ def apply_camera_settings(camera_id, settings):
         
     except Exception as e:
         raise Exception(f"Failed to apply camera settings: {str(e)}")
-
+    
 def apply_stream_settings(camera_ip, settings):
 
     conn = sqlite3.connect(DATABASE)

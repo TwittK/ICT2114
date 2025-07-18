@@ -100,6 +100,7 @@
                         </div>
                         </div>
                     {% endif %}
+
                 {% endfor %}
             </ul>
         </div>
@@ -178,7 +179,7 @@
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userProfileDropdown">
                                 </ul>
                             </div>
-                            <div class="nav-item">
+                            <div class="nav-item d-flex align-items-center">
                                 <a href="{{ url_for('logout') }}" class="nav-link d-flex align-items-center"
                                    title="Logout">
                                     <i class="fa-solid fa-right-from-bracket"></i>

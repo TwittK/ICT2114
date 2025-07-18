@@ -1,165 +1,241 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="alert alert-info mt-4">
-  <i class="fa-solid fa-info-circle"></i> <strong>Admin Access:</strong> Only administrators can modify camera settings.
+<div class="container-fluid px-4 py-3">
+  <div class="row justify-content-center">
+    <div class="col-lg-10 col-xl-8">
+
+      <!-- <div class="alert alert-info">
+        <i class="fa-solid fa-info-circle"></i> <strong>Admin Access:</strong> Only administrators can modify camera
+        settings.
+      </div> -->
+
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h2 class="card-title mb-0">
+            <i class="fa-solid fa-video me-2"></i>
+            Camera Settings — {{ camera['name'] }}
+          </h2>
+        </div>
+
+        <div class="card-body">
+          <ul class="nav nav-tabs mb-4" id="cameraTab" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="general-tab" data-bs-toggle="tab" href="#general" role="tab">
+                <i class="fa-solid fa-gear me-1"></i> General
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="stream-tab" data-bs-toggle="tab" href="#stream" role="tab">
+                <i class="fa-solid fa-video me-1"></i> Stream
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="network-tab" data-bs-toggle="tab" href="#network" role="tab">
+                <i class="fa-solid fa-network-wired me-1"></i> Network
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="time-tab" data-bs-toggle="tab" href="#time" role="tab">
+                <i class="fa-solid fa-clock me-1"></i> Time & Date
+              </a>
+            </li>
+          </ul>
+
+          <form method="post">
+            <div class="tab-content">
+              <!-- General Tab -->
+              <div class="tab-pane fade show active" id="general" role="tabpanel">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-tag me-1"></i> Camera Name:
+                      </label>
+                      <input name="name" class="form-control" value="{{ camera['name'] }}" required>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Stream Tab -->
+              <div class="tab-pane fade" id="stream" role="tabpanel">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-expand me-1"></i> Resolution:
+                      </label>
+                      <select name="resolution" class="form-select">
+                        <option value="720" {{ 'selected' if camera['resolution']==720 }}>720p (1280x720)</option>
+                        <option value="1080" {{ 'selected' if camera['resolution']==1080 }}>1080p (1920x1080)</option>
+                        <option value="1520" {{ 'selected' if camera['resolution']==1520 }}>1520p (2688x1520)</option>
+                      </select>
+                      <small class="form-text text-muted">Current: {{ camera['resolution'] }}p</small>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-gauge me-1"></i> Frame Rate:
+                      </label>
+                      <select name="frame_rate" class="form-select">
+                        <option value="20" {{ 'selected' if camera['frame_rate']==20 }}>20fps</option>
+                        <option value="25" {{ 'selected' if camera['frame_rate']==25 }}>25fps</option>
+                      </select>
+                      <small class="form-text text-muted">Current: {{ camera['frame_rate'] }}fps</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-file-video me-1"></i> Video Encoding:
+                      </label>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="encoding" value="H.264" id="h264" {% if
+                          camera['encoding']=='H.264' %}checked{% endif %}>
+                        <label class="form-check-label" for="h264">H.264 (Better compatibility)</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="encoding" value="H.265" id="h265" {% if
+                          camera['encoding']=='H.265' %}checked{% endif %}>
+                        <label class="form-check-label" for="h265">H.265 (Better compression)</label>
+                      </div>
+                      <small class="form-text text-muted">Current: {{ camera['encoding'] }}</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Network Tab -->
+              <div class="tab-pane fade" id="network" role="tabpanel">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-network-wired me-1"></i> IP Configuration:
+                      </label>
+                      <select name="camera_ip_type" class="form-select" id="ipTypeSelect" disabled>
+                        <option value="static" {{ 'selected' if camera['camera_ip_type']=='static' }}>Static IP</option>
+                        <option value="dhcp" {{ 'selected' if camera['camera_ip_type']=='dhcp' }}>DHCP</option>
+                      </select>
+                      <input type="hidden" name="camera_ip_type" value="{{ camera['camera_ip_type'] }}">
+                      <small class="form-text text-muted">Current: {{ camera['camera_ip_type']|title }}</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="staticIpFields" style="{{ 'display:none;' if camera['camera_ip_type']=='dhcp' else '' }}">
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="mb-3">
+                        <label class="form-label fw-semibold">IP Address:</label>
+                        <input name="ip_address" class="form-control" value="{{ camera['ip_address'] }}"
+                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" readonly>
+                        <small class="form-text text-muted">Current: {{ camera['ip_address'] }}</small>
+                      </div>
+                    </div>
+
+                    <div class="col-md-4">
+                      <div class="mb-3">
+                        <label class="form-label fw-semibold">Subnet Mask:</label>
+                        <input name="subnet_mask" class="form-control" value="{{ camera['subnet_mask'] }}"
+                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" readonly>
+                        <small class="form-text text-muted">Current: {{ camera['subnet_mask'] }}</small>
+                      </div>
+                    </div>
+
+                    <div class="col-md-4">
+                      <div class="mb-3">
+                        <label class="form-label fw-semibold">Gateway:</label>
+                        <input name="gateway" class="form-control" value="{{ camera['gateway'] }}"
+                          pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" readonly>
+                        <small class="form-text text-muted">Current: {{ camera['gateway'] }}</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Time & Date Tab -->
+              <div class="tab-pane fade" id="time" role="tabpanel">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-globe me-1"></i> Timezone:
+                      </label>
+                      <select name="timezone" class="form-select">
+                        <option value="Asia/Singapore" {{ 'selected' if camera['timezone']=='Asia/Singapore' }}>
+                          Asia/Singapore (GMT+8)
+                        </option>
+                        <option value="UTC" {{ 'selected' if camera['timezone']=='UTC' }}>UTC (GMT+0)</option>
+                      </select>
+                      <small class="form-text text-muted">Current: {{ camera['timezone'] }}</small>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-server me-1"></i> NTP Server Address:
+                      </label>
+                      <input name="ntp_server_address" class="form-control"
+                        value="{{ camera['ntp_server_address'] if camera['ntp_server_address'] else 'pool.ntp.org' }}">
+                      <small class="form-text text-muted">Current: {{ camera['ntp_server_address'] if
+                        camera['ntp_server_address'] else 'Not set' }}</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="sync_with_ntp" value="1" id="ntpSync" {%
+                          if camera['sync_with_ntp'] %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="ntpSync">
+                          <i class="fa-solid fa-sync me-1"></i> Synchronize with NTP Server
+                        </label>
+                      </div>
+                      <small class="form-text text-muted">Current: {{ 'Enabled' if camera['sync_with_ntp'] else
+                        'Disabled' }}</small>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="mb-3" id="manualTimeField">
+                      <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-clock me-1"></i> Manual Time Setting:
+                      </label>
+                      <input type="datetime-local" name="manual_time" class="form-control"
+                        value="{{ camera['time'][:16] if camera['time'] else '' }}">
+                      <small class="form-text text-muted">Current: {{ camera['time'] if camera['time'] else 'Not set'
+                        }}</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+              <a href="{{ url_for('index') }}" class="btn btn-outline-secondary d-flex align-items-center">
+                <i class="fa-solid fa-xmark me-1"></i> Cancel
+              </a>
+              <button type="submit" class="btn btn-primary d-flex align-items-center">
+                <i class="fa-solid fa-save me-1"></i> Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-
-<h2>Camera Settings — {{ camera['name'] }}</h2>
-
-<ul class="nav nav-tabs" id="cameraTab" role="tablist">
-  <li class="nav-item">
-    <a class="nav-link active" id="general-tab" data-bs-toggle="tab" href="#general" role="tab">General</a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" id="stream-tab" data-bs-toggle="tab" href="#stream" role="tab">Stream</a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" id="network-tab" data-bs-toggle="tab" href="#network" role="tab">Network</a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" id="time-tab" data-bs-toggle="tab" href="#time" role="tab">Time & Date</a>
-  </li>
-</ul>
-
-<form method="post">
-  <div class="tab-content mt-3">
-    <!-- General Tab -->
-    <div class="tab-pane fade show active" id="general" role="tabpanel">
-      <div class="mb-3">
-        <label class="form-label">Camera Name:</label>
-        <input name="name" class="form-control" value="{{ camera['name'] }}" required>
-      </div>
-    </div>
-
-    <!-- Stream Tab -->
-    <div class="tab-pane fade" id="stream" role="tabpanel">
-      <div class="mb-3">
-        <label class="form-label">Resolution:</label>
-        <select name="resolution" class="form-select">
-          <!-- <option value="480" {{ 'selected' if camera['resolution']==480 }}>480p (640x480)</option> -->
-          <option value="720" {{ 'selected' if camera['resolution']==720 }}>720p (1280x720)</option>
-          <option value="1080" {{ 'selected' if camera['resolution']==1080 }}>1080p (1920x1080)</option>
-          <option value="1520" {{ 'selected' if camera['resolution']==1520 }}>1520p (2688x1520)</option>
-          <!-- <option value="2160" {{ 'selected' if camera['resolution']==2160 }}>4K (3840x2160)</option> -->
-        </select>
-        <small class="form-text text-muted">Current: {{ camera['resolution'] }}p</small>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Frame Rate:</label>
-        <select name="frame_rate" class="form-select">
-          <!-- <option value="10" {{ 'selected' if camera['frame_rate']==10 }}>10fps</option>
-          <option value="15" {{ 'selected' if camera['frame_rate']==15 }}>15fps</option>
-          <option value="20" {{ 'selected' if camera['frame_rate']==20 }}>20fps</option>
-          <option value="25" {{ 'selected' if camera['frame_rate']==25 }}>25fps</option>
-          <option value="30" {{ 'selected' if camera['frame_rate']==30 }}>30fps</option> -->
-          <option value="10" {{ 'selected' if camera['frame_rate']==10 }}>20fps</option>
-          <option value="10" {{ 'selected' if camera['frame_rate']==10 }}>25fps</option>
-        </select>
-        <small class="form-text text-muted">Current: {{ camera['frame_rate'] }}fps</small>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Video Encoding:</label>
-        <div class="form-check">
-          <input class="form-check-input" type="radio" name="encoding" value="H.264" id="h264" {% if
-            camera['encoding']=='H.264' %}checked{% endif %}>
-          <label class="form-check-label" for="h264">H.264 (Better compatibility)</label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="radio" name="encoding" value="H.265" id="h265" {% if
-            camera['encoding']=='H.265' %}checked{% endif %}>
-          <label class="form-check-label" for="h265">H.265 (Better compression)</label>
-        </div>
-        <small class="form-text text-muted">Current: {{ camera['encoding'] }}</small>
-      </div>
-    </div>
-
-    <!-- Network Tab -->
-    <div class="tab-pane fade" id="network" role="tabpanel">
-      <div class="mb-3">
-        <label class="form-label">IP Configuration:</label>
-        <select name="camera_ip_type" class="form-select" id="ipTypeSelect">
-          <option value="static" {{ 'selected' if camera['camera_ip_type']=='static' }}>Static IP</option>
-          <option value="dhcp" {{ 'selected' if camera['camera_ip_type']=='dhcp' }}>DHCP</option>
-        </select>
-        <small class="form-text text-muted">Current: {{ camera['camera_ip_type']|title }}</small>
-      </div>
-
-      <div id="staticIpFields" style="{{ 'display:none;' if camera['camera_ip_type']=='dhcp' else '' }}">
-        <div class="mb-3">
-          <label class="form-label">IP Address:</label>
-          <input name="ip_address" class="form-control" value="{{ camera['ip_address'] }}"
-            pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-          <small class="form-text text-muted">Current: {{ camera['ip_address'] }}</small>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Subnet Mask:</label>
-          <input name="subnet_mask" class="form-control" value="{{ camera['subnet_mask'] }}"
-            pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-          <small class="form-text text-muted">Current: {{ camera['subnet_mask'] }}</small>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Gateway:</label>
-          <input name="gateway" class="form-control" value="{{ camera['gateway'] }}"
-            pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-          <small class="form-text text-muted">Current: {{ camera['gateway'] }}</small>
-        </div>
-      </div>
-    </div>
-
-    <!-- Time & Date Tab -->
-    <div class="tab-pane fade" id="time" role="tabpanel">
-      <div class="mb-3">
-        <label class="form-label">Timezone:</label>
-        <select name="timezone" class="form-select">
-          <option value="Asia/Singapore" {{ 'selected' if camera['timezone']=='Asia/Singapore' }}>Asia/Singapore (GMT+8)
-          </option>
-          <option value="UTC" {{ 'selected' if camera['timezone']=='UTC' }}>UTC (GMT+0)</option>
-          <!-- <option value="America/New_York" {{ 'selected' if camera['timezone']=='America/New_York' }}>America/New_York
-            (GMT-5)</option>
-          <option value="Europe/London" {{ 'selected' if camera['timezone']=='Europe/London' }}>Europe/London (GMT+0)
-          </option> -->
-        </select>
-        <small class="form-text text-muted">Current: {{ camera['timezone'] }}</small>
-      </div>
-
-      <div class="mb-3">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="sync_with_ntp" value="1" id="ntpSync" {% if
-            camera['sync_with_ntp'] %}checked{% endif %}>
-          <label class="form-check-label" for="ntpSync">
-            Synchronize with NTP Server
-          </label>
-        </div>
-        <small class="form-text text-muted">Current: {{ 'Enabled' if camera['sync_with_ntp'] else 'Disabled' }}</small>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">NTP Server Address:</label>
-        <input name="ntp_server_address" class="form-control"
-          value="{{ camera['ntp_server_address'] if camera['ntp_server_address'] else 'pool.ntp.org' }}">
-        <small class="form-text text-muted">Current: {{ camera['ntp_server_address'] if camera['ntp_server_address']
-          else 'Not set' }}</small>
-      </div>
-
-      <div class="mb-3" id="manualTimeField">
-        <label class="form-label">Manual Time Setting:</label>
-        <input type="datetime-local" name="manual_time" class="form-control"
-          value="{{ camera['time'][:16] if camera['time'] else '' }}">
-        <small class="form-text text-muted">Current: {{ camera['time'] if camera['time'] else 'Not set' }}</small>
-      </div>
-    </div>
-  </div>
-
-  <div class="mt-4">
-    <button type="submit" class="btn btn-primary">Save</button>
-    <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
-  </div>
-</form>
 
 <script>
   // Show/hide static IP fields based on IP type selection
@@ -178,11 +254,11 @@
     const manualField = document.getElementById('manualTimeField');
 
     if (this.checked) {
-      ntpField.style.display = 'block';
-      manualField.style.display = 'none';
+      if (ntpField) ntpField.style.display = 'block';
+      if (manualField) manualField.style.display = 'none';
     } else {
-      ntpField.style.display = 'none';
-      manualField.style.display = 'block';
+      if (ntpField) ntpField.style.display = 'none';
+      if (manualField) manualField.style.display = 'block';
     }
   });
 </script>
