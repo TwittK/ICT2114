@@ -6,6 +6,7 @@
 </div>
 
 <h1>User Management</h1>
+<button class="btn btn-primary my-3">Create Account</button>
 
 {% if users %}
   <table class="table">
@@ -29,7 +30,7 @@
                   <td>{{ user.role }}</td>
                   {% if user_management %}
                     <td class="row">
-                        <form class="col" method="POST" action="{{ url_for('user_management', delete=0, update=1) }}">
+                        <form class="col" method="POST" action="{{ url_for('user_management', delete=0, update=1) }}" onsubmit="return confirm('Are you sure you want to update this role?');">
                           <input type="hidden" name="user_id" value="{{ user.id }}">
                           <select name="new_role" class="form-select form-select-sm d-inline w-auto">
                               {% for role in roles %}

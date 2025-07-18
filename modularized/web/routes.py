@@ -1048,3 +1048,8 @@ def role_management():
 
     return render_template('role_management.html', roles=roles, cam_management=cam_management, user_management=user_management,)
     
+@login_required
+@require_permission('user_management')
+def create_account():
+    if request.method == "POST":
+        pass
