@@ -1,5 +1,5 @@
 import sqlite3
-from database import create_camera
+from database import create_camera, create_new_camera
 
 
 class CameraDAO:
@@ -79,3 +79,34 @@ class CameraDAO:
                 return False, None
 
             return True, row[0]
+    
+    def add_new_camera(self, lab_name, user_id, device_info):
+        """Creates a default-named camera in a given lab."""
+        lab_id = self.get_lab_id(lab_name)
+        if lab_id is None:
+            return False, "Lab not found"
+
+        count = self.count_cameras_in_lab(lab_id)
+        default_name = f"Camera {count + 1}"
+
+        success = create_new_camera(
+            name=default_name,
+            camera_user_id=user_id,
+            camera_lab_id=lab_id,
+            resolution=device_info["resolution"],
+            frame_rate=device_info["frame_rate"],
+            encoding=device_info["encoding"],
+            camera_ip_type=device_info["camera_ip_type"],
+            ip_address=device_info["ip_address"],
+            subnet_mask=device_info["subnet_mask"],
+            gateway=device_info["gateway"],
+            timezone=device_info["timezone"],
+            sync_with_ntp=device_info["sync_with_ntp"],
+            ntp_server_address=device_info["ntp_server_address"],
+            time=device_info["time"]
+        )
+
+        if success:
+            return True, f"{default_name} added to {lab_name}"
+        else:
+            return False, "Failed to add camera"

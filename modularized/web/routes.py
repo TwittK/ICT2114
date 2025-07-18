@@ -1,4 +1,4 @@
-from flask import Flask, request, session, redirect, url_for, render_template, flash, Response
+from flask import Flask, request, session, redirect, url_for, render_template, flash, Response, jsonify
 from functools import wraps
 from data_source.camera_dao import CameraDAO
 from datetime import datetime
@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 import cv2
 from database import verify_user, update_last_login
 from shared.camera_manager import CameraManager
+from shared.camera_discovery import CameraDiscovery
 import queue
 
 DATABASE = "users.sqlite"
@@ -134,20 +135,46 @@ def index():
 
     is_deleting_camera = request.args.get("delete", "0") == "1"
     is_adding_camera = request.args.get("add", "0") == "1"
-    today_str = datetime.now().strftime('%Y-%m-%dT%H:%M')
+    today_str = datetime.now().strftime('%Y-%m-%d')
 
     is_admin = session.get('role') == 'admin'
 
     results = []
 
-    # Create default camera inside the database - ADMIN ONLY
-    if is_adding_camera and lab_name and is_admin:
-        user_id = session.get("user_id")
-        dao = CameraDAO("users.sqlite")
+    # Create camera inside the database - ADMIN ONLY
+    if request.method == "POST" and is_adding_camera and lab_name and is_admin:
+        try:
+            if not request.is_json:
+                flash("Invalid request.", "danger")
+                return redirect(url_for("index"))
+            
+            data = request.get_json()
+            device_info = data.get("device_info")
 
-        success, message = dao.add_default_camera(lab_name, user_id)
-        flash(message, "success" if success else "danger")
-        return redirect(url_for("index", lab=lab_name))
+            # Device info not found
+            if not device_info:
+                flash("Error retrieving device info.", "danger")
+                return redirect(url_for("index"))
+            
+            user_id = session.get("user_id")
+            dao = CameraDAO("users.sqlite")
+
+            success, message = dao.add_new_camera(
+                lab_name=lab_name,
+                user_id=user_id,
+                device_info=device_info
+            )
+
+            flash(message, "success" if success else "danger")
+            return redirect(url_for("index", lab=lab_name))
+        
+        except Exception as e:
+            flash("Error retrieving IP and/or device info.", "danger")
+            return redirect(url_for("index"))
+
+        # success, message = dao.add_default_camera(lab_name, user_id)
+
+    
     elif is_adding_camera and not is_admin:
         flash("Admin access required to add cameras!", "error")
         return redirect(url_for("index", lab=lab_name))
@@ -787,11 +814,11 @@ def video_feed(camera_id):
 
 @app.route('/check_ip', methods=['POST'])
 def check_ip():
-    from flask import request, jsonify
     ip_address = request.json.get('ip')
 
-    # TEMP. TODO: Will replace with actual logic to verify ip address validity
-    valid_ips = ["192.168.1.64", "192.168.1.65"]
-    is_valid = ip_address in valid_ips
+    cd = CameraDiscovery()
+    discover_results = cd.discover_camera(ip_address)
+    if discover_results is None:
+        return jsonify({'valid': False, 'device_info': discover_results})
 
-    return jsonify({'valid': is_valid})
+    return jsonify({'valid': True, 'device_info': discover_results})

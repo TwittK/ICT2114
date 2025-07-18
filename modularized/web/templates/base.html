@@ -88,10 +88,12 @@
                                 <div id="cameraValidationMessage" class="mt-2 text-danger"></div>
                             </div>
 
+                            <input type="hidden" id="deviceInfoData" />
+
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                 <button type="button" class="btn btn-primary" id="addCameraBtn" disabled>
-                                    <a href="{{ url_for('index', add=1, lab=lab.lab_name) }}" class="text-light link-offset-2 link-underline link-underline-opacity-0"> Add Camera </a>
+                                    Add Camera
                                 </button>
                             </div>
                             </div>
@@ -186,74 +188,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='js/index.js') }}"></script>
 
+
 {% block scripts %}{% endblock %}
 
 </body>
-
-<script>
-
-    document.getElementById("validateCameraBtn").addEventListener("click", function () {
-    const ip = document.getElementById("cameraInput").value.trim();
-    const messageDiv = document.getElementById("cameraValidationMessage");
-    const addBtn = document.getElementById("addCameraBtn");
-    const searchIcon = document.getElementById("searchIcon");
-    
-    // Disable add button on input change
-    const cameraInput = document.getElementById("cameraInput");
-    cameraInput.addEventListener("input", function () {
-
-        addBtn.disabled = true;
-
-        // Clear any validation messages
-        const messageDiv = document.getElementById("cameraValidationMessage");
-        messageDiv.textContent = "";
-        messageDiv.classList.remove("text-success", "text-danger");
-    });
-
-    messageDiv.textContent = "";
-    addBtn.disabled = true;
-
-    if (!ip) {
-        messageDiv.textContent = "Please enter a valid IP address.";
-        return;
-    }
-
-    // Set loading spinner
-    searchIcon.innerHTML = `
-        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-        <span class="visually-hidden" role="status">Loading...</span>
-    `;
-
-    // Validate if IP of camera exists in NVR
-    fetch("/check_ip", {
-        method: "POST",
-        headers: {
-        "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ ip: ip })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.valid) {
-            messageDiv.textContent = "Camera found in NVR!";
-            messageDiv.classList.remove("text-danger");
-            messageDiv.classList.add("text-success");
-            addBtn.disabled = false;
-        } else {
-            messageDiv.textContent = "Camera not found in NVR.";
-            messageDiv.classList.remove("text-success");
-            messageDiv.classList.add("text-danger");
-        }
-    })
-    .catch(error => {
-        console.error("Error:", error);
-        messageDiv.textContent = "Server error. Please try again.";
-        messageDiv.classList.remove("text-success");
-        messageDiv.classList.add("text-danger");
-    })
-    .finally(() => {
-        searchIcon.innerHTML = "🔍";
-    });
-    });
-</script>
+<script src="{{ url_for('static', filename='js/validateCamera.js') }}"></script>
 </html>

@@ -217,3 +217,45 @@ def create_camera(
         return False
     finally:
         conn.close()
+
+
+def create_new_camera(
+        name,
+        camera_user_id,
+        camera_lab_id,
+        resolution,
+        frame_rate,
+        encoding,
+        camera_ip_type,
+        ip_address,
+        subnet_mask,
+        gateway,
+        timezone,
+        sync_with_ntp,
+        ntp_server_address,
+        time
+):
+    conn = sqlite3.connect('users.sqlite')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+                       INSERT INTO Camera (name, resolution, frame_rate,
+                                           encoding, camera_ip_type, ip_address,
+                                           subnet_mask, gateway, timezone,
+                                           sync_with_ntp, ntp_server_address, time,
+                                           camera_user_id, camera_lab_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ''', (name, resolution, frame_rate,
+                             encoding, camera_ip_type, ip_address,
+                             subnet_mask, gateway, timezone,
+                             sync_with_ntp, ntp_server_address, time,
+                             camera_user_id, camera_lab_id)
+                       )
+
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
