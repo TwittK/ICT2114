@@ -290,6 +290,7 @@ def insert_default_roles():
     finally:
         conn.close()
 
+
 def get_all_users():
     conn = sqlite3.connect('users.sqlite')
     conn.row_factory = sqlite3.Row
@@ -302,6 +303,7 @@ def get_all_users():
 
     return [dict(row) for row in users]
 
+
 def get_all_roles():
     conn = sqlite3.connect('users.sqlite')
     conn.row_factory = sqlite3.Row
@@ -313,3 +315,30 @@ def get_all_roles():
     conn.close()
     
     return [dict(r) for r in roles]
+
+
+def get_all_permissions():
+    conn = sqlite3.connect('users.sqlite')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM Permission")
+    roles = cursor.fetchall()
+
+    conn.close()
+    
+    return [dict(r) for r in roles]
+
+
+def get_all_rolepermissions():
+    conn = sqlite3.connect('users.sqlite')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM RolePermission")
+    roles = cursor.fetchall()
+
+    conn.close()
+    
+    return [dict(r) for r in roles]
+

@@ -1,12 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="alert alert-info">
+<div class="alert alert-info mt-4">
   <i class="fa-solid fa-info-circle"></i> <strong>User Management Access:</strong> Only users with user management permission can access this page.
 </div>
 
 <h1>User Management</h1>
-<button class="btn btn-primary my-3">Create Account</button>
+<button class="btn btn-primary my-3" >
+  <a class="text-light" href="{{ url_for('create_account') }}">Create Account</a>
+</button>
 
 {% if users %}
   <table class="table">

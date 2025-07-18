@@ -8,7 +8,7 @@ from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
 
 import cv2
-from database import verify_user, update_last_login, get_all_users, get_all_roles
+from database import verify_user, update_last_login, get_all_users, get_all_roles, get_all_permissions, get_all_rolepermissions
 from shared.camera_manager import CameraManager
 from shared.camera_discovery import CameraDiscovery
 import queue
@@ -1045,11 +1045,40 @@ def role_management():
     user_management = check_permission(conn, role, "user_management")
 
     roles = get_all_roles()
+    permissions = get_all_permissions()
+    role_permissions = get_all_rolepermissions()
 
-    return render_template('role_management.html', roles=roles, cam_management=cam_management, user_management=user_management,)
+    return render_template(
+        'role_management.html',
+        roles=roles,
+        permissions=permissions,
+        role_permissions=role_permissions,
+        cam_management=cam_management,
+        user_management=user_management
+    )
     
+@app.route('/create_account', methods=['GET', 'POST'])
 @login_required
 @require_permission('user_management')
 def create_account():
+
+    # Open database connection from permission verification
+    try:
+        conn = sqlite3.connect(DATABASE)
+    except Exception:
+        return redirect(url_for("index"))
+    role = session.get('role')
+    if role is None:
+        return redirect(url_for("index"))
+    
+    cam_management = check_permission(conn, role, "camera_management")
+    user_management = check_permission(conn, role, "user_management")
+
+    roles = get_all_roles()
+
     if request.method == "POST":
-        pass
+        # TODO: Add logic to create new account
+        return redirect(url_for("create_account.html"))
+    
+
+    return render_template("create_account.html", roles=roles, cam_management=cam_management, user_management=user_management,)
