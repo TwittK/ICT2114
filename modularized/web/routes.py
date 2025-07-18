@@ -1112,7 +1112,7 @@ def role_management():
 
         # Add a new role
         if action == "add_role":
-            new_role_name = request.form.get("role_name")
+            new_role_name = request.form.get("role_name").strip()
             if not new_role_name:
                 flash("Error creating new role.", "error")
                 return redirect(url_for("role_management"))
@@ -1187,8 +1187,8 @@ def labs():
     if request.method == "POST":
         action = request.form.get("action")
         if action == "add_lab":
-            lab_name = request.form.get("lab_name")
-            lab_safety_email = request.form.get("lab_safety_email")
+            lab_name = request.form.get("lab_name").strip()
+            lab_safety_email = request.form.get("lab_safety_email").strip()
 
             if lab_name and len(lab_name) > 0 and lab_safety_email and len(lab_safety_email) > 0:
                 cursor = conn.cursor()
