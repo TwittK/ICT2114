@@ -1,13 +1,32 @@
+CREATE TABLE IF NOT EXISTS Roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS Permission (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS RolePermission (
+    role_id INTEGER NOT NULL,
+    permission_id INTEGER NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES Roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES Permission(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS users
 (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      VARCHAR(50) UNIQUE  NOT NULL,
     email         VARCHAR(100) UNIQUE NOT NULL,
     password_hash TEXT                NOT NULL,
-    role          VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    role          INTEGER,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP,
-    is_active     BOOLEAN     DEFAULT 1
+    is_active     BOOLEAN     DEFAULT 1,
+    FOREIGN KEY (role) REFERENCES Roles(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Lab
@@ -58,4 +77,3 @@ CREATE TABLE IF NOT EXISTS Snapshot
     FOREIGN KEY (person_id) REFERENCES Person (PersonId) ON DELETE CASCADE,
     FOREIGN KEY (camera_id) REFERENCES Camera (CameraId) ON DELETE CASCADE
 );
-

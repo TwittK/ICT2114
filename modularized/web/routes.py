@@ -8,10 +8,11 @@ from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
 
 import cv2
-from database import verify_user, update_last_login
+from database import verify_user, update_last_login, get_all_users, get_all_roles
 from shared.camera_manager import CameraManager
 from shared.camera_discovery import CameraDiscovery
 import queue
+from web.utils import check_permission
 
 DATABASE = "users.sqlite"
 SNAPSHOT_FOLDER = "snapshots"
@@ -41,15 +42,30 @@ def login_required(f):
     return decorated_function
 
 
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session or session.get('role') != 'admin':
-            flash('Admin access required!', 'error')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
+def require_permission(permission_name):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'logged_in' not in session:
+                flash('You must be logged in to access this page.', 'danger')
+                return redirect(url_for('index'))
 
-    return decorated_function
+            role_name = session.get('role')
+            if not role_name:
+                flash('No role assigned to user.', 'danger')
+                return redirect(url_for('index'))
+
+            conn = sqlite3.connect(DATABASE)
+            has_permission = check_permission(conn, role_name, permission_name)
+            conn.close()
+
+            if not has_permission:
+                flash(f"Permission '{permission_name}' required.", 'danger')
+                return redirect(url_for('index'))
+
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 
 @app.context_processor
@@ -137,12 +153,21 @@ def index():
     is_adding_camera = request.args.get("add", "0") == "1"
     today_str = datetime.now().strftime('%Y-%m-%d')
 
-    is_admin = session.get('role') == 'admin'
-
     results = []
 
+    # Open database connection from permission verification
+    try:
+        conn = sqlite3.connect(DATABASE)
+    except Exception:
+        return redirect(url_for("index"))
+    role = session.get('role')
+    if role is None:
+        return redirect(url_for("index"))
+    cam_management = check_permission(conn, role, "camera_management")
+    user_management = check_permission(conn, role, "user_management")
+
     # Create camera inside the database - ADMIN ONLY
-    if request.method == "POST" and is_adding_camera and lab_name and is_admin:
+    if request.method == "POST" and is_adding_camera and lab_name and cam_management:
         try:
             if not request.is_json:
                 flash("Invalid request.", "danger")
@@ -183,12 +208,12 @@ def index():
             flash("Error retrieving IP and/or device info.", "danger")
             return redirect(url_for("index"))
     
-    elif is_adding_camera and not is_admin:
+    elif is_adding_camera and not check_permission(conn, role, "add_camera"):
         flash("Admin access required to add cameras!", "error")
         return redirect(url_for("index", lab=lab_name))
 
     # Delete camera - ADMIN ONLY
-    if is_deleting_camera and camera_name and lab_name and is_admin:
+    if is_deleting_camera and camera_name and lab_name and cam_management:
         user_id = session.get("user_id")
         dao = CameraDAO("users.sqlite")
         
@@ -210,17 +235,16 @@ def index():
 
         flash(message, "success" if success else "danger")
         return redirect(url_for("index") if success else url_for("index", lab=lab_name))
-    elif is_deleting_camera and not is_admin:
+    elif is_deleting_camera and not check_permission(conn, role, "delete_camera"):
         flash("Admin access required to delete cameras!", "error")
         return redirect(url_for("index", lab=lab_name))
 
-    if request.method == "POST":
+    if request.method == "POST" and check_permission(conn, role, "view_incompliances"):
         action = request.form.get("action")
 
         date_filter = request.form.get("date")
         object_filter = request.form.get("object_type")
 
-        conn = sqlite3.connect(DATABASE)
         conn.row_factory = dict_factory
         cursor = conn.cursor()
 
@@ -286,7 +310,8 @@ def index():
         snapshot_folder=SNAPSHOT_FOLDER,
         lab_name=lab_name,
         camera_name=camera_name,
-        is_admin=is_admin,
+        cam_management=cam_management,
+        user_management = user_management,
         today=today_str,
     )
 
@@ -298,13 +323,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/admin')
-@login_required
-@admin_required
-def admin_panel():
-    return render_template('admin.html')
-
-
 def get_db():
     conn = sqlite3.connect('users.sqlite')
     conn.row_factory = sqlite3.Row
@@ -312,8 +330,16 @@ def get_db():
 
 @app.route('/edit_camera/<int:camera_id>', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@require_permission('camera_management')
 def edit_camera(camera_id):
+
+    conn = sqlite3.connect(DATABASE)
+    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    if not permission_granted:
+        flash('No Privileges to Edit Camera', 'danger')
+        return redirect(url_for('index'))
+    conn.close()
+    
     conn = sqlite3.connect('users.sqlite')
     conn.row_factory = dict_factory  # Enable dictionary-style access
     cursor = conn.cursor()
@@ -390,7 +416,7 @@ def edit_camera(camera_id):
     ''', (camera_id,))
     
     camera = cursor.fetchone()
-    conn.close()
+    
     
     if not camera:
         flash('Camera not found', 'error')
@@ -415,13 +441,22 @@ def edit_camera(camera_id):
         'lab_name': camera['lab_name'] or 'Unknown Lab'
     }
     
-    return render_template('edit_camera.html', camera=camera_data)
+    user_management = check_permission(conn, session.get('role'), "user_management")
+    conn.close()
+    return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted, user_management=user_management)
 
 def apply_camera_settings(camera_id, settings):
+
+    conn = sqlite3.connect(DATABASE)
+    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    if not permission_granted:
+        flash('No Privileges to Edit Camera', 'danger')
+        return redirect(url_for('index'))
+    conn.close()
+
     """Apply all camera settings to the physical camera"""
     try:
         # Get camera IP address from database
-        conn = sqlite3.connect('users.sqlite')
         cursor = conn.cursor()
         
         cursor.execute("SELECT ip_address FROM Camera WHERE CameraId = ?", (camera_id,))
@@ -460,6 +495,14 @@ def apply_camera_settings(camera_id, settings):
         raise Exception(f"Failed to apply camera settings: {str(e)}")
 
 def apply_stream_settings(camera_ip, settings):
+
+    conn = sqlite3.connect(DATABASE)
+    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    if not permission_granted:
+        flash('No Privileges to Edit Camera', 'danger')
+        return redirect(url_for('index'))
+    conn.close()
+
     """Apply stream settings to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
@@ -567,6 +610,14 @@ def apply_stream_settings(camera_ip, settings):
         raise Exception(f"Failed to apply stream settings to {camera_ip}: {str(e)}")
 
 def apply_network_settings(camera_ip, settings):
+
+    conn = sqlite3.connect(DATABASE)
+    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    if not permission_granted:
+        flash('No Privileges to Edit Camera', 'danger')
+        return redirect(url_for('index'))
+    conn.close()
+
     """Apply network settings to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
@@ -670,6 +721,14 @@ def apply_network_settings(camera_ip, settings):
         raise Exception(f"Failed to apply network settings to {camera_ip}: {str(e)}")
 
 def apply_time_settings(camera_ip, settings):
+
+    conn = sqlite3.connect(DATABASE)
+    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    if not permission_granted:
+        flash('No Privileges to Edit Camera', 'danger')
+        return redirect(url_for('index'))
+    conn.close()
+
     """Apply time settings to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
@@ -794,6 +853,14 @@ def apply_time_settings(camera_ip, settings):
 
 @app.route('/video_feed/<camera_id>')
 def video_feed(camera_id):
+
+    conn = sqlite3.connect(DATABASE)
+    role = session.get('role')
+    if not check_permission(conn, role, "video_feed"):
+        flash('No Privileges to View Live Video Feed', 'danger')
+        return redirect(url_for('index'))
+    conn.close()
+    
     cam_manager = CameraManager.get_instance()
 
     camera_id = int(camera_id)
@@ -833,7 +900,7 @@ def check_ip():
 
 @app.route('/add_camera', methods=['POST'])
 @login_required
-@admin_required
+@require_permission('camera_management')
 def add_camera():
     try:
         data = request.get_json()
@@ -904,3 +971,80 @@ def add_camera():
     except Exception as e:
         print(f"❌ Error adding camera: {e}")
         return jsonify({'success': False, 'message': f'Error adding camera: {str(e)}'})
+
+@app.route('/user_management', methods=['GET', 'POST'])
+@login_required
+@require_permission('user_management')
+def user_management():
+    
+    # Open database connection from permission verification
+    try:
+        conn = sqlite3.connect(DATABASE)
+    except Exception:
+        return redirect(url_for("index"))
+    role = session.get('role')
+    if role is None:
+        return redirect(url_for("index"))
+    
+    cam_management = check_permission(conn, role, "camera_management")
+    user_management = check_permission(conn, role, "user_management")
+
+    users = get_all_users()
+    roles = get_all_roles()
+
+    if request.method == "GET":
+        return render_template(
+            "user_management.html",
+            users=users,
+            roles=roles,
+            cam_management=cam_management,
+            user_management=user_management,
+        )
+
+    if request.method == "POST":
+        user_id = request.form.get("user_id")
+        new_role = request.form.get("new_role")
+        update = request.args.get("update")
+        delete = request.args.get("delete")
+
+        if int(delete) and not int(update):
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            flash("User role updated successfully.", "success")
+
+        elif int(update) and not int(delete):
+            print(new_role)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM Roles WHERE name = ?", (new_role,))
+            role_exists = cursor.fetchone()
+            if role_exists:
+                cursor.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
+                conn.commit()
+                flash("User role updated successfully.", "success")
+        else:
+            flash("Missing user or role data.", "danger")
+
+        return redirect(url_for("user_management"))
+
+@app.route('/role_management', methods=['GET', 'POST'])
+@login_required
+@require_permission('user_management')
+def role_management():
+
+    # Open database connection from permission verification
+    try:
+        conn = sqlite3.connect(DATABASE)
+    except Exception:
+        return redirect(url_for("index"))
+    role = session.get('role')
+    if role is None:
+        return redirect(url_for("index"))
+    
+    cam_management = check_permission(conn, role, "camera_management")
+    user_management = check_permission(conn, role, "user_management")
+
+    roles = get_all_roles()
+
+    return render_template('role_management.html', roles=roles, cam_management=cam_management, user_management=user_management,)
+    

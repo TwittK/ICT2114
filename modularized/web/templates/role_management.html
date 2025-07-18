@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="alert alert-info">
+  <i class="fa-solid fa-info-circle"></i> <strong>Role Management Access:</strong> Only users with user management permission can access this page.
+</div>
+
+<h1>Role Management</h1>
+
+{% if roles %}
+
+{% else %}
+    <p>No roles found.</p>
+{% endif %}
+
+{% endblock %}

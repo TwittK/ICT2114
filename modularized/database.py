@@ -261,3 +261,55 @@ def create_new_camera(
     finally:
         conn.close()
 
+        
+def insert_default_roles():
+
+    # Insert default roles and permissions (admin and user)
+    conn = sqlite3.connect('users.sqlite')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""INSERT INTO Roles (name) VALUES ('admin'), ('user');""")
+        
+        cursor.execute("""            
+            INSERT INTO Permission (name) VALUES
+            ('camera_management'),
+            ('view_incompliances'),
+            ('video_feed'),
+            ('user_management')
+        """)
+
+        cursor.execute("INSERT INTO RolePermission (role_id, permission_id) SELECT 1, id FROM Permission;")
+        cursor.execute("INSERT INTO RolePermission (role_id, permission_id) SELECT 2, id FROM Permission WHERE name IN ('view_incompliances', 'video_feed');")
+
+        conn.commit()
+
+        return True
+    except sqlite3.IntegrityError:
+
+        return False
+    finally:
+        conn.close()
+
+def get_all_users():
+    conn = sqlite3.connect('users.sqlite')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM users')
+    users = cursor.fetchall()
+
+    conn.close()
+
+    return [dict(row) for row in users]
+
+def get_all_roles():
+    conn = sqlite3.connect('users.sqlite')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM Roles")
+    roles = cursor.fetchall()
+
+    conn.close()
+    
+    return [dict(r) for r in roles]
