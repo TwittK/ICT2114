@@ -1251,10 +1251,18 @@ def create_account():
     if request.method == "POST":
         # TODO: Add logic to create new account
         # Get form data
-        username_form = request.form.get("username")
-        email_form = request.form.get("email")
+        username_form = request.form.get("username", "").strip()
+        email_form = request.form.get("email", "").strip()
         password_form = request.form.get("password")
-        role_form = request.form.get("role")
+        role_form = request.form.get("role", "").strip()
+
+        # Validate required fields are not empty
+        if not username_form or not email_form or not password_form or not role_form:
+            flash("❌ All fields are required.", "danger")
+            return render_template("create_account.html",
+                                   roles=roles,
+                                   cam_management=cam_management,
+                                   user_role_management=user_role_management)
 
         # Password length validation
         if len(password_form) < 8:
