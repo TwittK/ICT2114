@@ -996,7 +996,7 @@ def user_management():
 
     if request.method == "GET":
         return render_template(
-            "user_role_management.html",
+            "user_management.html",
             users=users,
             roles=roles,
             cam_management=cam_management,
@@ -1071,7 +1071,25 @@ def role_management():
 
         # Update permissions of exisitng roles
         elif action == "update":
-            pass
+            permissions_map = set()
+
+            for key in request.form.keys():
+                if key.startswith("role_perm_"):
+                    rp = key[len("role_perm_"):]
+                    role_name, perm_name = rp.split('_', 1)
+                    role_id = dao.get_role_id_by_name(role_name)
+                    perm_id = dao.get_permission_id_by_name(perm_name)
+                    if role_id and perm_id:
+                        permissions_map.add((role_id, perm_id))
+            try:
+                # Update role and permissions in database
+                dao.update_role_permissions(permissions_map)
+                flash("Permissions updated successfully.", "success")
+
+            except Exception:
+                flash("Error updating permissions.", "error")
+                
+            return redirect(url_for('role_management'))
         
         elif action == "delete":
             print("deleting role")

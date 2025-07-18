@@ -75,3 +75,60 @@ class RoleDAO:
     
     finally:
       conn.close()
+
+  def update_role_permissions(self, permissions_map):
+    """
+    Transaction to update role to permission mappings.
+    permissions_map: Dictionary of (role_id, perm_id) tuples
+    """
+    conn = sqlite3.connect(self.db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+      cursor = conn.cursor()
+      cursor.execute("BEGIN TRANSACTION;")
+
+      # Clear all permissions first
+      cursor.execute("DELETE FROM RolePermission")
+
+      # Insert all new permissions
+      for role_id, perm_id in permissions_map:
+        cursor.execute("INSERT INTO RolePermission (role_id, permission_id) VALUES (?, ?)", (role_id, perm_id))
+
+      conn.commit()
+
+    except Exception as e:
+      conn.rollback()
+      raise e
+    
+    finally:
+      conn.close()
+  
+  def get_role_id_by_name(self, role_name):
+    """Returns role ID using role name."""
+    try:
+      conn = sqlite3.connect(self.db_path)
+      cursor = conn.cursor()
+      cursor.execute("SELECT id FROM Roles WHERE name = ?", (role_name,))
+
+      return cursor.fetchone()[0]
+
+    except sqlite3.IntegrityError:
+      return None
+    
+    finally:
+      conn.close()
+
+  def get_permission_id_by_name(self, permission_name):
+    """Returns permission ID using role name."""
+    try:
+      conn = sqlite3.connect(self.db_path)
+      cursor = conn.cursor()
+      cursor.execute("SELECT id FROM Permission WHERE name = ?", (permission_name,))
+
+      return cursor.fetchone()[0]
+
+    except sqlite3.IntegrityError:
+      return None
+    
+    finally:
+      conn.close()
