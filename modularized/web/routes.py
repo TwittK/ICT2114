@@ -1,6 +1,7 @@
 from flask import Flask, request, session, redirect, url_for, render_template, flash, Response, jsonify
 from functools import wraps
 from data_source.camera_dao import CameraDAO
+from data_source.role_dao import RoleDAO 
 from datetime import datetime
 import sqlite3
 import requests
@@ -8,7 +9,7 @@ from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
 
 import cv2
-from database import verify_user, update_last_login, get_all_users, get_all_roles, get_all_permissions, get_all_rolepermissions
+from database import verify_user, update_last_login, get_all_users
 from shared.camera_manager import CameraManager
 from shared.camera_discovery import CameraDiscovery
 import queue
@@ -164,7 +165,7 @@ def index():
     if role is None:
         return redirect(url_for("index"))
     cam_management = check_permission(conn, role, "camera_management")
-    user_management = check_permission(conn, role, "user_management")
+    user_role_management = check_permission(conn, role, "user_role_management")
 
     # Create camera inside the database - ADMIN ONLY
     if request.method == "POST" and is_adding_camera and lab_name and cam_management:
@@ -311,7 +312,7 @@ def index():
         lab_name=lab_name,
         camera_name=camera_name,
         cam_management=cam_management,
-        user_management = user_management,
+        user_role_management = user_role_management,
         today=today_str,
     )
 
@@ -441,9 +442,9 @@ def edit_camera(camera_id):
         'lab_name': camera['lab_name'] or 'Unknown Lab'
     }
     
-    user_management = check_permission(conn, session.get('role'), "user_management")
+    user_role_management = check_permission(conn, session.get('role'), "user_role_management")
     conn.close()
-    return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted, user_management=user_management)
+    return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted, user_role_management=user_role_management)
 
 def apply_camera_settings(camera_id, settings):
 
@@ -974,7 +975,7 @@ def add_camera():
 
 @app.route('/user_management', methods=['GET', 'POST'])
 @login_required
-@require_permission('user_management')
+@require_permission('user_role_management')
 def user_management():
     
     # Open database connection from permission verification
@@ -987,18 +988,19 @@ def user_management():
         return redirect(url_for("index"))
     
     cam_management = check_permission(conn, role, "camera_management")
-    user_management = check_permission(conn, role, "user_management")
+    user_role_management = check_permission(conn, role, "user_role_management")
 
+    dao = RoleDAO(DATABASE)
     users = get_all_users()
-    roles = get_all_roles()
+    roles = dao.get_all_roles()
 
     if request.method == "GET":
         return render_template(
-            "user_management.html",
+            "user_role_management.html",
             users=users,
             roles=roles,
             cam_management=cam_management,
-            user_management=user_management,
+            user_role_management=user_role_management,
         )
 
     if request.method == "POST":
@@ -1014,7 +1016,6 @@ def user_management():
             flash("User role updated successfully.", "success")
 
         elif int(update) and not int(delete):
-            print(new_role)
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM Roles WHERE name = ?", (new_role,))
             role_exists = cursor.fetchone()
@@ -1029,7 +1030,7 @@ def user_management():
 
 @app.route('/role_management', methods=['GET', 'POST'])
 @login_required
-@require_permission('user_management')
+@require_permission('user_role_management')
 def role_management():
 
     # Open database connection from permission verification
@@ -1042,11 +1043,47 @@ def role_management():
         return redirect(url_for("index"))
     
     cam_management = check_permission(conn, role, "camera_management")
-    user_management = check_permission(conn, role, "user_management")
+    user_role_management = check_permission(conn, role, "user_role_management")
 
-    roles = get_all_roles()
-    permissions = get_all_permissions()
-    role_permissions = get_all_rolepermissions()
+    dao = RoleDAO(DATABASE)
+    roles = dao.get_all_roles()
+    permissions = dao.get_all_permissions()
+    role_permissions = dao.get_all_rolepermissions()
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        # Add a new role
+        if action == "add_role":
+            new_role_name = request.form.get("role_name")
+            if not new_role_name:
+                flash("Error creating new role.", "error")
+                return redirect(url_for("role_management"))
+            
+            success = dao.insert_new_role(new_role_name.strip())
+
+            if not success:
+                flash("Error creating new role.", "error")
+                return redirect(url_for("role_management"))
+
+            flash("Created new role with empty permissions.", "success")
+            return redirect(url_for("role_management"))
+
+        # Update permissions of exisitng roles
+        elif action == "update":
+            pass
+        
+        elif action == "delete":
+            print("deleting role")
+            role_id = request.form.get("role_id")
+            success = dao.delete_role(role_id)
+
+            if not success:
+                flash("Error deleting role.", "error")
+                return redirect(url_for("role_management"))
+
+            flash("Deleted role.", "success")
+            return redirect(url_for("role_management"))
 
     return render_template(
         'role_management.html',
@@ -1054,12 +1091,13 @@ def role_management():
         permissions=permissions,
         role_permissions=role_permissions,
         cam_management=cam_management,
-        user_management=user_management
+        user_role_management=user_role_management
     )
-    
+
+
 @app.route('/create_account', methods=['GET', 'POST'])
 @login_required
-@require_permission('user_management')
+@require_permission('user_role_management')
 def create_account():
 
     # Open database connection from permission verification
@@ -1072,13 +1110,14 @@ def create_account():
         return redirect(url_for("index"))
     
     cam_management = check_permission(conn, role, "camera_management")
-    user_management = check_permission(conn, role, "user_management")
+    user_role_management = check_permission(conn, role, "user_role_management")
 
-    roles = get_all_roles()
+    dao = RoleDAO(DATABASE)
+    roles = dao.get_all_roles()
 
     if request.method == "POST":
         # TODO: Add logic to create new account
         return redirect(url_for("create_account.html"))
     
 
-    return render_template("create_account.html", roles=roles, cam_management=cam_management, user_management=user_management,)
+    return render_template("create_account.html", roles=roles, cam_management=cam_management, user_role_management=user_role_management,)

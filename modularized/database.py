@@ -275,7 +275,7 @@ def insert_default_roles():
             ('camera_management'),
             ('view_incompliances'),
             ('video_feed'),
-            ('user_management')
+            ('user_role_management')
         """)
 
         cursor.execute("INSERT INTO RolePermission (role_id, permission_id) SELECT 1, id FROM Permission;")
@@ -304,41 +304,4 @@ def get_all_users():
     return [dict(row) for row in users]
 
 
-def get_all_roles():
-    conn = sqlite3.connect('users.sqlite')
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM Roles")
-    roles = cursor.fetchall()
-
-    conn.close()
-    
-    return [dict(r) for r in roles]
-
-
-def get_all_permissions():
-    conn = sqlite3.connect('users.sqlite')
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM Permission")
-    roles = cursor.fetchall()
-
-    conn.close()
-    
-    return [dict(r) for r in roles]
-
-
-def get_all_rolepermissions():
-    conn = sqlite3.connect('users.sqlite')
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM RolePermission")
-    roles = cursor.fetchall()
-
-    conn.close()
-    
-    return [dict(r) for r in roles]
 
