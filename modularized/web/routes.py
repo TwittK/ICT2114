@@ -990,11 +990,12 @@ def user_management():
     cam_management = check_permission(conn, role, "camera_management")
     user_role_management = check_permission(conn, role, "user_role_management")
 
-    dao = RoleDAO(DATABASE)
-    users = get_all_users()
-    roles = dao.get_all_roles()
-
     if request.method == "GET":
+
+        dao = RoleDAO(DATABASE)
+        users = get_all_users()
+        roles = dao.get_all_roles()
+
         return render_template(
             "user_management.html",
             users=users,
@@ -1088,13 +1089,12 @@ def role_management():
 
             except Exception:
                 flash("Error updating permissions.", "error")
-                
+
             return redirect(url_for('role_management'))
         
         elif action == "delete":
-            print("deleting role")
-            role_id = request.form.get("role_id")
-            success = dao.delete_role(role_id)
+            role_name = request.form.get("role_name")
+            success = dao.delete_role(role_name)
 
             if not success:
                 flash("Error deleting role.", "error")

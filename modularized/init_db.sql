@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users
     username      VARCHAR(50) UNIQUE  NOT NULL,
     email         VARCHAR(100) UNIQUE NOT NULL,
     password_hash TEXT                NOT NULL,
-    role          INTEGER,
+    role          TEXT,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP,
     is_active     BOOLEAN     DEFAULT 1,

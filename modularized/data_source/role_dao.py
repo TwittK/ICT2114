@@ -59,13 +59,13 @@ class RoleDAO:
     finally:
       conn.close()
 
-  def delete_role(self, role_id):
-    """Deletes a role using its id."""
+  def delete_role(self, role_name):
+    """Deletes a role using its name. Update all affected users' roles to default 'user' role. """
     try:
       conn = sqlite3.connect(self.db_path)
-      conn.execute("PRAGMA foreign_keys = ON") 
       cursor = conn.cursor()
-      cursor.execute("DELETE FROM Roles WHERE id = ?", (role_id,))
+      cursor.execute("UPDATE users SET role = ? WHERE role = ?", ('user', role_name))
+      cursor.execute("DELETE FROM Roles WHERE name = ?", (role_name,))
       conn.commit()
 
       return True
