@@ -1005,18 +1005,19 @@ def user_management():
         )
 
     if request.method == "POST":
+        
         user_id = request.form.get("user_id")
-        new_role = request.form.get("new_role")
-        update = request.args.get("update")
-        delete = request.args.get("delete")
+        action = request.form.get("action")
 
-        if int(delete) and not int(update):
+        if action == "delete":
             cursor = conn.cursor()
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
             flash("User role updated successfully.", "success")
 
-        elif int(update) and not int(delete):
+        elif action == "update":
+            new_role = request.form.get("new_role")
+
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM Roles WHERE name = ?", (new_role,))
             role_exists = cursor.fetchone()
@@ -1024,9 +1025,7 @@ def user_management():
                 cursor.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
                 conn.commit()
                 flash("User role updated successfully.", "success")
-        else:
-            flash("Missing user or role data.", "danger")
-
+                
         return redirect(url_for("user_management"))
 
 @app.route('/role_management', methods=['GET', 'POST'])

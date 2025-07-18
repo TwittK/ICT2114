@@ -32,7 +32,8 @@
                   <td>{{ user.role }}</td>
                   {% if user_role_management %}
                     <td class="row">
-                        <form class="col" method="POST" action="{{ url_for('user_management', delete=0, update=1) }}" onsubmit="return confirm('Are you sure you want to update this role?');">
+                        <form class="col" method="POST" action="{{ url_for('user_management') }}" onsubmit="return confirm('Are you sure you want to update this role?');">
+                          <input type="hidden" name="action" value="update">
                           <input type="hidden" name="user_id" value="{{ user.id }}">
                           <select name="new_role" class="form-select form-select-sm d-inline w-auto">
                               {% for role in roles %}
@@ -47,8 +48,9 @@
                           <button type="submit" class="btn btn-sm btn-primary">Update</button>
                         </form>
                         <!-- Delete user form -->
-                        <form class="col" method="POST" action="{{ url_for('user_management', delete=1, update=0) }}" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                        <form class="col" method="POST" action="{{ url_for('user_management') }}" onsubmit="return confirm('Are you sure you want to delete this user?');">
                           <input type="hidden" name="user_id" value="{{ user.id }}">
+                          <input type="hidden" name="action" value="delete">
                           <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                         </form>
                     </td> 
