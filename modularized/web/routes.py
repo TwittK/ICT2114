@@ -1184,7 +1184,47 @@ def labs():
     cam_management = check_permission(conn, role, "camera_management")
     user_role_management = check_permission(conn, role, "user_role_management")
 
-    return render_template("labs.html", cam_management=cam_management, user_role_management=user_role_management)
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "add_lab":
+            lab_name = request.form.get("lab_name")
+            lab_safety_email = request.form.get("lab_safety_email")
+
+            if lab_name and len(lab_name) > 0 and lab_safety_email and len(lab_safety_email) > 0:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
+                conn.commit()
+                return redirect(url_for("labs"))
+            
+            return redirect(url_for("labs"))
+
+        elif action == "delete":
+            lab_id = request.form.get("lab_id")
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM Lab WHERE LabId = ?", (lab_id,))
+            conn.commit()
+            return redirect(url_for("labs"))
+        
+        elif action == "update":
+            lab_id = request.form.get("lab_id")
+            new_lab_name = request.form.get("new_lab_name")
+            new_lab_email = request.form.get("new_lab_email")
+
+            cursor = conn.cursor()
+            cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?", (new_lab_name, new_lab_email, lab_id,))
+            conn.commit()
+
+            return redirect(url_for("labs"))
+        
+
+
+    conn.row_factory = dict_factory
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM Lab")
+    labs = cursor.fetchall()
+
+    conn.close()
+    return render_template("labs.html", labs=labs, cam_management=cam_management, user_role_management=user_role_management)
 
 @app.route('/create_account', methods=['GET', 'POST'])
 @login_required

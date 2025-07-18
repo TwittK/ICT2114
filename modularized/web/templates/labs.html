@@ -5,6 +5,75 @@
 
 {% if cam_management %}
 
+  <!-- Add New Lab Form -->
+  <div class="card mb-4">
+    <div class="card-header">
+      Create New Lab
+    </div>
+    
+    <div class="card-body">
+      <form method="post" action="{{ url_for('labs') }}">
+        <div class="form-group my-1">
+          <input type="hidden" name="action" value="add_lab">
+          <label for="new_lab">Lab Name:</label>
+          <input type="text" class="form-control" name="lab_name" id="new_lab" required>
+
+          <label for="new_lab_email" class="my-2">Lab Safety Email:</label>
+          <input type="email" class="form-control" name="lab_safety_email" id="new_lab_email" required>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Add Lab</button>
+      </form>
+    </div>
+  </div>
+
+  {% if labs %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Lab Name</th>
+                <th scope="col">Lab Safety Email</th>
+                <th scope="col">Update</th>
+                <th scope="col">Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lab in labs %}
+                <tr>
+                    <td>{{ lab.LabId }}</td>
+                    <form method="post" action="{{ url_for('labs') }}">
+                      <td>
+                        <div class="form-group">
+                          <input type="text" name="new_lab_name" class="form-control" value="{{ lab.lab_name }}">
+                        </div>
+                      </td>
+                      <td>
+                        <div class="form-group">
+                          <input type="email" name="new_lab_email" class="form-control" value="{{ lab.lab_safety_email }}">
+                        </div>
+                      </td>
+                      <td>
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="lab_id" value="{{ lab.LabId }}">
+                        <button type="submit" class="btn btn-primary">Update</button>
+                      </td>
+                    </form>
+
+                    <form method="post" action="{{ url_for('labs') }}" onsubmit="return confirm('Are you sure you want to delete this lab?')">
+                      <td>
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="lab_id" value="{{ lab.LabId }}">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                      </td>
+                    </form>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+  
+  {% else %}
+    <p>No labs.</p>
+  {% endif %}
 {% endif %}
 
 
