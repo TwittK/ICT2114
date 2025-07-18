@@ -198,7 +198,7 @@ def index():
             flash("Camera not found in database.", "danger")
             return redirect(url_for("index", lab=lab_name))
         
-        # Remove camera from manager
+        # Remove camera from manager, stop detection and join threads
         camera_manager = CameraManager('users.sqlite')
         remove_success = camera_manager.remove_camera(camera_id)
         if not remove_success:
