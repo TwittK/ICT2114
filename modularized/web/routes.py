@@ -357,3 +357,14 @@ def video_feed(camera_id):
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
     return Response(generate_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/check_ip', methods=['POST'])
+def check_ip():
+    from flask import request, jsonify
+    ip_address = request.json.get('ip')
+
+    # TEMP. TODO: Will replace with actual logic to verify ip address validity
+    valid_ips = ["192.168.1.64", "192.168.1.65"]
+    is_valid = ip_address in valid_ips
+
+    return jsonify({'valid': is_valid})

@@ -60,12 +60,43 @@
                     {# Add button for camera. #}
                     {# Check if user is admin #}
                     {% if session.get('role') == 'admin' %}
-                        <li class="ps-3 mt-1">
-                            <a href="{{ url_for('index', add=1, lab=lab.lab_name) }}"
+                        <li class="ps-3 mt-1" > 
+                            <a data-bs-toggle="modal" data-bs-target="#addCameraModal"
                                class="text-decoration-none icon-plus">
-                                <i class="fa-solid fa-circle-plus"></i>
-                            </a>
+                            <i class="fa-solid fa-circle-plus"></i>
+                        </a>
                         </li>
+                        <!-- Add Camera Modal -->
+                        <div class="modal" id="addCameraModal" tabindex="-1" aria-labelledby="addCameraModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                            <div class="modal-header">
+                                <h1 class="modal-title fs-5" id="addCameraModalLabel">Add New Camera</h1>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+
+                            <div class="modal-body">
+                                <p>Input IP Address of Camera and press the search icon to check if IP address exists in NVR.</p>
+                                <!-- Input IP address -->
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="cameraInput" placeholder="Enter Camera IP Address">
+                                    <button class="btn btn-outline-secondary" type="button" id="validateCameraBtn">
+                                        <span id="searchIcon">🔍</span>
+                                    </button>
+                                </div>
+                                <!-- Validation result message -->
+                                <div id="cameraValidationMessage" class="mt-2 text-danger"></div>
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" id="addCameraBtn" disabled>
+                                    <a href="{{ url_for('index', add=1, lab=lab.lab_name) }}" class="text-light link-offset-2 link-underline link-underline-opacity-0"> Add Camera </a>
+                                </button>
+                            </div>
+                            </div>
+                        </div>
+                        </div>
                     {% endif %}
                 {% endfor %}
             </ul>
@@ -159,4 +190,70 @@
 
 </body>
 
+<script>
+
+    document.getElementById("validateCameraBtn").addEventListener("click", function () {
+    const ip = document.getElementById("cameraInput").value.trim();
+    const messageDiv = document.getElementById("cameraValidationMessage");
+    const addBtn = document.getElementById("addCameraBtn");
+    const searchIcon = document.getElementById("searchIcon");
+    
+    // Disable add button on input change
+    const cameraInput = document.getElementById("cameraInput");
+    cameraInput.addEventListener("input", function () {
+
+        addBtn.disabled = true;
+
+        // Clear any validation messages
+        const messageDiv = document.getElementById("cameraValidationMessage");
+        messageDiv.textContent = "";
+        messageDiv.classList.remove("text-success", "text-danger");
+    });
+
+    messageDiv.textContent = "";
+    addBtn.disabled = true;
+
+    if (!ip) {
+        messageDiv.textContent = "Please enter a valid IP address.";
+        return;
+    }
+
+    // Set loading spinner
+    searchIcon.innerHTML = `
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span class="visually-hidden" role="status">Loading...</span>
+    `;
+
+    // Validate if IP of camera exists in NVR
+    fetch("/check_ip", {
+        method: "POST",
+        headers: {
+        "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ ip: ip })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.valid) {
+            messageDiv.textContent = "Camera found in NVR!";
+            messageDiv.classList.remove("text-danger");
+            messageDiv.classList.add("text-success");
+            addBtn.disabled = false;
+        } else {
+            messageDiv.textContent = "Camera not found in NVR.";
+            messageDiv.classList.remove("text-success");
+            messageDiv.classList.add("text-danger");
+        }
+    })
+    .catch(error => {
+        console.error("Error:", error);
+        messageDiv.textContent = "Server error. Please try again.";
+        messageDiv.classList.remove("text-success");
+        messageDiv.classList.add("text-danger");
+    })
+    .finally(() => {
+        searchIcon.innerHTML = "🔍";
+    });
+    });
+</script>
 </html>
