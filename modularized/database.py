@@ -254,8 +254,10 @@ def create_new_camera(
                        )
 
         conn.commit()
-        return True
+        camera_id = cursor.lastrowid
+        return True, camera_id
     except sqlite3.IntegrityError:
-        return False
+        return False, None
     finally:
         conn.close()
+

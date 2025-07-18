@@ -159,21 +159,29 @@ def index():
             user_id = session.get("user_id")
             dao = CameraDAO("users.sqlite")
 
-            success, message = dao.add_new_camera(
+            # Insert camera into database
+            camera_id, message = dao.add_new_camera(
                 lab_name=lab_name,
                 user_id=user_id,
                 device_info=device_info
             )
+            if camera_id is None:
+                flash("Error inserting camera into database.", "danger")
+                return redirect(url_for("index"))
+            
+            # Add camera into manager and start detection on newly inserted camera
+            cm = CameraManager('users.sqlite')
+            result = cm.add_new_camera(device_info["ip_address"], "101", True) 
+            if not result:
+                flash("Error inserting camera into camera manager.", "danger")
+                return redirect(url_for("index"))  
 
-            flash(message, "success" if success else "danger")
+            flash(message, "success" if result else "danger")
             return redirect(url_for("index", lab=lab_name))
         
         except Exception as e:
             flash("Error retrieving IP and/or device info.", "danger")
             return redirect(url_for("index"))
-
-        # success, message = dao.add_default_camera(lab_name, user_id)
-
     
     elif is_adding_camera and not is_admin:
         flash("Admin access required to add cameras!", "error")

@@ -79,29 +79,33 @@ class CameraManager:
     from threads.saver import image_saver
     from shared.camera import Camera
 
-    camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
+    try:
+      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
 
-    # Start all threads for detection
-    read_thread = threading.Thread(target=read_frames, args=(camera,))
-    preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
-    detection_thread = threading.Thread(target=detection, args=(camera,))
-    save_thread = threading.Thread(target=image_saver, args=(camera,))
+      # Start all threads for detection
+      read_thread = threading.Thread(target=read_frames, args=(camera,))
+      preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
+      detection_thread = threading.Thread(target=detection, args=(camera,))
+      save_thread = threading.Thread(target=image_saver, args=(camera,))
 
 
-    read_thread.start()
-    preprocess_thread.start()
-    detection_thread.start()
-    save_thread.start()
+      read_thread.start()
+      preprocess_thread.start()
+      detection_thread.start()
+      save_thread.start()
 
-    self.camera_pool[camera_id] = {
-      "camera": camera,
-      "threads": {
-        "read": read_thread,
-        "detection": detection_thread,
-        "save": save_thread,
-        "preprocess": preprocess_thread
-      },
-    }
+      self.camera_pool[camera_id] = {
+        "camera": camera,
+        "threads": {
+          "read": read_thread,
+          "detection": detection_thread,
+          "save": save_thread,
+          "preprocess": preprocess_thread
+        },
+      }
 
-    print(f"[INFO] Camera {camera_id} added.")
-    return True
+      print(f"[INFO] Camera {camera_id} added.")
+      return True
+
+    except Exception:
+      return False

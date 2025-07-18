@@ -89,7 +89,7 @@ class CameraDAO:
         count = self.count_cameras_in_lab(lab_id)
         default_name = f"Camera {count + 1}"
 
-        success = create_new_camera(
+        success, camera_id = create_new_camera(
             name=default_name,
             camera_user_id=user_id,
             camera_lab_id=lab_id,
@@ -107,6 +107,6 @@ class CameraDAO:
         )
 
         if success:
-            return True, f"{default_name} added to {lab_name}"
+            return camera_id, f"{default_name} added to {lab_name} as CameraId {camera_id}"
         else:
-            return False, "Failed to add camera"
+            return None, "Failed to add camera"
