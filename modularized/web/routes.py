@@ -830,3 +830,77 @@ def check_ip():
         return jsonify({'valid': False, 'device_info': discover_results})
 
     return jsonify({'valid': True, 'device_info': discover_results})
+
+@app.route('/add_camera', methods=['POST'])
+@login_required
+@admin_required
+def add_camera():
+    try:
+        data = request.get_json()
+        camera_ip = data.get('ip')
+        device_info = data.get('device_info')
+        
+        print(f"🔍 Attempting to add camera: {camera_ip}")
+        print(f"📋 Device info: {device_info}")
+        
+        # Check if camera already exists
+        conn = sqlite3.connect('users.sqlite')
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM Camera WHERE ip_address = ?", (camera_ip,))
+        if cursor.fetchone()[0] > 0:
+            print(f"❌ Camera {camera_ip} already exists in database")
+            conn.close()
+            return jsonify({'success': False, 'message': f'Camera {camera_ip} already exists!'})
+        
+        # Get default lab ID
+        cursor.execute("SELECT LabId FROM Lab LIMIT 1")
+        lab_result = cursor.fetchone()
+        lab_id = lab_result[0] if lab_result else 1
+        
+        # Get current user ID from session
+        user_id = session.get('user_id', 1)
+        
+        # Add to database with correct column names and all required fields
+        cursor.execute("""
+            INSERT INTO Camera (name, ip_address, camera_lab_id, camera_user_id, resolution, frame_rate, encoding,
+                              subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp, ntp_server_address, time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            device_info.get('device_name', f'Camera_{camera_ip}'),
+            camera_ip,
+            lab_id,  # Fixed: using camera_lab_id column name
+            user_id,  # Added: camera_user_id is required
+            device_info.get('resolution', 1080),
+            device_info.get('frame_rate', 25),
+            device_info.get('encoding', 'H.265'),
+            device_info.get('subnet_mask', '255.255.255.0'),
+            device_info.get('gateway', '192.168.1.1'),
+            device_info.get('camera_ip_type', 'static'),
+            device_info.get('timezone', 'Asia/Singapore'),
+            device_info.get('sync_with_ntp', 1 if device_info.get('sync_with_ntp') else 0),
+            device_info.get('ntp_server_address', 'pool.ntp.org'),  # Fixed: use correct key
+            device_info.get('time', '2025-01-01T00:00:00')  # Added: time is required (NOT NULL)
+        ))
+        
+        camera_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Camera {camera_ip} added to database with ID {camera_id}")
+        
+        # Add to camera manager
+        from shared.camera_manager import CameraManager
+        # Try to get existing instance first (singleton pattern)
+        manager = CameraManager.get_instance()
+        # except RuntimeError:
+        #     # If no instance exists, create one with db_path
+        #     manager = CameraManager('users.sqlite')
+        manager.add_new_camera(camera_id, camera_ip, "101", True)
+        
+        print(f"✅ Camera {camera_ip} added to camera manager")
+        
+        return jsonify({'success': True, 'message': f'Camera {camera_ip} added successfully!'})
+        
+    except Exception as e:
+        print(f"❌ Error adding camera: {e}")
+        return jsonify({'success': False, 'message': f'Error adding camera: {str(e)}'})

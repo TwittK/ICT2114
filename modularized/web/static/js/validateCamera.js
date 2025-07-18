@@ -1,4 +1,5 @@
 function disableAddButton() {
+  const addBtn = document.getElementById("addCameraBtn");
 
   document.getElementById("deviceInfoData").value = ""; // Clear hidden device info
   addBtn.disabled = true;
@@ -81,7 +82,6 @@ function validateCamera() {
 }
 
 function addNewCamera() {
-
   const ip = document.getElementById("cameraInput").value.trim();
   const deviceInfoRaw = document.getElementById("deviceInfoData").value;
   if (!ip || !deviceInfoRaw) {
@@ -90,7 +90,9 @@ function addNewCamera() {
   }
 
   const deviceInfo = JSON.parse(deviceInfoRaw);
-  fetch(`/index?add=1&lab={{ lab.lab_name }}`, {
+  
+  // Fix: Use a simpler URL without template variables
+  fetch(`/add_camera`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -100,6 +102,19 @@ function addNewCamera() {
       device_info: deviceInfo
     })
   })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert("Camera added successfully!");
+      location.reload(); // Reload the page to show the new camera
+    } else {
+      alert("Failed to add camera: " + data.message);
+    }
+  })
+  .catch(error => {
+    console.error("Error:", error);
+    alert("Error adding camera. Please try again.");
+  });
 }
 
 function registerListeners() {
