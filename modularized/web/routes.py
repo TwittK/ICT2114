@@ -13,7 +13,7 @@ from database import verify_user, update_last_login, get_all_users
 from shared.camera_manager import CameraManager
 from shared.camera_discovery import CameraDiscovery
 import queue
-from web.utils import check_permission
+from web.utils import check_permission, validate_and_sanitize_text
 from werkzeug.security import generate_password_hash
 
 DATABASE = "users.sqlite"
@@ -186,6 +186,13 @@ def index():
             user_id = session.get("user_id")
             dao = CameraDAO("users.sqlite")
 
+            # Validate and sanitize string
+            try:
+                lab_name = validate_and_sanitize_text(lab_name)
+            except ValueError as e:
+                flash(f"Validation error {e}", "danger")
+                return redirect(url_for("index"))
+
             # Insert camera into database
             camera_id, message = dao.add_new_camera(
                 lab_name=lab_name,
@@ -351,6 +358,14 @@ def edit_camera(camera_id):
         try:
             # Get form data
             name = request.form.get('name')
+
+            # Validate and sanitize string
+            try:
+                name = validate_and_sanitize_text(name)
+            except ValueError as e:
+                flash(f"Validation error {e}", "danger")
+                return redirect(url_for("edit_camera", camera_id=camera_id))
+
             resolution = int(request.form.get('resolution', 1080))
             frame_rate = int(request.form.get('frame_rate', 30))
             encoding = request.form.get('encoding', 'H.265')
@@ -1114,6 +1129,14 @@ def role_management():
         # Add a new role
         if action == "add_role":
             new_role_name = request.form.get("role_name").strip()
+
+            # Validate and sanitize input
+            try:
+                new_role_name = validate_and_sanitize_text(new_role_name)
+            except ValueError as e:
+                flash(f"Validation error {e}", "danger")
+                return redirect(url_for("role_management"))
+            
             if not new_role_name:
                 flash("Error creating new role.", "error")
                 return redirect(url_for("role_management"))
@@ -1188,15 +1211,21 @@ def labs():
     if request.method == "POST":
         action = request.form.get("action")
         if action == "add_lab":
-            lab_name = request.form.get("lab_name").strip()
-            lab_safety_email = request.form.get("lab_safety_email").strip()
+            lab_name = request.form.get("lab_name")
+            lab_safety_email = request.form.get("lab_safety_email")
 
-            if lab_name and len(lab_name) > 0 and lab_safety_email and len(lab_safety_email) > 0:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
-                conn.commit()
+            # Validate and sanitize input
+            try:
+                lab_name = validate_and_sanitize_text(lab_name)
+                lab_safety_email = validate_and_sanitize_text(lab_safety_email)
+            except ValueError as e:
+                flash(f"Validation error {e}", "danger")
                 return redirect(url_for("labs"))
             
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
+            conn.commit()
+
             return redirect(url_for("labs"))
 
         elif action == "delete":
@@ -1211,14 +1240,20 @@ def labs():
             new_lab_name = request.form.get("new_lab_name")
             new_lab_email = request.form.get("new_lab_email")
 
+            # Validate and sanitize string input
+            try:
+                new_lab_name = validate_and_sanitize_text(new_lab_name)
+                new_lab_email = validate_and_sanitize_text(new_lab_email)
+            except ValueError as e:
+                flash(f"Validation error {e}", "danger")
+                return redirect(url_for("labs"))
+            
             cursor = conn.cursor()
             cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?", (new_lab_name, new_lab_email, lab_id,))
             conn.commit()
 
             return redirect(url_for("labs"))
         
-
-
     conn.row_factory = dict_factory
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM Lab")
@@ -1249,13 +1284,21 @@ def create_account():
     roles = dao.get_all_roles()
 
     if request.method == "POST":
-        # TODO: Add logic to create new account
         # Get form data
-        username_form = request.form.get("username", "").strip()
-        email_form = request.form.get("email", "").strip()
+        username_form = request.form.get("username", "")
+        email_form = request.form.get("email", "")
         password_form = request.form.get("password")
-        role_form = request.form.get("role", "").strip()
+        role_form = request.form.get("role", "")
 
+        # Validate and sanitize string input
+        try:
+            username_form = validate_and_sanitize_text(username_form)
+            email_form = validate_and_sanitize_text(email_form)
+            role_form = validate_and_sanitize_text(role_form)
+        except ValueError as e:
+            flash(f"Validation error {e}", "danger")
+            return redirect(url_for("labs"))
+        
         # Validate required fields are not empty
         if not username_form or not email_form or not password_form or not role_form:
             flash("❌ All fields are required.", "danger")
