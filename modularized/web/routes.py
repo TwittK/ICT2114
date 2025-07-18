@@ -14,6 +14,7 @@ from shared.camera_manager import CameraManager
 from shared.camera_discovery import CameraDiscovery
 import queue
 from web.utils import check_permission
+from werkzeug.security import generate_password_hash
 
 DATABASE = "users.sqlite"
 SNAPSHOT_FOLDER = "snapshots"
@@ -1234,6 +1235,7 @@ def create_account():
     # Open database connection from permission verification
     try:
         conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
     except Exception:
         return redirect(url_for("index"))
     role = session.get('role')
@@ -1248,7 +1250,49 @@ def create_account():
 
     if request.method == "POST":
         # TODO: Add logic to create new account
-        return redirect(url_for("create_account.html"))
-    
+        # Get form data
+        username_form = request.form.get("username")
+        email_form = request.form.get("email")
+        password_form = request.form.get("password")
+        role_form = request.form.get("role")
+
+        # Password length validation
+        if len(password_form) < 8:
+            flash("❌ Password must be at least 8 characters long.", "danger")
+            return render_template(
+                "create_account.html",
+                roles=roles,
+                cam_management=cam_management,
+                user_role_management=user_role_management,
+            )
+        
+        # Check email uniqueness
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email_form,))
+        if cursor.fetchone():
+            flash("❌ An account with this email already exists.", "danger")
+            return render_template("create_account.html",
+                                roles=roles,
+                                cam_management=cam_management,
+                                user_role_management=user_role_management)
+
+
+        # Hash password
+        password_hash = generate_password_hash(password_form)
+
+        # Insert into DB
+        try:
+            cursor.execute("""
+                INSERT INTO users (username, email, password_hash, role)
+                VALUES (?, ?, ?, ?)
+            """, (username_form, email_form, password_hash, role_form))
+            conn.commit()
+            flash("✅ Account created successfully!", "success")
+            return redirect(url_for("user_management"))
+        except sqlite3.IntegrityError:
+            flash("❌ Username or email already exists.", "danger")
+        except Exception as e:
+            flash(f"❌ Failed to create user: {str(e)}", "danger")
+        finally:
+            conn.close()    
 
     return render_template("create_account.html", roles=roles, cam_management=cam_management, user_role_management=user_role_management,)

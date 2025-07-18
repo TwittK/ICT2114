@@ -5,6 +5,52 @@
   <i class="fa-solid fa-info-circle"></i> <strong>Create New Account:</strong> Only users with user management permission can access this page.
 </div>
 
-<h1>Create New Account</h1>
+<div class="container mt-4" style="max-width: 600px;">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <i class="fa-solid fa-user-plus me-1"></i> Create New Account
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('create_account') }}">
+        <!-- Username -->
+        <div class="mb-3">
+          <label for="username" class="form-label fw-semibold">Username</label>
+          <input type="text" class="form-control" id="username" name="username" required>
+        </div>
+
+        <!-- Email -->
+        <div class="mb-3">
+          <label for="email" class="form-label fw-semibold">Email</label>
+          <input type="email" class="form-control" id="email" name="email" required>
+        </div>
+
+        <!-- Password -->
+        <div class="mb-3">
+          <label for="password" class="form-label fw-semibold">Password</label>
+          <input type="password" class="form-control" id="password" name="password" minlength="8" required>
+        </div>
+
+        <!-- Role -->
+        <div class="mb-3">
+          <label for="role" class="form-label fw-semibold">Role</label>
+          <select name="role" id="role" class="form-select" required>
+            {% for role in roles %}
+              <option value="{{ role.name }}">{{ role.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Buttons -->
+        <div class="d-flex justify-content-between">
+          <a href="{{ url_for('user_management') }}" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-success">
+            <i class="fa-solid fa-user-plus me-1"></i> Create Account
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 
 {% endblock %}
