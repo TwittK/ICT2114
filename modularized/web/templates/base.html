@@ -132,7 +132,6 @@
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
 
                     {% if user_role_management %}
-
                     <ul class="navbar-nav ms-4">
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -150,10 +149,15 @@
                                 </li>
                             </ul>
                         </li>
-                        
-
                     </ul>
+                    {% endif %}
 
+                    {% if cam_management %}
+                        <div class="nav-item d-flex align-items-center ms-3">
+                            <a href="{{ url_for('labs') }}" class="nav-link d-flex align-items-center">
+                                Labs
+                            </a>
+                        </div>
                     {% endif %}
 
                     <div class="navbar-nav ms-auto">

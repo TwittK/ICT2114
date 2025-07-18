@@ -916,15 +916,8 @@ def apply_time_settings(camera_ip, settings):
         raise Exception(f"Failed to apply time settings to {camera_ip}: {str(e)}")
 
 @app.route('/video_feed/<camera_id>')
+@require_permission('video_feed')
 def video_feed(camera_id):
-
-    conn = sqlite3.connect(DATABASE)
-    role = session.get('role')
-    if not check_permission(conn, role, "video_feed"):
-        flash('No Privileges to View Live Video Feed', 'danger')
-        return redirect(url_for('index'))
-    conn.close()
-    
     cam_manager = CameraManager.get_instance()
 
     camera_id = int(camera_id)
@@ -1073,6 +1066,7 @@ def user_management():
         action = request.form.get("action")
 
         if action == "delete":
+            conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
@@ -1174,6 +1168,23 @@ def role_management():
         user_role_management=user_role_management
     )
 
+@app.route('/labs', methods=['GET', 'POST'])
+@login_required
+@require_permission('camera_management')
+def labs():
+    # Open database connection from permission verification
+    try:
+        conn = sqlite3.connect(DATABASE)
+    except Exception:
+        return redirect(url_for("index"))
+    role = session.get('role')
+    if role is None:
+        return redirect(url_for("index"))
+    
+    cam_management = check_permission(conn, role, "camera_management")
+    user_role_management = check_permission(conn, role, "user_role_management")
+
+    return render_template("labs.html", cam_management=cam_management, user_role_management=user_role_management)
 
 @app.route('/create_account', methods=['GET', 'POST'])
 @login_required
