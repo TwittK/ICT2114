@@ -1,7 +1,7 @@
 from flask import Flask, request, session, redirect, url_for, render_template, flash, Response, jsonify
 from functools import wraps
 from data_source.camera_dao import CameraDAO
-from data_source.role_dao import RoleDAO 
+from data_source.role_dao import RoleDAO
 from datetime import datetime
 import sqlite3
 import requests
@@ -27,12 +27,14 @@ class_id_to_label = {
     41: "Cup",
 }
 
+
 def dict_factory(cursor, row):
     """Convert sqlite3.Row to dictionary"""
     d = {}
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
     return d
+
 
 def login_required(f):
     @wraps(f)
@@ -66,7 +68,9 @@ def require_permission(permission_name):
                 return redirect(url_for('index'))
 
             return f(*args, **kwargs)
+
         return decorated_function
+
     return decorator
 
 
@@ -174,7 +178,7 @@ def index():
             if not request.is_json:
                 flash("Invalid request.", "danger")
                 return redirect(url_for("index"))
-            
+
             data = request.get_json()
             device_info = data.get("device_info")
 
@@ -182,7 +186,7 @@ def index():
             if not device_info:
                 flash("Error retrieving device info.", "danger")
                 return redirect(url_for("index"))
-            
+
             user_id = session.get("user_id")
             dao = CameraDAO("users.sqlite")
 
@@ -202,21 +206,21 @@ def index():
             if camera_id is None:
                 flash("Error inserting camera into database.", "danger")
                 return redirect(url_for("index"))
-            
+
             # Add camera into manager and start detection on newly inserted camera
             cm = CameraManager('users.sqlite')
-            result = cm.add_new_camera(device_info["ip_address"], "101", True) 
+            result = cm.add_new_camera(device_info["ip_address"], "101", True)
             if not result:
                 flash("Error inserting camera into camera manager.", "danger")
-                return redirect(url_for("index"))  
+                return redirect(url_for("index"))
 
             flash(message, "success" if result else "danger")
             return redirect(url_for("index", lab=lab_name))
-        
+
         except Exception as e:
             flash("Error retrieving IP and/or device info.", "danger")
             return redirect(url_for("index"))
-    
+
     elif is_adding_camera and not check_permission(conn, role, "add_camera"):
         flash("Admin access required to add cameras!", "error")
         return redirect(url_for("index", lab=lab_name))
@@ -225,20 +229,20 @@ def index():
     if is_deleting_camera and camera_name and lab_name and cam_management:
         user_id = session.get("user_id")
         dao = CameraDAO("users.sqlite")
-        
+
         # Retrieve camera id
         id_success, camera_id = dao.get_camera_id(lab_name, camera_name, user_id)
         if not id_success:
             flash("Camera not found in database.", "danger")
             return redirect(url_for("index", lab=lab_name))
-        
+
         # Remove camera from manager, stop detection and join threads
         camera_manager = CameraManager('users.sqlite')
         remove_success = camera_manager.remove_camera(camera_id)
         if not remove_success:
             flash("Failed to stop camera threads properly.", "danger")
             return redirect(url_for("index", lab=lab_name))
-        
+
         # Delete camera from database
         success, message = dao.delete_camera(lab_name, camera_name, user_id)
 
@@ -297,10 +301,10 @@ def index():
         # Replace class ID with label using mapping.
         results = []
         for row in raw_results:
-            time_generated = row[0]
-            object_detected = row[1]
-            confidence = row[2]
-            image_url = row[3]
+            time_generated = row["time_generated"]
+            object_detected = row["object_detected"]
+            confidence = row["confidence"]
+            image_url = row["imageURL"]
 
             # Try to interpret as int (e.g., if stored as string class ID)
             try:
@@ -320,7 +324,7 @@ def index():
         lab_name=lab_name,
         camera_name=camera_name,
         cam_management=cam_management,
-        user_role_management = user_role_management,
+        user_role_management=user_role_management,
         today=today_str,
     )
 
@@ -337,22 +341,22 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
 @app.route('/edit_camera/<int:camera_id>', methods=['GET', 'POST'])
 @login_required
 @require_permission('camera_management')
 def edit_camera(camera_id):
-
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
         flash('No Privileges to Edit Camera', 'danger')
         return redirect(url_for('index'))
     conn.close()
-    
+
     conn = sqlite3.connect('users.sqlite')
     conn.row_factory = dict_factory  # Enable dictionary-style access
     cursor = conn.cursor()
-    
+
     if request.method == 'POST':
         # Handle form submission - update camera settings
         try:
@@ -377,24 +381,33 @@ def edit_camera(camera_id):
             sync_with_ntp = 1 if request.form.get('sync_with_ntp') else 0
             ntp_server_address = request.form.get('ntp_server_address', 'pool.ntp.org')
             manual_time = request.form.get('manual_time')
-            
+
             # Use current time if manual_time is provided and NTP is disabled
             time_value = manual_time if manual_time and not sync_with_ntp else None
-            
+
             # Update camera in database
             cursor.execute('''
-                UPDATE Camera 
-                SET name = ?, resolution = ?, frame_rate = ?, encoding = ?,
-                    camera_ip_type = ?, ip_address = ?, subnet_mask = ?, gateway = ?,
-                    timezone = ?, sync_with_ntp = ?, ntp_server_address = ?, time = ?
-                WHERE CameraId = ?
-            ''', (name, resolution, frame_rate, encoding, camera_ip_type, 
-                  ip_address, subnet_mask, gateway, timezone, sync_with_ntp,
-                  ntp_server_address, time_value, camera_id))
-            
+                           UPDATE Camera
+                           SET name               = ?,
+                               resolution         = ?,
+                               frame_rate         = ?,
+                               encoding           = ?,
+                               camera_ip_type     = ?,
+                               ip_address         = ?,
+                               subnet_mask        = ?,
+                               gateway            = ?,
+                               timezone           = ?,
+                               sync_with_ntp      = ?,
+                               ntp_server_address = ?,
+                               time               = ?
+                           WHERE CameraId = ?
+                           ''', (name, resolution, frame_rate, encoding, camera_ip_type,
+                                 ip_address, subnet_mask, gateway, timezone, sync_with_ntp,
+                                 ntp_server_address, time_value, camera_id))
+
             conn.commit()
             flash('Camera settings updated successfully!', 'success')
-            
+
             # Optionally, try to apply settings to actual camera via API
             try:
                 apply_camera_settings(camera_id, {
@@ -413,33 +426,43 @@ def edit_camera(camera_id):
                 flash('Settings applied to camera successfully!', 'success')
             except Exception as e:
                 flash(f'Settings saved but failed to apply to camera: {str(e)}', 'warning')
-            
+
         except Exception as e:
             conn.rollback()
             flash(f'Error updating camera settings: {str(e)}', 'error')
-        
+
         finally:
             conn.close()
-        
+
         return redirect(url_for('edit_camera', camera_id=camera_id))
-    
+
     # GET request - fetch camera data
     cursor.execute('''
-        SELECT c.CameraId, c.name, c.resolution, c.frame_rate, c.encoding, 
-               c.camera_ip_type, c.ip_address, c.subnet_mask, c.gateway, 
-               c.timezone, c.sync_with_ntp, c.ntp_server_address, c.time, l.lab_name 
-        FROM Camera c 
-        JOIN Lab l ON c.camera_lab_id = l.LabId 
-        WHERE c.CameraId = ?
-    ''', (camera_id,))
-    
+                   SELECT c.CameraId,
+                          c.name,
+                          c.resolution,
+                          c.frame_rate,
+                          c.encoding,
+                          c.camera_ip_type,
+                          c.ip_address,
+                          c.subnet_mask,
+                          c.gateway,
+                          c.timezone,
+                          c.sync_with_ntp,
+                          c.ntp_server_address,
+                          c.time,
+                          l.lab_name
+                   FROM Camera c
+                            JOIN Lab l ON c.camera_lab_id = l.LabId
+                   WHERE c.CameraId = ?
+                   ''', (camera_id,))
+
     camera = cursor.fetchone()
-    
-    
+
     if not camera:
         flash('Camera not found', 'error')
         return redirect(url_for('index'))
-    
+
     # Ensure all required fields have default values
     camera_data = {
         'CameraId': camera['CameraId'],
@@ -458,31 +481,33 @@ def edit_camera(camera_id):
         'time': camera['time'] or '',
         'lab_name': camera['lab_name'] or 'Unknown Lab'
     }
-    
+
     user_role_management = check_permission(conn, session.get('role'), "user_role_management")
     conn.close()
-    return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted, user_role_management=user_role_management)
+    return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted,
+                           user_role_management=user_role_management)
+
 
 def apply_device_settings(camera_ip, settings):
     """Apply device settings (name) to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
         discovery = CameraDiscovery()
-        
+
         # Update device name if provided
         if 'name' in settings:
             device_name = settings['name']
-            
+
             # Create new device info XML following the working pattern
             ET.register_namespace('', "http://www.hikvision.com/ver20/XMLSchema")
-            
+
             # Check camera namespace first
             check_url = f"http://{camera_ip}/ISAPI/System/deviceInfo"
             check_response = requests.get(check_url, auth=HTTPDigestAuth(discovery.username, discovery.password))
-            
+
             if check_response.status_code != 200:
                 raise Exception(f"Failed to check device info: {check_response.status_code}")
-            
+
             # Determine namespace and create appropriate XML
             if "hikvision.com" in check_response.text:
                 device_info = ET.Element("DeviceInfo", xmlns="http://www.hikvision.com/ver20/XMLSchema")
@@ -490,36 +515,36 @@ def apply_device_settings(camera_ip, settings):
             else:
                 device_info = ET.Element("DeviceInfo", xmlns="http://www.isapi.org/ver20/XMLSchema")
                 ET.register_namespace('', "http://www.isapi.org/ver20/XMLSchema")
-            
+
             device_name_elem = ET.SubElement(device_info, "deviceName")
             device_name_elem.text = device_name
-            
+
             # Convert to XML
             xml_data = ET.tostring(device_info, encoding='utf-8')
-            
+
             # Send PUT request to update device name
             url = f"http://{camera_ip}/ISAPI/System/deviceInfo"
             headers = {"Content-Type": "application/xml"}
-            
+
             response = requests.put(
                 url,
                 data=xml_data,
                 headers=headers,
                 auth=HTTPDigestAuth(discovery.username, discovery.password)
             )
-            
+
             if response.status_code == 200:
                 print(f"✅ Device name updated to '{device_name}' successfully.")
             else:
                 print(f"❌ Failed to update device name. Status: {response.status_code} - {response.reason}")
                 print("Response:", response.text)
                 raise Exception(f"Failed to update device name: {response.status_code} - {response.text}")
-        
+
     except Exception as e:
         raise Exception(f"Failed to apply device settings to {camera_ip}: {str(e)}")
 
-def apply_camera_settings(camera_id, settings):
 
+def apply_camera_settings(camera_id, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
@@ -532,50 +557,50 @@ def apply_camera_settings(camera_id, settings):
         print("TRYING ISAPI UPDATE")
         # Get camera IP address from database
         cursor = conn.cursor()
-        
+
         cursor.execute("SELECT ip_address FROM Camera WHERE CameraId = ?", (camera_id,))
         result = cursor.fetchone()
         conn.close()
-        
+
         if not result:
             raise Exception(f"Camera {camera_id} not found in database")
-        
+
         camera_ip = result[0]
-        
+
         if not camera_ip:
             raise Exception(f"No IP address configured for camera {camera_id}")
-        
+
         # Apply device settings (name)
-        device_settings = {k: v for k, v in settings.items() 
-                          if k in ['name']}
+        device_settings = {k: v for k, v in settings.items()
+                           if k in ['name']}
         if device_settings:
             apply_device_settings(camera_ip, device_settings)
-        
+
         # Apply stream settings (resolution, frame rate, encoding)
-        stream_settings = {k: v for k, v in settings.items() 
-                          if k in ['resolution', 'frame_rate', 'encoding']}
+        stream_settings = {k: v for k, v in settings.items()
+                           if k in ['resolution', 'frame_rate', 'encoding']}
         if stream_settings:
             apply_stream_settings(camera_ip, stream_settings)
-        
+
         # Apply network settings (IP, subnet, gateway, IP type)
-        network_settings = {k: v for k, v in settings.items() 
-                           if k in ['ip_address', 'subnet_mask', 'gateway', 'camera_ip_type']}
+        network_settings = {k: v for k, v in settings.items()
+                            if k in ['ip_address', 'subnet_mask', 'gateway', 'camera_ip_type']}
         if network_settings:
             apply_network_settings(camera_ip, network_settings)
-        
+
         # Apply time settings (timezone, NTP, NTP server)
-        time_settings = {k: v for k, v in settings.items() 
-                        if k in ['timezone', 'sync_with_ntp', 'ntp_server_address']}
+        time_settings = {k: v for k, v in settings.items()
+                         if k in ['timezone', 'sync_with_ntp', 'ntp_server_address']}
         if time_settings:
             apply_time_settings(camera_ip, time_settings)
-        
+
         print(f"✅ All settings applied to camera {camera_id} at {camera_ip}")
-        
+
     except Exception as e:
         raise Exception(f"Failed to apply camera settings: {str(e)}")
-    
-def apply_stream_settings(camera_ip, settings):
 
+
+def apply_stream_settings(camera_ip, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
@@ -587,17 +612,17 @@ def apply_stream_settings(camera_ip, settings):
     try:
         from shared.camera_discovery import CameraDiscovery
         discovery = CameraDiscovery()
-        
+
         # Fetch current configuration
         url = f"http://{camera_ip}/ISAPI/Streaming/channels/101"
         response = requests.get(url, auth=HTTPDigestAuth(discovery.username, discovery.password))
-        
+
         if response.status_code != 200:
             raise Exception(f"Failed to fetch current stream settings: {response.status_code}")
-        
+
         # Parse current XML
         root = ET.fromstring(response.text)
-        
+
         # Determine namespace and register it to avoid prefixes
         if "hikvision.com" in response.text:
             ns = {"hik": "http://www.hikvision.com/ver20/XMLSchema"}
@@ -605,7 +630,7 @@ def apply_stream_settings(camera_ip, settings):
         else:
             ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
             ET.register_namespace('', ns["isapi"])
-        
+
         # Update resolution if provided
         if 'resolution' in settings:
             resolution = settings['resolution']
@@ -619,7 +644,7 @@ def apply_stream_settings(camera_ip, settings):
                 width, height = 2688, 1520
             else:
                 width, height = 1920, 1080
-            
+
             # Update width and height
             if "hikvision.com" in response.text:
                 width_elem = root.find(".//hik:videoResolutionWidth", namespaces=ns)
@@ -627,70 +652,70 @@ def apply_stream_settings(camera_ip, settings):
             else:
                 width_elem = root.find(".//isapi:videoResolutionWidth", namespaces=ns)
                 height_elem = root.find(".//isapi:videoResolutionHeight", namespaces=ns)
-            
+
             if width_elem is not None:
                 print(f"🔄 Changing resolution width from {width_elem.text} to {width}")
                 width_elem.text = str(width)
             if height_elem is not None:
                 print(f"🔄 Changing resolution height from {height_elem.text} to {height}")
                 height_elem.text = str(height)
-        
+
         # Update frame rate if provided
         if 'frame_rate' in settings:
             frame_rate = settings['frame_rate']
             # Convert to camera format (25 -> 2500)
             camera_frame_rate = frame_rate * 100
-            
+
             if "hikvision.com" in response.text:
                 framerate_elem = root.find(".//hik:maxFrameRate", namespaces=ns)
             else:
                 framerate_elem = root.find(".//isapi:maxFrameRate", namespaces=ns)
-            
+
             if framerate_elem is not None:
                 print(f"🔄 Changing frame rate from {framerate_elem.text} to {camera_frame_rate}")
                 framerate_elem.text = str(camera_frame_rate)
             else:
                 print("❌ maxFrameRate element not found.")
-        
+
         # Update codec if provided
         if 'encoding' in settings:
             codec = settings['encoding']
-            
+
             if "hikvision.com" in response.text:
                 codec_elem = root.find(".//hik:videoCodecType", namespaces=ns)
             else:
                 codec_elem = root.find(".//isapi:videoCodecType", namespaces=ns)
-            
+
             if codec_elem is not None:
                 print(f"🔄 Changing codec from {codec_elem.text} to {codec}")
                 codec_elem.text = codec
             else:
                 print("❌ videoCodecType element not found.")
                 return
-        
+
         # Send updated XML back to camera
         updated_xml = ET.tostring(root, encoding="utf-8")
         headers = {"Content-Type": "application/xml"}
-        
+
         response = requests.put(
             url,
             data=updated_xml,
             headers=headers,
             auth=HTTPDigestAuth(discovery.username, discovery.password)
         )
-        
+
         if response.status_code == 200:
             print("✅ Stream settings updated successfully.")
         else:
             print(f"❌ Failed to update. Status: {response.status_code} - {response.reason}")
             print("Response:", response.text)
             raise Exception(f"Failed to update stream settings: {response.status_code} - {response.text}")
-        
+
     except Exception as e:
         raise Exception(f"Failed to apply stream settings to {camera_ip}: {str(e)}")
 
-def apply_network_settings(camera_ip, settings):
 
+def apply_network_settings(camera_ip, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
@@ -702,17 +727,17 @@ def apply_network_settings(camera_ip, settings):
     try:
         from shared.camera_discovery import CameraDiscovery
         discovery = CameraDiscovery()
-        
+
         # Fetch current configuration
         url = f"http://{camera_ip}/ISAPI/System/Network/interfaces/1"
         response = requests.get(url, auth=HTTPDigestAuth(discovery.username, discovery.password))
-        
+
         if response.status_code != 200:
             raise Exception(f"Failed to fetch current network settings: {response.status_code}")
-        
+
         # Parse current XML
         root = ET.fromstring(response.text)
-        
+
         # Determine namespace and register it to avoid prefixes
         if "hikvision.com" in response.text:
             ns = {"hik": "http://www.hikvision.com/ver20/XMLSchema"}
@@ -720,88 +745,88 @@ def apply_network_settings(camera_ip, settings):
         else:
             ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
             ET.register_namespace('', ns["isapi"])
-        
+
         # Update IP address type
         if 'camera_ip_type' in settings:
             addressing_type = settings['camera_ip_type']  # 'static' or 'dhcp'
-            
+
             if "hikvision.com" in response.text:
                 addressing_elem = root.find(".//hik:IPAddress/hik:addressingType", namespaces=ns)
             else:
                 addressing_elem = root.find(".//isapi:IPAddress/isapi:addressingType", namespaces=ns)
-            
+
             if addressing_elem is not None:
                 print(f"🔄 Changing IP addressing type from {addressing_elem.text} to {addressing_type}")
                 addressing_elem.text = addressing_type
             else:
                 print("❌ addressingType element not found.")
-        
+
         # Update static IP settings if provided
         if 'ip_address' in settings:
             ip_address = settings['ip_address']
-            
+
             if "hikvision.com" in response.text:
                 ip_elem = root.find(".//hik:IPAddress/hik:ipAddress", namespaces=ns)
             else:
                 ip_elem = root.find(".//isapi:IPAddress/isapi:ipAddress", namespaces=ns)
-            
+
             if ip_elem is not None:
                 print(f"🔄 Changing IP address from {ip_elem.text} to {ip_address}")
                 ip_elem.text = ip_address
             else:
                 print("❌ ipAddress element not found.")
-        
+
         if 'subnet_mask' in settings:
             subnet_mask = settings['subnet_mask']
-            
+
             if "hikvision.com" in response.text:
                 mask_elem = root.find(".//hik:IPAddress/hik:subnetMask", namespaces=ns)
             else:
                 mask_elem = root.find(".//isapi:IPAddress/isapi:subnetMask", namespaces=ns)
-            
+
             if mask_elem is not None:
                 print(f"🔄 Changing subnet mask from {mask_elem.text} to {subnet_mask}")
                 mask_elem.text = subnet_mask
             else:
                 print("❌ subnetMask element not found.")
-        
+
         if 'gateway' in settings:
             gateway = settings['gateway']
-            
+
             if "hikvision.com" in response.text:
                 gateway_elem = root.find(".//hik:IPAddress/hik:DefaultGateway/hik:ipAddress", namespaces=ns)
             else:
                 gateway_elem = root.find(".//isapi:IPAddress/isapi:DefaultGateway/isapi:ipAddress", namespaces=ns)
-            
+
             if gateway_elem is not None:
                 print(f"🔄 Changing gateway from {gateway_elem.text} to {gateway}")
                 gateway_elem.text = gateway
             else:
                 print("❌ DefaultGateway ipAddress element not found.")
-        
+
         # Send updated XML back to camera
         updated_xml = ET.tostring(root, encoding="utf-8")
         headers = {"Content-Type": "application/xml"}
-        
+
         response = requests.put(
             url,
             data=updated_xml,
             headers=headers,
             auth=HTTPDigestAuth(discovery.username, discovery.password)
         )
-        
+
         if response.status_code == 200:
             print("✅ Network settings updated successfully.")
         else:
             print(f"❌ Failed to update network settings. Status: {response.status_code} - {response.reason}")
             print("Response:", response.text)
             raise Exception(f"Failed to update network settings: {response.status_code} - {response.text}")
-        
+
     except Exception as e:
         raise Exception(f"Failed to apply network settings to {camera_ip}: {str(e)}")
 
-def apply_time_settings(camera_ip, settings):
 
+def apply_time_settings(camera_ip, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
@@ -813,17 +838,17 @@ def apply_time_settings(camera_ip, settings):
     try:
         from shared.camera_discovery import CameraDiscovery
         discovery = CameraDiscovery()
-        
+
         # Update time configuration
         time_url = f"http://{camera_ip}/ISAPI/System/time"
         response = requests.get(time_url, auth=HTTPDigestAuth(discovery.username, discovery.password))
-        
+
         if response.status_code != 200:
             raise Exception(f"Failed to fetch current time settings: {response.status_code}")
-        
+
         # Parse current XML
         root = ET.fromstring(response.text)
-        
+
         # Determine namespace and register it to avoid prefixes
         if "hikvision.com" in response.text:
             ns = {"hik": "http://www.hikvision.com/ver20/XMLSchema"}
@@ -831,23 +856,23 @@ def apply_time_settings(camera_ip, settings):
         else:
             ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
             ET.register_namespace('', ns["isapi"])
-        
+
         # Update time mode based on NTP setting
         if 'sync_with_ntp' in settings:
             sync_with_ntp = settings['sync_with_ntp']
             time_mode = 'NTP' if sync_with_ntp else 'manual'
-            
+
             if "hikvision.com" in response.text:
                 time_mode_elem = root.find(".//hik:timeMode", namespaces=ns)
             else:
                 time_mode_elem = root.find(".//isapi:timeMode", namespaces=ns)
-            
+
             if time_mode_elem is not None:
                 print(f"🔄 Changing time mode from {time_mode_elem.text} to {time_mode}")
                 time_mode_elem.text = time_mode
             else:
                 print("❌ timeMode element not found.")
-        
+
         # Update timezone if provided
         if 'timezone' in settings:
             timezone = settings['timezone']
@@ -858,44 +883,44 @@ def apply_time_settings(camera_ip, settings):
                 tz_value = 'UTC+00:00'
             else:
                 tz_value = 'CST-8:00:00'  # default
-            
+
             if "hikvision.com" in response.text:
                 timezone_elem = root.find(".//hik:timeZone", namespaces=ns)
             else:
                 timezone_elem = root.find(".//isapi:timeZone", namespaces=ns)
-            
+
             if timezone_elem is not None:
                 print(f"🔄 Changing timezone from {timezone_elem.text} to {tz_value}")
                 timezone_elem.text = tz_value
             else:
                 print("❌ timeZone element not found.")
-        
+
         # Send updated time XML back to camera
         updated_xml = ET.tostring(root, encoding="utf-8")
         headers = {"Content-Type": "application/xml"}
-        
+
         response = requests.put(
             time_url,
             data=updated_xml,
             headers=headers,
             auth=HTTPDigestAuth(discovery.username, discovery.password)
         )
-        
+
         if response.status_code == 200:
             print("✅ Time settings updated successfully.")
         else:
             print(f"❌ Failed to update time settings. Status: {response.status_code} - {response.reason}")
             print("Response:", response.text)
             raise Exception(f"Failed to update time settings: {response.status_code} - {response.text}")
-        
+
         # Update NTP server if provided
         if 'ntp_server_address' in settings:
             ntp_url = f"http://{camera_ip}/ISAPI/System/time/ntpServers"
             response = requests.get(ntp_url, auth=HTTPDigestAuth(discovery.username, discovery.password))
-            
+
             if response.status_code == 200:
                 ntp_root = ET.fromstring(response.text)
-                
+
                 # Register namespace for NTP XML
                 if "hikvision.com" in response.text:
                     ET.register_namespace('', ns["hik"])
@@ -903,21 +928,21 @@ def apply_time_settings(camera_ip, settings):
                 else:
                     ET.register_namespace('', ns["isapi"])
                     hostname_elem = ntp_root.find(".//isapi:NTPServer/isapi:hostName", namespaces=ns)
-                
+
                 if hostname_elem is not None:
                     print(f"🔄 Changing NTP server from {hostname_elem.text} to {settings['ntp_server_address']}")
                     hostname_elem.text = settings['ntp_server_address']
-                    
+
                     # Send updated NTP XML back to camera
                     updated_ntp_xml = ET.tostring(ntp_root, encoding="utf-8")
-                    
+
                     response = requests.put(
                         ntp_url,
                         data=updated_ntp_xml,
                         headers=headers,
                         auth=HTTPDigestAuth(discovery.username, discovery.password)
                     )
-                    
+
                     if response.status_code == 200:
                         print("✅ NTP server updated successfully.")
                     else:
@@ -927,9 +952,10 @@ def apply_time_settings(camera_ip, settings):
                     print("❌ NTP hostName element not found.")
             else:
                 print(f"❌ Failed to fetch NTP settings. Status: {response.status_code}")
-        
+
     except Exception as e:
         raise Exception(f"Failed to apply time settings to {camera_ip}: {str(e)}")
+
 
 @app.route('/video_feed/<camera_id>')
 @require_permission('video_feed')
@@ -960,6 +986,7 @@ def video_feed(camera_id):
 
     return Response(generate_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
 @app.route('/check_ip', methods=['POST'])
 def check_ip():
     ip_address = request.json.get('ip')
@@ -971,6 +998,7 @@ def check_ip():
 
     return jsonify({'valid': True, 'device_info': discover_results})
 
+
 @app.route('/add_camera', methods=['POST'])
 @login_required
 @require_permission('camera_management')
@@ -979,10 +1007,10 @@ def add_camera():
         data = request.get_json()
         camera_ip = data.get('ip')
         device_info = data.get('device_info')
-        
+
         print(f"🔍 Attempting to add camera: {camera_ip}")
         print(f"📋 Device info: {device_info}")
-        
+
         # Check if camera already exists
         conn = sqlite3.connect('users.sqlite')
         cursor = conn.cursor()
@@ -991,43 +1019,45 @@ def add_camera():
             print(f"❌ Camera {camera_ip} already exists in database")
             conn.close()
             return jsonify({'success': False, 'message': f'Camera {camera_ip} already exists!'})
-        
+
         # Get default lab ID
         cursor.execute("SELECT LabId FROM Lab LIMIT 1")
         lab_result = cursor.fetchone()
         lab_id = lab_result[0] if lab_result else 1
-        
+
         # Get current user ID from session
         user_id = session.get('user_id', 1)
-        
+
         # Add to database with correct column names and all required fields
         cursor.execute("""
-            INSERT INTO Camera (name, ip_address, camera_lab_id, camera_user_id, resolution, frame_rate, encoding,
-                              subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp, ntp_server_address, time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            device_info.get('device_name', f'Camera_{camera_ip}'),
-            camera_ip,
-            lab_id,  # Fixed: using camera_lab_id column name
-            user_id,  # Added: camera_user_id is required
-            device_info.get('resolution', 1080),
-            device_info.get('frame_rate', 25),
-            device_info.get('encoding', 'H.265'),
-            device_info.get('subnet_mask', '255.255.255.0'),
-            device_info.get('gateway', '192.168.1.1'),
-            device_info.get('camera_ip_type', 'static'),
-            device_info.get('timezone', 'Asia/Singapore'),
-            device_info.get('sync_with_ntp', 1 if device_info.get('sync_with_ntp') else 0),
-            device_info.get('ntp_server_address', 'pool.ntp.org'),  # Fixed: use correct key
-            device_info.get('time', '2025-01-01T00:00:00')  # Added: time is required (NOT NULL)
-        ))
-        
+                       INSERT INTO Camera (name, ip_address, camera_lab_id, camera_user_id, resolution, frame_rate,
+                                           encoding,
+                                           subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp,
+                                           ntp_server_address, time)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       """, (
+                           device_info.get('device_name', f'Camera_{camera_ip}'),
+                           camera_ip,
+                           lab_id,  # Fixed: using camera_lab_id column name
+                           user_id,  # Added: camera_user_id is required
+                           device_info.get('resolution', 1080),
+                           device_info.get('frame_rate', 25),
+                           device_info.get('encoding', 'H.265'),
+                           device_info.get('subnet_mask', '255.255.255.0'),
+                           device_info.get('gateway', '192.168.1.1'),
+                           device_info.get('camera_ip_type', 'static'),
+                           device_info.get('timezone', 'Asia/Singapore'),
+                           device_info.get('sync_with_ntp', 1 if device_info.get('sync_with_ntp') else 0),
+                           device_info.get('ntp_server_address', 'pool.ntp.org'),  # Fixed: use correct key
+                           device_info.get('time', '2025-01-01T00:00:00')  # Added: time is required (NOT NULL)
+                       ))
+
         camera_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        
+
         print(f"✅ Camera {camera_ip} added to database with ID {camera_id}")
-        
+
         # Add to camera manager
         from shared.camera_manager import CameraManager
         # Try to get existing instance first (singleton pattern)
@@ -1036,20 +1066,20 @@ def add_camera():
         #     # If no instance exists, create one with db_path
         #     manager = CameraManager('users.sqlite')
         manager.add_new_camera(camera_id, camera_ip, "101", True)
-        
+
         print(f"✅ Camera {camera_ip} added to camera manager")
-        
+
         return jsonify({'success': True, 'message': f'Camera {camera_ip} added successfully!'})
-        
+
     except Exception as e:
         print(f"❌ Error adding camera: {e}")
         return jsonify({'success': False, 'message': f'Error adding camera: {str(e)}'})
+
 
 @app.route('/user_management', methods=['GET', 'POST'])
 @login_required
 @require_permission('user_role_management')
 def user_management():
-    
     # Open database connection from permission verification
     try:
         conn = sqlite3.connect(DATABASE)
@@ -1058,12 +1088,11 @@ def user_management():
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
-    
+
     cam_management = check_permission(conn, role, "camera_management")
     user_role_management = check_permission(conn, role, "user_role_management")
 
     if request.method == "GET":
-
         dao = RoleDAO(DATABASE)
         users = get_all_users()
         roles = dao.get_all_roles()
@@ -1077,7 +1106,7 @@ def user_management():
         )
 
     if request.method == "POST":
-        
+
         user_id = request.form.get("user_id")
         action = request.form.get("action")
 
@@ -1098,14 +1127,14 @@ def user_management():
                 cursor.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
                 conn.commit()
                 flash("User role updated successfully.", "success")
-                
+
         return redirect(url_for("user_management"))
+
 
 @app.route('/role_management', methods=['GET', 'POST'])
 @login_required
 @require_permission('user_role_management')
 def role_management():
-
     # Open database connection from permission verification
     try:
         conn = sqlite3.connect(DATABASE)
@@ -1114,7 +1143,7 @@ def role_management():
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
-    
+
     cam_management = check_permission(conn, role, "camera_management")
     user_role_management = check_permission(conn, role, "user_role_management")
 
@@ -1136,11 +1165,11 @@ def role_management():
             except ValueError as e:
                 flash(f"Validation error {e}", "danger")
                 return redirect(url_for("role_management"))
-            
+
             if not new_role_name:
                 flash("Error creating new role.", "error")
                 return redirect(url_for("role_management"))
-            
+
             success = dao.insert_new_role(new_role_name.strip())
 
             if not success:
@@ -1171,7 +1200,7 @@ def role_management():
                 flash("Error updating permissions.", "error")
 
             return redirect(url_for('role_management'))
-        
+
         elif action == "delete":
             role_name = request.form.get("role_name")
             success = dao.delete_role(role_name)
@@ -1192,6 +1221,7 @@ def role_management():
         user_role_management=user_role_management
     )
 
+
 @app.route('/labs', methods=['GET', 'POST'])
 @login_required
 @require_permission('camera_management')
@@ -1204,7 +1234,7 @@ def labs():
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
-    
+
     cam_management = check_permission(conn, role, "camera_management")
     user_role_management = check_permission(conn, role, "user_role_management")
 
@@ -1221,7 +1251,7 @@ def labs():
             except ValueError as e:
                 flash(f"Validation error {e}", "danger")
                 return redirect(url_for("labs"))
-            
+
             cursor = conn.cursor()
             cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
             conn.commit()
@@ -1234,7 +1264,7 @@ def labs():
             cursor.execute("DELETE FROM Lab WHERE LabId = ?", (lab_id,))
             conn.commit()
             return redirect(url_for("labs"))
-        
+
         elif action == "update":
             lab_id = request.form.get("lab_id")
             new_lab_name = request.form.get("new_lab_name")
@@ -1247,26 +1277,28 @@ def labs():
             except ValueError as e:
                 flash(f"Validation error {e}", "danger")
                 return redirect(url_for("labs"))
-            
+
             cursor = conn.cursor()
-            cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?", (new_lab_name, new_lab_email, lab_id,))
+            cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?",
+                           (new_lab_name, new_lab_email, lab_id,))
             conn.commit()
 
             return redirect(url_for("labs"))
-        
+
     conn.row_factory = dict_factory
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM Lab")
     labs = cursor.fetchall()
 
     conn.close()
-    return render_template("labs.html", labs=labs, cam_management=cam_management, user_role_management=user_role_management)
+    return render_template("labs.html", labs=labs, cam_management=cam_management,
+                           user_role_management=user_role_management)
+
 
 @app.route('/create_account', methods=['GET', 'POST'])
 @login_required
 @require_permission('user_role_management')
 def create_account():
-
     # Open database connection from permission verification
     try:
         conn = sqlite3.connect(DATABASE)
@@ -1276,7 +1308,7 @@ def create_account():
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
-    
+
     cam_management = check_permission(conn, role, "camera_management")
     user_role_management = check_permission(conn, role, "user_role_management")
 
@@ -1298,7 +1330,7 @@ def create_account():
         except ValueError as e:
             flash(f"Validation error {e}", "danger")
             return redirect(url_for("labs"))
-        
+
         # Validate required fields are not empty
         if not username_form or not email_form or not password_form or not role_form:
             flash("❌ All fields are required.", "danger")
@@ -1316,16 +1348,15 @@ def create_account():
                 cam_management=cam_management,
                 user_role_management=user_role_management,
             )
-        
+
         # Check email uniqueness
         cursor.execute("SELECT id FROM users WHERE email = ?", (email_form,))
         if cursor.fetchone():
             flash("❌ An account with this email already exists.", "danger")
             return render_template("create_account.html",
-                                roles=roles,
-                                cam_management=cam_management,
-                                user_role_management=user_role_management)
-
+                                   roles=roles,
+                                   cam_management=cam_management,
+                                   user_role_management=user_role_management)
 
         # Hash password
         password_hash = generate_password_hash(password_form)
@@ -1333,9 +1364,9 @@ def create_account():
         # Insert into DB
         try:
             cursor.execute("""
-                INSERT INTO users (username, email, password_hash, role)
-                VALUES (?, ?, ?, ?)
-            """, (username_form, email_form, password_hash, role_form))
+                           INSERT INTO users (username, email, password_hash, role)
+                           VALUES (?, ?, ?, ?)
+                           """, (username_form, email_form, password_hash, role_form))
             conn.commit()
             flash("✅ Account created successfully!", "success")
             return redirect(url_for("user_management"))
@@ -1344,6 +1375,7 @@ def create_account():
         except Exception as e:
             flash(f"❌ Failed to create user: {str(e)}", "danger")
         finally:
-            conn.close()    
+            conn.close()
 
-    return render_template("create_account.html", roles=roles, cam_management=cam_management, user_role_management=user_role_management,)
+    return render_template("create_account.html", roles=roles, cam_management=cam_management,
+                           user_role_management=user_role_management, )
