@@ -1110,23 +1110,26 @@ def user_management():
             # Stop detection on camera and join threads
             cursor = conn.cursor()
             cursor.execute('SELECT CameraId FROM Camera WHERE camera_user_id = ?', (user_id,))
-            camera_id = cursor.fetchone()[0]
-            success = cm.remove_camera(camera_id)
-            if success:
-                is_same_user = session.get('user_id') == user_id
+            camera_id = cursor.fetchone()
 
-                conn.execute("PRAGMA foreign_keys = ON")
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
-                conn.commit()
+            if camera_id is not None:
+                success = cm.remove_camera(camera_id[0])
+                if not success:
+                    flash("Error stopping detection on affected cameras.", "success")
+                    return redirect(url_for("user_management"))
 
-                if (is_same_user):
-                    redirect(url_for('logout'))
-                flash("User deleted successfully.", "success")
+            is_same_user = int(session.get('user_id')) == int(user_id)
 
-            else:
-                flash("Error deleting user.", "danger")
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+
+            if (is_same_user):
+                return redirect(url_for('logout'))
             
+            flash("User deleted successfully.", "success")
+
 
         elif action == "update":
             new_role = request.form.get("new_role")
