@@ -1302,11 +1302,15 @@ def labs():
     conn.row_factory = dict_factory
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM Lab")
-    labs = cursor.fetchall()
+    all_lab_details = cursor.fetchall()
 
     conn.close()
-    return render_template("labs.html", labs=labs, cam_management=cam_management,
-                           user_role_management=user_role_management)
+    return render_template(
+        "labs.html",
+        all_lab_details=all_lab_details,
+        cam_management=cam_management,
+        user_role_management=user_role_management
+    )
 
 
 @app.route('/create_account', methods=['GET', 'POST'])

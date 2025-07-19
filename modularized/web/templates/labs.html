@@ -26,7 +26,7 @@
     </div>
   </div>
 
-  {% if labs %}
+  {% if all_lab_details %}
     <table class="table">
         <thead>
             <tr>
@@ -38,7 +38,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for lab in labs %}
+            {% for lab in all_lab_details %}
                 <tr>
                     <td>{{ lab.LabId }}</td>
                     <form method="post" action="{{ url_for('labs') }}">
