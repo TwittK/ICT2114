@@ -349,11 +349,6 @@ def get_db():
 @login_required
 @require_permission('camera_management')
 def edit_camera(camera_id):
-    permission_granted = check_permission(session.get('role'), "camera_management")
-    if not permission_granted:
-        flash(NO_PRIVILEGES, 'danger')
-        return redirect(url_for('index'))
-    
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = dict_factory  # Enable dictionary-style access
     cursor = conn.cursor()
@@ -545,13 +540,8 @@ def apply_device_settings(camera_ip, settings):
     except Exception as e:
         raise Exception(f"Failed to apply device settings to {camera_ip}: {str(e)}")
 
-
+@require_permission('camera_management')
 def apply_camera_settings(camera_id, settings):
-    permission_granted = check_permission(session.get('role'), "camera_management")
-    if not permission_granted:
-        flash(NO_PRIVILEGES, 'danger')
-        return redirect(url_for('index'))
-
     """Apply all camera settings to the physical camera"""
     try:
         print("TRYING ISAPI UPDATE")
@@ -600,12 +590,8 @@ def apply_camera_settings(camera_id, settings):
     except Exception as e:
         raise Exception(f"Failed to apply camera settings: {str(e)}")
 
-
+@require_permission('camera_management')
 def apply_stream_settings(camera_ip, settings):
-    permission_granted = check_permission(session.get('role'), "camera_management")
-    if not permission_granted:
-        flash(NO_PRIVILEGES, 'danger')
-        return redirect(url_for('index'))
 
     """Apply stream settings to camera"""
     try:
@@ -713,12 +699,8 @@ def apply_stream_settings(camera_ip, settings):
     except Exception as e:
         raise Exception(f"Failed to apply stream settings to {camera_ip}: {str(e)}")
 
-
+@require_permission('camera_management')
 def apply_network_settings(camera_ip, settings):
-    permission_granted = check_permission(session.get('role'), "camera_management")
-    if not permission_granted:
-        flash(NO_PRIVILEGES, 'danger')
-        return redirect(url_for('index'))
 
     """Apply network settings to camera"""
     try:
@@ -822,12 +804,8 @@ def apply_network_settings(camera_ip, settings):
     except Exception as e:
         raise Exception(f"Failed to apply network settings to {camera_ip}: {str(e)}")
 
-
+@require_permission('camera_management')
 def apply_time_settings(camera_ip, settings):
-    permission_granted = check_permission(session.get('role'), "camera_management")
-    if not permission_granted:
-        flash(NO_PRIVILEGES, 'danger')
-        return redirect(url_for('index'))
 
     """Apply time settings to camera"""
     try:
