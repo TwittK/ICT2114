@@ -1,6 +1,7 @@
 import sqlite3
 from database import create_camera, create_new_camera
 
+LAB_NOT_FOUND = "Lab not found"
 
 class CameraDAO:
     def __init__(self, db_path):
@@ -25,7 +26,7 @@ class CameraDAO:
         """Creates a default-named camera in a given lab."""
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
-            return False, "Lab not found"
+            return False, LAB_NOT_FOUND
 
         count = self.count_cameras_in_lab(lab_id)
         default_name = f"Camera {count + 1}"
@@ -45,7 +46,7 @@ class CameraDAO:
         """Delete a camera by its name, lab name, and user ID."""
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
-            return False, "Lab not found"
+            return False, LAB_NOT_FOUND
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -84,7 +85,7 @@ class CameraDAO:
         """Creates a default-named camera in a given lab."""
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
-            return False, "Lab not found"
+            return False, LAB_NOT_FOUND
 
         count = self.count_cameras_in_lab(lab_id)
         default_name = f"Camera {count + 1}"

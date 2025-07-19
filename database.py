@@ -3,9 +3,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import sqlite_vec
 
+DATABASE = 'users.sqlite'
 
 def init_database():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -26,7 +27,7 @@ def init_database():
 
 
 def create_user(username, email, password, role='user'):
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     password_hash = generate_password_hash(password)
@@ -46,7 +47,7 @@ def create_user(username, email, password, role='user'):
 
 
 def verify_user(email, password):
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -70,7 +71,7 @@ def verify_user(email, password):
 
 
 def update_last_login(user_id):
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -84,7 +85,7 @@ def update_last_login(user_id):
 
 
 def create_default_admin():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
@@ -105,7 +106,7 @@ def create_default_admin():
 
 
 def create_default_labs_and_cameras():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -135,7 +136,7 @@ def create_default_labs_and_cameras():
 
 
 def create_lab(lab_name, lab_safety_email):
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     try:
@@ -169,7 +170,7 @@ def create_camera(
         time='2025-01-01T00:00:00',
 
 ):
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     try:

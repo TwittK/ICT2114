@@ -59,10 +59,8 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
                     cls_id = int(box.cls.cpu())
                     confidence = float(box.conf.cpu())
                     coords = box.xyxy[0].cpu().numpy()
-                    # class_name = drink_model.names[cls_id]
-                    # print(
-                    #     f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}"
-                    # )
+                    class_name = drink_model.names[cls_id]
+                    print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
 
                     x1, y1, x2, y2 = map(int, coords)
 
