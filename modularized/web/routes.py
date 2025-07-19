@@ -157,6 +157,9 @@ def index():
     today_str = datetime.now().strftime('%Y-%m-%d')
 
     results = []
+    date_filter = None
+    object_filter = None
+    selected_date = today_str
 
     # Open database connection from permission verification
     try:
@@ -277,6 +280,8 @@ def index():
             params.append(camera_name)
 
         if date_filter:
+            selected_date = date_filter
+            
             query += " AND DATE(s.time_generated) = ?"
             params.append(date_filter)
 
@@ -326,6 +331,8 @@ def index():
         user_role_management=user_role_management,
         today=today_str,
         all_labels=all_labels,
+        selected_date=selected_date,
+        selected_object_type=object_filter,
     )
 
 
