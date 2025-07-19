@@ -8,7 +8,9 @@
 <h1>User Management</h1>
 
 {% if user_role_management %}
-  <h3>NOTE: Deleting user will also remove all cameras created by that user.</h3>
+
+  <i class="fa-solid fa-info-circle my-3"></i> Note: Deleting user will also remove all cameras created by that user.
+
   <button class="btn btn-primary my-3" >
     <a class="text-light" href="{{ url_for('create_account') }}">Create Account</a>
   </button>
