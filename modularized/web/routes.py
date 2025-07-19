@@ -2,6 +2,7 @@ from flask import Flask, request, session, redirect, url_for, render_template, f
 from functools import wraps
 from data_source.camera_dao import CameraDAO
 from data_source.role_dao import RoleDAO
+from data_source.lab_dao import LabDAO
 from datetime import datetime
 import sqlite3
 import requests
@@ -189,7 +190,7 @@ def index():
             try:
                 lab_name = validate_and_sanitize_text(lab_name)
             except ValueError as e:
-                flash(f"Validation error {e}", "danger")
+                flash(f"Validation error: {e}", "danger")
                 return redirect(url_for("index"))
 
             # Insert camera into database
@@ -363,7 +364,7 @@ def edit_camera(camera_id):
             try:
                 name = validate_and_sanitize_text(name)
             except ValueError as e:
-                flash(f"Validation error {e}", "danger")
+                flash(f"Validation error: {e}", "danger")
                 return redirect(url_for("edit_camera", camera_id=camera_id))
 
             resolution = int(request.form.get('resolution', 1080))
@@ -1085,7 +1086,7 @@ def user_management():
 
             cm = CameraManager(DATABASE)
 
-            # Stop detection on camera and join threads
+            # Stop detection on cameras created by deleted user and join threads
             cursor = conn.cursor()
             cursor.execute('SELECT CameraId FROM Camera WHERE camera_user_id = ?', (user_id,))
             camera_id = cursor.fetchone()
@@ -1152,7 +1153,7 @@ def role_management():
             try:
                 new_role_name = validate_and_sanitize_text(new_role_name)
             except ValueError as e:
-                flash(f"Validation error {e}", "danger")
+                flash(f"Validation error: {e}", "danger")
                 return redirect(url_for("role_management"))
 
             if not new_role_name:
@@ -1223,10 +1224,11 @@ def labs():
     cam_management = check_permission(role, "camera_management")
     user_role_management = check_permission(role, "user_role_management")
 
-    conn = sqlite3.connect(DATABASE)
+    dao = LabDAO(DATABASE)
 
     if request.method == "POST":
         action = request.form.get("action")
+        
         if action == "add_lab":
             lab_name = request.form.get("lab_name")
             lab_safety_email = request.form.get("lab_safety_email")
@@ -1236,25 +1238,18 @@ def labs():
                 lab_name = validate_and_sanitize_text(lab_name)
                 lab_safety_email = validate_and_sanitize_text(lab_safety_email)
             except ValueError as e:
-                flash(f"Validation error {e}", "danger")
-                return redirect(url_for("labs"))
+                flash(f"Validation error: {e}", "danger")
+                return redirect(request.url)
 
-            try:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
-                conn.commit()
+            success = dao.insert_lab(lab_name, lab_safety_email)
 
-                flash(f"New lab created.", "success")
-
-            except sqlite3.IntegrityError:
-                flash(f"Error creating new lab.", "danger")
+            flash(f"New lab created.", "success") if success else flash(f"Error creating new lab.", "danger")
 
         elif action == "delete":
             lab_id = request.form.get("lab_id")
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM Lab WHERE LabId = ?", (lab_id,))
-            conn.commit()
-            flash(f"Lab deleted succesfully.", "success")
+            success = dao.delete_lab(lab_id)
+            
+            flash(f"Lab deleted succesfully.", "success") if success else flash(f"Error deleting lab.", "danger")
 
         elif action == "update":
             lab_id = request.form.get("lab_id")
@@ -1266,23 +1261,17 @@ def labs():
                 new_lab_name = validate_and_sanitize_text(new_lab_name)
                 new_lab_email = validate_and_sanitize_text(new_lab_email)
             except ValueError as e:
-                flash(f"Validation error {e}", "danger")
+                flash(f"Validation error: {e}", "danger")
+                return redirect(request.url)
 
-            cursor = conn.cursor()
-            cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?",
-                           (new_lab_name, new_lab_email, lab_id,))
-            conn.commit()
-            flash(f"Lab details updated succesfully.", "success")
+            success = dao.update_lab(new_lab_name, new_lab_email, lab_id)
 
-        conn.close()
+            flash(f"Lab details updated succesfully.", "success") if success else flash(f"Failed to update lab details.", "danger")
+
         return redirect(url_for("labs"))
     
-    conn.row_factory = dict_factory
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM Lab")
-    all_lab_details = cursor.fetchall()
+    all_lab_details = dao.get_all_labs()
 
-    conn.close()
     return render_template(
         "labs.html",
         all_lab_details=all_lab_details,
@@ -1318,7 +1307,7 @@ def create_account():
             email_form = validate_and_sanitize_text(email_form)
             role_form = validate_and_sanitize_text(role_form)
         except ValueError as e:
-            flash(f"Validation error {e}", "danger")
+            flash(f"Validation error: {e}", "danger")
             return redirect(url_for("labs"))
 
         # Validate required fields are not empty
