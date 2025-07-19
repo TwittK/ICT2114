@@ -57,9 +57,7 @@ def require_permission(permission_name):
                 flash('No role assigned to user.', 'danger')
                 return redirect(url_for('index'))
 
-            conn = sqlite3.connect(DATABASE)
-            has_permission = check_permission(conn, role_name, permission_name)
-            conn.close()
+            has_permission = check_permission(role_name, permission_name)
 
             if not has_permission:
                 flash(f"Permission '{permission_name}' required.", 'danger')
@@ -134,7 +132,7 @@ def login():
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
-            flash('Invalid username or password!', 'error')
+            flash('Invalid username or password!', 'danger')
 
     return render_template('login.html')
 
@@ -162,16 +160,12 @@ def index():
     object_filter = None
     selected_date = today_str
 
-    # Open database connection from permission verification
-    try:
-        conn = sqlite3.connect(DATABASE)
-    except Exception:
-        return redirect(url_for("index"))
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
-    cam_management = check_permission(conn, role, "camera_management")
-    user_role_management = check_permission(conn, role, "user_role_management")
+
+    cam_management = check_permission(role, "camera_management")
+    user_role_management = check_permission(role, "user_role_management")
 
     # Create camera inside the database - ADMIN ONLY
     if request.method == "POST" and is_adding_camera and lab_name and cam_management:
@@ -222,8 +216,8 @@ def index():
             flash("Error retrieving IP and/or device info.", "danger")
             return redirect(url_for("index"))
 
-    elif is_adding_camera and not check_permission(conn, role, "add_camera"):
-        flash("Admin access required to add cameras!", "error")
+    elif is_adding_camera and not check_permission(role, "add_camera"):
+        flash("Admin access required to add cameras!", 'danger')
         return redirect(url_for("index", lab=lab_name))
 
     # Delete camera - ADMIN ONLY
@@ -249,16 +243,17 @@ def index():
 
         flash(message, "success" if success else "danger")
         return redirect(url_for("index") if success else url_for("index", lab=lab_name))
-    elif is_deleting_camera and not check_permission(conn, role, "delete_camera"):
-        flash("Admin access required to delete cameras!", "error")
+    elif is_deleting_camera and not check_permission(role, "delete_camera"):
+        flash("Admin access required to delete cameras!", 'danger')
         return redirect(url_for("index", lab=lab_name))
 
-    if request.method == "POST" and check_permission(conn, role, "view_incompliances"):
+    if request.method == "POST" and check_permission(role, "view_incompliances"):
         action = request.form.get("action")
 
         date_filter = request.form.get("date")
         object_filter = request.form.get("object_type")
 
+        conn = sqlite3.connect(DATABASE)
         conn.row_factory = dict_factory
         cursor = conn.cursor()
 
@@ -354,12 +349,10 @@ def get_db():
 @login_required
 @require_permission('camera_management')
 def edit_camera(camera_id):
-    conn = sqlite3.connect(DATABASE)
-    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    permission_granted = check_permission(session.get('role'), "camera_management")
     if not permission_granted:
         flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
-    conn.close()
     
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = dict_factory  # Enable dictionary-style access
@@ -437,7 +430,7 @@ def edit_camera(camera_id):
 
         except Exception as e:
             conn.rollback()
-            flash(f'Error updating camera settings: {str(e)}', 'error')
+            flash(f'Error updating camera settings: {str(e)}', 'danger')
 
         finally:
             conn.close()
@@ -468,7 +461,7 @@ def edit_camera(camera_id):
     camera = cursor.fetchone()
 
     if not camera:
-        flash('Camera not found', 'error')
+        flash('Camera not found', 'danger')
         return redirect(url_for('index'))
 
     # Ensure all required fields have default values
@@ -490,8 +483,9 @@ def edit_camera(camera_id):
         'lab_name': camera['lab_name'] or 'Unknown Lab'
     }
 
-    user_role_management = check_permission(conn, session.get('role'), "user_role_management")
     conn.close()
+
+    user_role_management = check_permission(session.get('role'), "user_role_management")
     return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted,
                            user_role_management=user_role_management)
 
@@ -553,17 +547,16 @@ def apply_device_settings(camera_ip, settings):
 
 
 def apply_camera_settings(camera_id, settings):
-    conn = sqlite3.connect(DATABASE)
-    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    permission_granted = check_permission(session.get('role'), "camera_management")
     if not permission_granted:
         flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
-    conn.close()
 
     """Apply all camera settings to the physical camera"""
     try:
         print("TRYING ISAPI UPDATE")
         # Get camera IP address from database
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
         cursor.execute("SELECT ip_address FROM Camera WHERE CameraId = ?", (camera_id,))
@@ -609,12 +602,10 @@ def apply_camera_settings(camera_id, settings):
 
 
 def apply_stream_settings(camera_ip, settings):
-    conn = sqlite3.connect(DATABASE)
-    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    permission_granted = check_permission(session.get('role'), "camera_management")
     if not permission_granted:
         flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
-    conn.close()
 
     """Apply stream settings to camera"""
     try:
@@ -724,12 +715,10 @@ def apply_stream_settings(camera_ip, settings):
 
 
 def apply_network_settings(camera_ip, settings):
-    conn = sqlite3.connect(DATABASE)
-    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    permission_granted = check_permission(session.get('role'), "camera_management")
     if not permission_granted:
         flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
-    conn.close()
 
     """Apply network settings to camera"""
     try:
@@ -835,12 +824,10 @@ def apply_network_settings(camera_ip, settings):
 
 
 def apply_time_settings(camera_ip, settings):
-    conn = sqlite3.connect(DATABASE)
-    permission_granted = check_permission(conn, session.get('role'), "camera_management")
+    permission_granted = check_permission(session.get('role'), "camera_management")
     if not permission_granted:
         flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
-    conn.close()
 
     """Apply time settings to camera"""
     try:
@@ -1088,17 +1075,13 @@ def add_camera():
 @login_required
 @require_permission('user_role_management')
 def user_management():
-    # Open database connection from permission verification
-    try:
-        conn = sqlite3.connect(DATABASE)
-    except Exception:
-        return redirect(url_for("index"))
+
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
 
-    cam_management = check_permission(conn, role, "camera_management")
-    user_role_management = check_permission(conn, role, "user_role_management")
+    cam_management = check_permission(role, "camera_management")
+    user_role_management = check_permission(role, "user_role_management")
 
     if request.method == "GET":
         dao = RoleDAO(DATABASE)
@@ -1118,6 +1101,8 @@ def user_management():
         user_id = request.form.get("user_id")
         action = request.form.get("action")
 
+        conn = sqlite3.connect(DATABASE)
+
         if action == "delete":
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
@@ -1136,6 +1121,7 @@ def user_management():
                 conn.commit()
                 flash("User role updated successfully.", "success")
 
+        conn.close()
         return redirect(url_for("user_management"))
 
 
@@ -1143,17 +1129,13 @@ def user_management():
 @login_required
 @require_permission('user_role_management')
 def role_management():
-    # Open database connection from permission verification
-    try:
-        conn = sqlite3.connect(DATABASE)
-    except Exception:
-        return redirect(url_for("index"))
+
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
 
-    cam_management = check_permission(conn, role, "camera_management")
-    user_role_management = check_permission(conn, role, "user_role_management")
+    cam_management = check_permission(role, "camera_management")
+    user_role_management = check_permission(role, "user_role_management")
 
     dao = RoleDAO(DATABASE)
     roles = dao.get_all_roles()
@@ -1162,10 +1144,10 @@ def role_management():
 
     if request.method == "POST":
         action = request.form.get("action")
-
+        
         # Add a new role
         if action == "add_role":
-            new_role_name = request.form.get("role_name").strip()
+            new_role_name = request.form.get("role_name").lower()
 
             # Validate and sanitize input
             try:
@@ -1175,13 +1157,13 @@ def role_management():
                 return redirect(url_for("role_management"))
 
             if not new_role_name:
-                flash("Error creating new role.", "error")
+                flash("Error creating new role.", 'danger')
                 return redirect(url_for("role_management"))
 
-            success = dao.insert_new_role(new_role_name.strip())
+            success = dao.insert_new_role(new_role_name)
 
             if not success:
-                flash("Error creating new role.", "error")
+                flash("Error creating new role.", 'danger')
                 return redirect(url_for("role_management"))
 
             flash("Created new role with empty permissions.", "success")
@@ -1205,7 +1187,7 @@ def role_management():
                 flash("Permissions updated successfully.", "success")
 
             except Exception:
-                flash("Error updating permissions.", "error")
+                flash("Error updating permissions.", 'danger')
 
             return redirect(url_for('role_management'))
 
@@ -1214,7 +1196,7 @@ def role_management():
             success = dao.delete_role(role_name)
 
             if not success:
-                flash("Error deleting role.", "error")
+                flash("Error deleting role.", 'danger')
                 return redirect(url_for("role_management"))
 
             flash("Deleted role.", "success")
@@ -1234,17 +1216,15 @@ def role_management():
 @login_required
 @require_permission('camera_management')
 def labs():
-    # Open database connection from permission verification
-    try:
-        conn = sqlite3.connect(DATABASE)
-    except Exception:
-        return redirect(url_for("index"))
+
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
 
-    cam_management = check_permission(conn, role, "camera_management")
-    user_role_management = check_permission(conn, role, "user_role_management")
+    cam_management = check_permission(role, "camera_management")
+    user_role_management = check_permission(role, "user_role_management")
+
+    conn = sqlite3.connect(DATABASE)
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -1260,18 +1240,18 @@ def labs():
                 flash(f"Validation error {e}", "danger")
                 return redirect(url_for("labs"))
 
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
-            conn.commit()
-
-            return redirect(url_for("labs"))
+            try:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
+                conn.commit()
+            except sqlite3.IntegrityError:
+                flash(f"Error creating new lab.", "danger")
 
         elif action == "delete":
             lab_id = request.form.get("lab_id")
             cursor = conn.cursor()
             cursor.execute("DELETE FROM Lab WHERE LabId = ?", (lab_id,))
             conn.commit()
-            return redirect(url_for("labs"))
 
         elif action == "update":
             lab_id = request.form.get("lab_id")
@@ -1284,15 +1264,15 @@ def labs():
                 new_lab_email = validate_and_sanitize_text(new_lab_email)
             except ValueError as e:
                 flash(f"Validation error {e}", "danger")
-                return redirect(url_for("labs"))
 
             cursor = conn.cursor()
             cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?",
                            (new_lab_name, new_lab_email, lab_id,))
             conn.commit()
 
-            return redirect(url_for("labs"))
-
+        conn.close()
+        return redirect(url_for("labs"))
+    
     conn.row_factory = dict_factory
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM Lab")
@@ -1307,18 +1287,12 @@ def labs():
 @login_required
 @require_permission('user_role_management')
 def create_account():
-    # Open database connection from permission verification
-    try:
-        conn = sqlite3.connect(DATABASE)
-        cursor = conn.cursor()
-    except Exception:
-        return redirect(url_for("index"))
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
 
-    cam_management = check_permission(conn, role, "camera_management")
-    user_role_management = check_permission(conn, role, "user_role_management")
+    cam_management = check_permission(role, "camera_management")
+    user_role_management = check_permission(role, "user_role_management")
 
     dao = RoleDAO(DATABASE)
     roles = dao.get_all_roles()
@@ -1358,6 +1332,8 @@ def create_account():
             )
 
         # Check email uniqueness
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE email = ?", (email_form,))
         if cursor.fetchone():
             flash("❌ An account with this email already exists.", "danger")

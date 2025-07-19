@@ -1,6 +1,10 @@
 import bleach
+import sqlite3
 
-def check_permission(conn, role_name, action):
+DATABASE = 'users.sqlite'
+
+def check_permission(role_name, action):
+  conn = sqlite3.connect(DATABASE)
   cur = conn.cursor()
   cur.execute("""
     SELECT 1
@@ -10,7 +14,10 @@ def check_permission(conn, role_name, action):
     WHERE r.name = ? AND p.name = ?
     LIMIT 1;
   """, (str(role_name), action))
-  return cur.fetchone() is not None
+
+  granted = cur.fetchone() is not None
+  conn.close()
+  return granted
 
 def validate_and_sanitize_text(text):
 
