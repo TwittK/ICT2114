@@ -1104,11 +1104,29 @@ def user_management():
         conn = sqlite3.connect(DATABASE)
 
         if action == "delete":
-            conn.execute("PRAGMA foreign_keys = ON")
+
+            cm = CameraManager(DATABASE)
+
+            # Stop detection on camera and join threads
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
-            conn.commit()
-            flash("User role updated successfully.", "success")
+            cursor.execute('SELECT CameraId FROM Camera WHERE camera_user_id = ?', (user_id,))
+            camera_id = cursor.fetchone()[0]
+            success = cm.remove_camera(camera_id)
+            if success:
+                is_same_user = session.get('user_id') == user_id
+
+                conn.execute("PRAGMA foreign_keys = ON")
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                conn.commit()
+
+                if (is_same_user):
+                    redirect(url_for('logout'))
+                flash("User deleted successfully.", "success")
+
+            else:
+                flash("Error deleting user.", "danger")
+            
 
         elif action == "update":
             new_role = request.form.get("new_role")
@@ -1244,6 +1262,9 @@ def labs():
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO Lab (lab_name, lab_safety_email) VALUES (?, ?)", (lab_name, lab_safety_email))
                 conn.commit()
+
+                flash(f"New lab created.", "success")
+
             except sqlite3.IntegrityError:
                 flash(f"Error creating new lab.", "danger")
 
@@ -1252,6 +1273,7 @@ def labs():
             cursor = conn.cursor()
             cursor.execute("DELETE FROM Lab WHERE LabId = ?", (lab_id,))
             conn.commit()
+            flash(f"Lab deleted succesfully.", "success")
 
         elif action == "update":
             lab_id = request.form.get("lab_id")
@@ -1269,6 +1291,7 @@ def labs():
             cursor.execute("UPDATE Lab SET lab_name = ?, lab_safety_email = ? WHERE LabId = ?",
                            (new_lab_name, new_lab_email, lab_id,))
             conn.commit()
+            flash(f"Lab details updated succesfully.", "success")
 
         conn.close()
         return redirect(url_for("labs"))

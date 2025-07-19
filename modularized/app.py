@@ -24,7 +24,7 @@ if __name__ == "__main__":
         print("[INFO] Flask server started and all cameras in database started detection")
 
         while True:
-            time.sleep(1)
+            time.sleep(0.01)
         # time.sleep(4)
         
     except KeyboardInterrupt:
