@@ -481,11 +481,11 @@ def edit_camera(camera_id):
 
     conn.close()
 
+    cam_management = check_permission(session.get('role'), "camera_management")
     user_role_management = check_permission(session.get('role'), "user_role_management")
-    return render_template('edit_camera.html', camera=camera_data, cam_management=permission_granted,
-                           user_role_management=user_role_management)
+    return render_template('edit_camera.html', camera=camera_data, cam_management=cam_management, user_role_management=user_role_management)
 
-
+@require_permission('camera_management')
 def apply_device_settings(camera_ip, settings):
     """Apply device settings (name) to camera"""
     try:

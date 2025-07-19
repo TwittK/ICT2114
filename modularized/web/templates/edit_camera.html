@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 
+{% if cam_management %}
 <div class="container-fluid px-4 py-3">
   <div class="row justify-content-center">
     <div class="col-lg-10 col-xl-8">
@@ -236,6 +237,9 @@
     </div>
   </div>
 </div>
+{% else %}
+  <p>Not enough permissions. Access denied.</p>
+{% endif %}
 
 <script>
   // Show/hide static IP fields based on IP type selection
