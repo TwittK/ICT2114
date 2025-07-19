@@ -15,7 +15,7 @@ WRIST_THRESHOLD = 170
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 3  # Number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
-
+DATABASE = 'users.sqlite'
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
     h, w, _ = img.shape
@@ -27,7 +27,7 @@ def safe_crop(img, x1, y1, x2, y2, padding=0):
 
 # Estimates the facial area based on the nose, eyes and ears
 def extract_face_from_nose(pose_points, frame):
-    h, w = frame.shape[:2]
+    h, _ = frame.shape[:2]
 
     nose = np.array(pose_points["nose"])
     l_eye = np.array(pose_points["left_eye"])
@@ -81,7 +81,7 @@ def detection(context: Camera):
 
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
-    process_incompliance = ProcessIncompliance("users.sqlite", context.camera_id)
+    process_incompliance = ProcessIncompliance(DATABASE, context.camera_id)
 
     while context.running.is_set():
         try:
@@ -168,18 +168,17 @@ def detection(context: Camera):
                     today = current_date[:10]
 
                     # Facial Recognition
-                    modeData = nvr.get_mode_data(frame)
-                    matchesFound = nvr.get_face_comparison(modeData)
+                    mode_data = nvr.get_mode_data(frame)
+                    matches_found = nvr.get_face_comparison(mode_data)
                     
-                    # matchesFound = (0, "fdsjf342")
-                    if matchesFound[0] == None:
+                    if matches_found[0] == None:
                         continue
 
                     # Match found
-                    if int(matchesFound[0]) >= 1:
+                    if int(matches_found[0]) >= 1:
 
                         print("Match found")
-                        person_id = process_incompliance.match_found_new_incompliance(matchesFound, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
+                        person_id = process_incompliance.match_found_new_incompliance(matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
 
                         # Incompliance on different date
                         if person_id is not None:
@@ -194,14 +193,14 @@ def detection(context: Camera):
                             
                         # Incompliance on the same date
                         else:
-                            print(f"[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
+                            print("[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
                             # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
 
 
                         flag_track_id(context, track_id)
 
                     # No match found
-                    elif int(matchesFound[0]) < 1:
+                    elif int(matches_found[0]) < 1:
                         print("No match found")
                         flag_track_id(context, track_id)
 
@@ -211,7 +210,7 @@ def detection(context: Camera):
                         os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
                         save_img(context, frame, str(person_id), today)
                         
-                        print(f"[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+                        print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
                         # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
 

@@ -5,6 +5,10 @@ import sqlite3
 from database import create_camera
 from datetime import datetime
 
+DATABASE = 'users.sqlite'
+DEFAULT_TIMEZONE = 'Asia/Singapore'
+DATETIME_FORMAT =  '%Y-%m-%dT%H:%M:%S'
+
 class CameraDiscovery:
     def __init__(self, username="admin", password="Sit12345"):
         self.username = username
@@ -35,10 +39,10 @@ class CameraDiscovery:
                     'subnet_mask': network_info.get('subnet_mask', '255.255.255.0'),
                     'gateway': network_info.get('gateway', '192.168.1.1'),
                     'camera_ip_type': network_info.get('ip_type', 'static'),
-                    'timezone': time_info.get('timezone', 'Asia/Singapore'),
+                    'timezone': time_info.get('timezone', DEFAULT_TIMEZONE),
                     'sync_with_ntp': time_info.get('sync_with_ntp', 0),
                     'ntp_server_address': ntp_info.get('ntp_server', 'pool.ntp.org'),
-                    'time': time_info.get('local_time', datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
+                    'time': time_info.get('local_time', datetime.now().strftime(DATETIME_FORMAT))
                 }
         except Exception as e:
             print(f"❌ Failed to discover camera {camera_ip}: {e}")
@@ -242,16 +246,16 @@ class CameraDiscovery:
                     sync_with_ntp = 1 if time_mode_elem.text.lower() == 'ntp' else 0
                 
                 # Parse timezone (CST-8:00:00 -> Asia/Singapore)
-                timezone = 'Asia/Singapore'  # default
+                timezone = DEFAULT_TIMEZONE  # default
                 if timezone_elem is not None and timezone_elem.text:
                     tz_text = timezone_elem.text
                     if 'CST-8' in tz_text or '+08:00' in tz_text:
-                        timezone = 'Asia/Singapore'
+                        timezone = DEFAULT_TIMEZONE
                     elif 'UTC' in tz_text or '+00:00' in tz_text:
                         timezone = 'UTC'
                 
                 # Parse local time format (2025-07-16T17:07:30+08:00)
-                local_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+                local_time = datetime.now().strftime(DATETIME_FORMAT)
                 if local_time_elem is not None and local_time_elem.text:
                     try:
                         # Remove timezone offset for database storage
@@ -261,7 +265,7 @@ class CameraDiscovery:
                         else:
                             local_time = local_time_elem.text[:19]  # Take first 19 chars (YYYY-MM-DDTHH:MM:SS)
                     except:
-                        local_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+                        local_time = datetime.now().strftime(DATETIME_FORMAT)
                 
                 return {
                     'timezone': timezone,
@@ -308,7 +312,7 @@ class CameraDiscovery:
                 
                 return result
                 
-            except ET.ParseError as e:
+            except ET.ParseError:
                 return None
         else:
             print(f"Debug - NTP request failed for {camera_ip}, status: {response.status_code}")
@@ -331,7 +335,7 @@ class CameraDiscovery:
 
     def auto_populate_database(self, camera_ips, lab_name="E2-L6-016", user_id=1):
         """Auto-populate database with discovered cameras"""
-        conn = sqlite3.connect('users.sqlite')
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         
         # Get lab ID

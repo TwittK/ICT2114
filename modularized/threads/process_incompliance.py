@@ -11,11 +11,11 @@ class ProcessIncompliance:
     return current_date[:10]
 
   # When face match is found in exisiting incompliance
-  def match_found_new_incompliance(self, matchesFound, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
+  def match_found_new_incompliance(self, matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
 
     # Get the matching person_id and the last incompliance date
     query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.snapshotId = ?;"""
-    cursor = self.db.execute(query, (matchesFound[1],))
+    cursor = self.db.execute(query, (matches_found[1],))
     result = cursor.fetchone()
 
     if result:
@@ -27,9 +27,9 @@ class ProcessIncompliance:
       if last_date != today and last_date is not None:
 
         face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-        snapshotId = nvr.insert_into_face_db(face_crop, person_id)
+        snapshot_id = nvr.insert_into_face_db(face_crop, person_id)
 
-        if snapshotId:
+        if snapshot_id:
           print("[FACE] 🔴 Inserted face into library")
           update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
           self.db.execute(update_query, (current_date, person_id),)
@@ -38,7 +38,7 @@ class ProcessIncompliance:
           self.db.execute(
             snapshot_query,
             (
-              snapshotId,  # snapshotId = PID from NVR (1 PID for every unique image)
+              snapshot_id,  # snapshot_id = PID from NVR (1 PID for every unique image)
               local_detected_food_drinks[track_id][2],  # confidence value
               current_date,
               str(local_detected_food_drinks[track_id][3]),  # detected object class id
@@ -68,16 +68,16 @@ class ProcessIncompliance:
 
     # Save face into NVR face library
     face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
-    snapshotId = nvr.insert_into_face_db(face_crop, person_id)
+    snapshot_id = nvr.insert_into_face_db(face_crop, person_id)
 
     # Save incompliance snapshot and record details in database
-    if snapshotId:
+    if snapshot_id:
       print("[FACE] 🔴 Inserted face into library")
       snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
       self.db.execute(
         snapshot_query,
         (
-          snapshotId,
+          snapshot_id,
           local_detected_food_drinks[track_id][2],  # confidence value
           current_date,
           str(local_detected_food_drinks[track_id][3]),  # detected object class id

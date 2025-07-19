@@ -15,7 +15,7 @@ class RoleDAO:
 
     conn.close()
     
-    return [r for r in roles]
+    return list(roles)
 
   def get_all_permissions(self):
     """Return permissions in dict"""
@@ -28,7 +28,7 @@ class RoleDAO:
 
     conn.close()
     
-    return [p for p in permissions]
+    return list(permissions)
 
   def get_all_rolepermissions(self):
     """Return list of tuples (role id, permission id)"""

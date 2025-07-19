@@ -18,6 +18,7 @@ from werkzeug.security import generate_password_hash
 
 DATABASE = "users.sqlite"
 SNAPSHOT_FOLDER = "snapshots"
+NO_PRIVILEGES = "Not enough privileges to complete action"
 
 app = Flask(__name__)
 
@@ -72,7 +73,7 @@ def require_permission(permission_name):
 
 @app.context_processor
 def inject_labs_with_cameras():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -184,7 +185,7 @@ def index():
                 return redirect(url_for("index"))
             
             user_id = session.get("user_id")
-            dao = CameraDAO("users.sqlite")
+            dao = CameraDAO(DATABASE)
 
             # Validate and sanitize string
             try:
@@ -204,7 +205,7 @@ def index():
                 return redirect(url_for("index"))
             
             # Add camera into manager and start detection on newly inserted camera
-            cm = CameraManager('users.sqlite')
+            cm = CameraManager(DATABASE)
             result = cm.add_new_camera(device_info["ip_address"], "101", True) 
             if not result:
                 flash("Error inserting camera into camera manager.", "danger")
@@ -224,7 +225,7 @@ def index():
     # Delete camera - ADMIN ONLY
     if is_deleting_camera and camera_name and lab_name and cam_management:
         user_id = session.get("user_id")
-        dao = CameraDAO("users.sqlite")
+        dao = CameraDAO(DATABASE)
         
         # Retrieve camera id
         id_success, camera_id = dao.get_camera_id(lab_name, camera_name, user_id)
@@ -233,7 +234,7 @@ def index():
             return redirect(url_for("index", lab=lab_name))
         
         # Remove camera from manager, stop detection and join threads
-        camera_manager = CameraManager('users.sqlite')
+        camera_manager = CameraManager(DATABASE)
         remove_success = camera_manager.remove_camera(camera_id)
         if not remove_success:
             flash("Failed to stop camera threads properly.", "danger")
@@ -333,7 +334,7 @@ def logout():
 
 
 def get_db():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -345,11 +346,11 @@ def edit_camera(camera_id):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
-        flash('No Privileges to Edit Camera', 'danger')
+        flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
     conn.close()
     
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = dict_factory  # Enable dictionary-style access
     cursor = conn.cursor()
     
@@ -523,7 +524,7 @@ def apply_camera_settings(camera_id, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
-        flash('No Privileges to Edit Camera', 'danger')
+        flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
     conn.close()
 
@@ -579,7 +580,7 @@ def apply_stream_settings(camera_ip, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
-        flash('No Privileges to Edit Camera', 'danger')
+        flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
     conn.close()
 
@@ -694,7 +695,7 @@ def apply_network_settings(camera_ip, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
-        flash('No Privileges to Edit Camera', 'danger')
+        flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
     conn.close()
 
@@ -805,7 +806,7 @@ def apply_time_settings(camera_ip, settings):
     conn = sqlite3.connect(DATABASE)
     permission_granted = check_permission(conn, session.get('role'), "camera_management")
     if not permission_granted:
-        flash('No Privileges to Edit Camera', 'danger')
+        flash(NO_PRIVILEGES, 'danger')
         return redirect(url_for('index'))
     conn.close()
 
@@ -984,7 +985,7 @@ def add_camera():
         print(f"📋 Device info: {device_info}")
         
         # Check if camera already exists
-        conn = sqlite3.connect('users.sqlite')
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM Camera WHERE ip_address = ?", (camera_ip,))
         if cursor.fetchone()[0] > 0:
@@ -1034,7 +1035,7 @@ def add_camera():
         manager = CameraManager.get_instance()
         # except RuntimeError:
         #     # If no instance exists, create one with db_path
-        #     manager = CameraManager('users.sqlite')
+        #     manager = CameraManager(DATABASE)
         manager.add_new_camera(camera_id, camera_ip, "101", True)
         
         print(f"✅ Camera {camera_ip} added to camera manager")

@@ -11,6 +11,17 @@ function disableAddButton() {
   
 }
 
+function validateIPv4(ip) {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return false; // Contains 4 parts
+
+  // Check that each part contains 3 digits and is between 0 to 255
+  return parts.every(part => {
+    const n = Number(part);
+    return /^\d{1,3}$/.test(part) && n >= 0 && n <= 255;
+  });
+}
+
 function validateCamera() {
   const ip = document.getElementById("cameraInput").value.trim();
   const messageDiv = document.getElementById("cameraValidationMessage");
@@ -24,9 +35,8 @@ function validateCamera() {
     messageDiv.textContent = "Please enter an IP address.";
     return;
   }
-  var ipv4Regex = /^(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  validate_ip = ipv4Regex.test(ip);
-  if (!validate_ip) {
+  validateIPResults = validateIPv4(ip);
+  if (!validateIPResults) {
     messageDiv.textContent = "Please enter a valid IP address.";
     return;
   }

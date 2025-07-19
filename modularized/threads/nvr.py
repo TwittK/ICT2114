@@ -34,25 +34,25 @@ class NVR:
         mode_data_elem = root.find(".//isapi:modeData", namespaces=ns)
 
         if mode_data_elem is not None:
-          modeData = mode_data_elem.text
+          mode_data = mode_data_elem.text
         else:
           return None
 
-      except ET.ParseError as e:
+      except ET.ParseError:
         return None
     else:
       return None
 
-    return modeData
+    return mode_data
   
-  def get_face_comparison(self, modeData):
-    if modeData is not None:
+  def get_face_comparison(self, mode_data):
+    if mode_data is not None:
 
       iv = os.urandom(16).hex()
       url = f"http://{self.nvr_ip}/ISAPI/Intelligent/FDLib/FDSearch?security=1&iv={iv}"
 
       # Build the XML payload
-      randomUUID = uuid.uuid4()
+      random_uuid = uuid.uuid4()
       xml_payload = f"""<?xml version="1.0" encoding="utf-8"?>
       <FDSearchDescription>
           <FDID>{self.fdid}</FDID>
@@ -65,11 +65,11 @@ class NVR:
               <FaceMode>
                   <ModeInfo>
                       <similarity>80</similarity>
-                      <modeData>{modeData}</modeData>
+                      <modeData>{mode_data}</modeData>
                   </ModeInfo>
               </FaceMode>
           </FaceModeList>
-          <searchID>{randomUUID}</searchID>
+          <searchID>{random_uuid}</searchID>
           <maxResults>1</maxResults>
           <searchResultPosition>0</searchResultPosition>
       </FDSearchDescription>
@@ -87,12 +87,12 @@ class NVR:
 
       root = ET.fromstring(response.text)
       ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
-      numOfMatches = root.find(".//isapi:numOfMatches", namespaces=ns)
+      num_of_matches = root.find(".//isapi:numOfMatches", namespaces=ns)
 
       # Check if there's any match
-      if numOfMatches is not None and int(numOfMatches.text) >= 1:
-        matchesFound = numOfMatches.text
-        personID = root.find(".//isapi:PID", namespaces=ns)
+      if num_of_matches is not None and int(num_of_matches.text) >= 1:
+        matches_found = num_of_matches.text
+        person_id = root.find(".//isapi:PID", namespaces=ns)
 
       else:
         return (0, None)
@@ -100,11 +100,11 @@ class NVR:
     else:
       return (None, None)
 
-    return matchesFound, personID.text
+    return matches_found, person_id.text
   
   def insert_into_face_db(self, face, name):
 
-    randomUUID = uuid.uuid4()
+    random_uuid = uuid.uuid4()
 
     # Prepare face image payload
     success, encoded_image = cv.imencode(".jpg", face)
@@ -123,7 +123,7 @@ class NVR:
             <name>{name}</name>
             <bornTime>2000-01-01</bornTime>
             <enable>true</enable>
-            <customHumanID>{randomUUID}</customHumanID>
+            <customHumanID>{random_uuid}</customHumanID>
         </FaceAppendData>
     </PictureUploadData>
     """

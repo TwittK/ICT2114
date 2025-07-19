@@ -39,7 +39,7 @@ def admin_required(f):
 
 @app.context_processor
 def inject_labs_with_cameras():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -99,7 +99,7 @@ def index():
     # Create default camera inside the database.
     if is_adding_camera and lab_name:
         user_id = session.get("user_id")
-        dao = CameraDAO("users.sqlite")
+        dao = CameraDAO(DATABASE)
 
         success, message = dao.add_default_camera(lab_name, user_id)
         flash(message, "success" if success else "danger")
@@ -107,7 +107,7 @@ def index():
 
     if is_deleting_camera and camera_name and lab_name:
         user_id = session.get("user_id")
-        dao = CameraDAO("users.sqlite")
+        dao = CameraDAO(DATABASE)
 
         success, message = dao.delete_camera(lab_name, camera_name, user_id)
 
@@ -191,7 +191,7 @@ def admin_panel():
 
 
 def get_db():
-    conn = sqlite3.connect('users.sqlite')
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
