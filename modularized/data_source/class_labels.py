@@ -1,0 +1,26 @@
+# Filename: data_source/class_labels.py
+class ClassLabelRepository:
+    def __init__(self):
+        self._class_id_to_label = {
+            39: "Bottle",
+            40: "Wine Glass",
+            41: "Cup",
+            46: "Fork",
+            47: "Apple",
+            48: "Sandwich",
+            49: "Orange",
+            50: "broccoli",
+            51: "Carrot",
+            52: "Hot Dog",
+            53: "Pizza",
+            54: "Donut",
+            55: "Cake"
+        }
+
+    def get_label(self, class_id: int) -> str:
+        """Returns the human-readable label for a class ID"""
+        return self._class_id_to_label.get(class_id, str(class_id))
+
+    def get_all_labels(self) -> dict:
+        """Returns a copy of the full class ID to label mapping."""
+        return self._class_id_to_label.copy()

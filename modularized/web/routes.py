@@ -15,17 +15,14 @@ from shared.camera_discovery import CameraDiscovery
 import queue
 from web.utils import check_permission, validate_and_sanitize_text
 from werkzeug.security import generate_password_hash
+from data_source.class_labels import ClassLabelRepository
 
 DATABASE = "users.sqlite"
 SNAPSHOT_FOLDER = "snapshots"
 
 app = Flask(__name__)
 
-class_id_to_label = {
-    39: "Bottle",
-    40: "Wine Glass",
-    41: "Cup",
-}
+label_repo = ClassLabelRepository()
 
 
 def dict_factory(cursor, row):
@@ -308,14 +305,16 @@ def index():
 
             # Try to interpret as int (e.g., if stored as string class ID)
             try:
-                label = class_id_to_label.get(int(object_detected), object_detected)
+                label = label_repo.get_label(int(object_detected))
             except ValueError:
-                # If it's already a string label
+                # If object_detected is already a string label.
                 label = object_detected
 
             results.append((time_generated, label, confidence, image_url))
 
         conn.close()
+
+    all_labels = label_repo.get_all_labels()
 
     return render_template(
         "index.html",
@@ -326,6 +325,7 @@ def index():
         cam_management=cam_management,
         user_role_management=user_role_management,
         today=today_str,
+        all_labels=all_labels,
     )
 
 
