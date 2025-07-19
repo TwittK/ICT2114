@@ -30,7 +30,6 @@
 
   <i class="fa-solid fa-info-circle my-3"></i> Admin and user role are default roles and cannot be deleted.
 
-
   <!-- Permission Matrix Table -->
   <form method="post" action="{{ url_for('role_management') }}">
     <input type="hidden" name="action" value="update">
@@ -78,22 +77,23 @@
       </tr>
     </thead>
     <tbody>
-      <tr>
+      
       {% for role in roles %}
         {% if role['name'] != "admin" and role['name'] != "user" %}
-        <td>{{ role['name'] }}</td>
-        <td>
-          <form method="post" action="{{ url_for('role_management') }}">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="role_name" value="{{ role['name'] }}">
-            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('WARNING: Are you sure you want to delete this role?');">
-              Delete
-            </button>
-          </form>
-        </td>
+        <tr>
+          <td>{{ role['name'] }}</td>
+          <td>
+            <form method="post" action="{{ url_for('role_management') }}">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="role_name" value="{{ role['name'] }}">
+              <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('WARNING: Are you sure you want to delete this role?');">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
         {% endif %}
       {% endfor %}
-      </tr>
     </tbody>
   </table>
   {% else %}
