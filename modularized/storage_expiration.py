@@ -47,41 +47,35 @@ class StorageExpiration:
 
     def delete_expired(self):
 
-        # Fetch all incompliance records that are earlier than 12 months ago.
-        self.cursor.execute("""SELECT DetectionId, snapshotId, imageURL FROM Snapshot WHERE datetime(time_generated) < datetime(?)""", (self.expiration_date,))
-        expired_snapshots = self.cursor.fetchall()
-        logging.info(f"Found {len(expired_snapshots)} expired snapshot(s).")
-
-        for detection_id, snapshot_id, image_url in expired_snapshots:
+        try:
+            self.cursor.execute("BEGIN TRANSACTION")
             
-            # Felete image from face library in NVR
-            self.nvr_delete_face(snapshot_id)
+            # Fetch all incompliance records that are earlier than 12 months ago.
+            self.cursor.execute("""SELECT DetectionId, snapshotId, imageURL FROM Snapshot WHERE datetime(time_generated) < datetime(?)""", (self.expiration_date,))
+            expired_snapshots = self.cursor.fetchall()
+            logging.info(f"Found {len(expired_snapshots)} expired snapshot(s).")
 
-            # Delete locally saved images
-            if image_url and os.path.exists(image_url):
-                os.remove(image_url)
-                logging.info(f"Deleted image: {image_url}")
-            else:
-                logging.warning(f"Image not found: {image_url}")
+            for detection_id, snapshot_id, image_url in expired_snapshots:
+                
+                # Felete image from face library in NVR
+                self.nvr_delete_face(snapshot_id)
 
-            # Delete from snapshot table
-            try:
-                self.cursor.execute("BEGIN TRANSACTION")
+                # Delete locally saved images
+                if image_url and os.path.exists(image_url):
+                    os.remove(image_url)
+                    logging.info(f"Deleted image: {image_url}")
+                else:
+                    logging.warning(f"Image not found: {image_url}")
+
+                # Delete from snapshot table
                 self.cursor.execute("DELETE FROM Snapshot WHERE DetectionId = ?", (detection_id,))
                 logging.info(f"Deleted DB record ID: {detection_id}")
                 self.conn.commit()
 
-
-            except sqlite3.Error:
-                self.conn.rollback()
-                logging.exception("Error deleting expired records, deletion aborted.")
-
-        # Delete from person table
-        try:
-            self.cursor.execute("BEGIN TRANSACTION")
-            self.cursor.execute("""DELETE FROM Person WHERE datetime(last_incompliance) < datetime(?)""", (self.expiration_date,))
-            logging.info("Deleted expired entries from Person table.")
-            self.conn.commit()
+                self.cursor.execute("BEGIN TRANSACTION")
+                self.cursor.execute("""DELETE FROM Person WHERE datetime(last_incompliance) < datetime(?)""", (self.expiration_date,))
+                logging.info("Deleted expired entries from Person table.")
+                self.conn.commit()
 
         except sqlite3.Error:
             self.conn.rollback()
