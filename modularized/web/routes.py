@@ -603,7 +603,6 @@ def edit_camera(camera_id):
                                  ntp_server_address, time_value, camera_id))
 
             conn.commit()
-            flash('Camera settings updated successfully!', 'success')
 
             # Optionally, try to apply settings to actual camera via API
             try:
@@ -1184,9 +1183,13 @@ def add_camera():
         data = request.get_json()
         camera_ip = data.get('ip')
         device_info = data.get('device_info')
+        lab_name = data.get('lab_name')  # Get lab name from request
 
-        print(f"🔍 Attempting to add camera: {camera_ip}")
+        print(f"🔍 Attempting to add camera: {camera_ip} to lab: {lab_name}")
         print(f"📋 Device info: {device_info}")
+
+        if not lab_name:
+            return jsonify({'success': False, 'message': 'Lab name is required'})
 
         # Check if camera already exists
         conn = sqlite3.connect(DATABASE)
@@ -1197,10 +1200,14 @@ def add_camera():
             conn.close()
             return jsonify({'success': False, 'message': f'Camera {camera_ip} already exists!'})
 
-        # Get default lab ID
-        cursor.execute("SELECT LabId FROM Lab LIMIT 1")
+        # Get the actual lab ID for the specified lab
+        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
         lab_result = cursor.fetchone()
-        lab_id = lab_result[0] if lab_result else 1
+        if not lab_result:
+            conn.close()
+            return jsonify({'success': False, 'message': f'Lab "{lab_name}" not found'})
+        
+        lab_id = lab_result[0]
 
         # Get current user ID from session
         user_id = session.get('user_id', 1)

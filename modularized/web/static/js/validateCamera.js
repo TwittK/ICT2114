@@ -94,14 +94,20 @@ function validateCamera() {
 function addNewCamera() {
   const ip = document.getElementById("cameraInput").value.trim();
   const deviceInfoRaw = document.getElementById("deviceInfoData").value;
+  const labName = document.getElementById("selectedLabName").value;
+  
   if (!ip || !deviceInfoRaw) {
     alert("Camera IP or device info missing.");
     return;
   }
 
+  if (!labName) {
+    alert("Lab name is missing.");
+    return;
+  }
+
   const deviceInfo = JSON.parse(deviceInfoRaw);
   
-  // Fix: Use a simpler URL without template variables
   fetch(`/add_camera`, {
     method: "POST",
     headers: {
@@ -109,7 +115,8 @@ function addNewCamera() {
     },
     body: JSON.stringify({
       ip: ip,
-      device_info: deviceInfo
+      device_info: deviceInfo,
+      lab_name: labName
     })
   })
   .then(response => response.json())
@@ -129,12 +136,37 @@ function addNewCamera() {
 
 function registerListeners() {
   const cameraInput = document.getElementById("cameraInput");
-  cameraInput.addEventListener("input", disableAddButton); // Disable add button on input change
+  cameraInput.addEventListener("input", disableAddButton);
 
-  document.getElementById("validateCameraBtn").addEventListener("click", validateCamera); // Handle search button clicks
+  document.getElementById("validateCameraBtn").addEventListener("click", validateCamera);
+  document.getElementById("addCameraBtn").addEventListener("click", addNewCamera);
 
-  document.getElementById("addCameraBtn").addEventListener("click", addNewCamera); // Handle add new camera clicks (after verifying IP address)
+  // Handle modal show event to capture lab name
+  const addCameraModal = document.getElementById('addCameraModal');
+  addCameraModal.addEventListener('show.bs.modal', function (event) {
+    // Button that triggered the modal
+    const button = event.relatedTarget;
+    // Extract lab name from data-* attributes
+    const labName = button.getAttribute('data-lab-name');
+    
+    // Update the modal's title to show lab name
+    const modalTitle = addCameraModal.querySelector('#addCameraModalLabel');
+    const selectedLabInput = addCameraModal.querySelector('#selectedLabName');
+    
+    if (modalTitle) {
+      modalTitle.textContent = `Add New Camera to ${labName}`;
+    }
+    
+    if (selectedLabInput) {
+      selectedLabInput.value = labName;
+    }
+    
+    // Reset form when modal opens
+    document.getElementById("cameraInput").value = "";
+    document.getElementById("cameraValidationMessage").textContent = "";
+    document.getElementById("deviceInfoData").value = "";
+    document.getElementById("addCameraBtn").disabled = true;
+  });
 }
-
 
 registerListeners();

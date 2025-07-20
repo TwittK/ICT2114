@@ -67,7 +67,7 @@
                 {# Check if user is admin #}
                 {% if cam_management %}
                 <li class="ps-3 mt-1">
-                    <a data-bs-toggle="modal" data-bs-target="#addCameraModal" class="text-decoration-none icon-plus">
+                    <a data-bs-toggle="modal" data-bs-target="#addCameraModal" data-lab-name="{{ lab.lab_name }}" class="text-decoration-none icon-plus">
                         <i class="fa-solid fa-circle-plus"></i>
                     </a>
                 </li>
@@ -95,9 +95,11 @@
                                 </div>
                                 <!-- Validation result message -->
                                 <div id="cameraValidationMessage" class="mt-2 text-danger"></div>
+                                
+                                <!-- Hidden inputs for storing data -->
+                                <input type="hidden" id="deviceInfoData" />
+                                <input type="hidden" id="selectedLabName" />
                             </div>
-
-                            <input type="hidden" id="deviceInfoData" />
 
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close
