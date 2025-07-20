@@ -29,12 +29,9 @@
         <div class="col-md-6">
             <label for="object_type" class="form-label">In-Compliance Type:</label>
             <select name="object_type" class="form-select rounded-pill">
-                <option value="">Select Type</option>
-                {% for class_id, label in all_labels.items() %}
-                    <option value="{{ class_id }}" {% if selected_object_type == class_id|string %}selected{% endif %}>
-                        {{ label }}
-                    </option>
-                {% endfor %}
+                <option value="">ALL</option>
+                <option value="food" {% if selected_object_type == 'food' %}selected{% endif %}>Food</option>
+                <option value="drink" {% if selected_object_type == 'drink' %}selected{% endif %}>Drink</option>
             </select>
         </div>
 

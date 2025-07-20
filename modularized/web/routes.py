@@ -312,8 +312,20 @@ def index():
             params.append(date_filter)
 
         if object_filter:
-            query += " AND s.object_detected = ?"
-            params.append(object_filter)
+            if object_filter == "food":
+                food_ids = label_repo.get_food_class_ids()
+                placeholders = ",".join("?" for _ in food_ids)
+                query += f" AND s.object_detected IN ({placeholders})"
+                params.extend(food_ids)
+            elif object_filter == "drink":
+                drinks_ids = label_repo.get_drink_class_ids()
+                placeholders = ",".join("?" for _ in drinks_ids)
+                query += f" AND s.object_detected IN ({placeholders})"
+                params.extend(drinks_ids)
+            else:
+                # Assume it's a specific class ID
+                query += " AND s.object_detected = ?"
+                params.append(object_filter)
 
         query += " ORDER BY s.time_generated DESC"
 
@@ -489,8 +501,20 @@ def second_compliance():
 
             # Apply object type filter if selected.
             if selected_object_type:
-                query += " AND s.object_detected = ?"
-                params.append(selected_object_type)
+                if selected_object_type == "food":
+                    food_ids = label_repo.get_food_class_ids()
+                    placeholders = ",".join("?" for _ in food_ids)
+                    query += f" AND s.object_detected IN ({placeholders})"
+                    params.extend(food_ids)
+                elif selected_object_type == "drink":
+                    drinks_ids = label_repo.get_drink_class_ids()
+                    placeholders = ",".join("?" for _ in drinks_ids)
+                    query += f" AND s.object_detected IN ({placeholders})"
+                    params.extend(drinks_ids)
+                else:
+                    # Assume it's a specific class ID
+                    query += " AND s.object_detected = ?"
+                    params.append(selected_object_type)
 
             query += " ORDER BY s.time_generated DESC"
 

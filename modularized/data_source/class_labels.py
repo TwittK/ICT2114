@@ -24,3 +24,9 @@ class ClassLabelRepository:
     def get_all_labels(self) -> dict:
         """Returns a copy of the full class ID to label mapping."""
         return self._class_id_to_label.copy()
+
+    def get_food_class_ids(self) -> list:
+        return [46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
+
+    def get_drink_class_ids(self) -> list:
+        return [39, 40, 41]
