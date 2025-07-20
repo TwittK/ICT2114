@@ -278,7 +278,6 @@ def index():
 
         if date_filter:
             selected_date = date_filter
-            
             query += " AND DATE(s.time_generated) = ?"
             params.append(date_filter)
 
@@ -330,6 +329,135 @@ def index():
         all_labels=all_labels,
         selected_date=selected_date,
         selected_object_type=object_filter,
+    )
+
+
+@app.route('/second-compliance', methods=["GET", "POST"])
+@login_required
+def second_compliance():
+    # Get lab and camera from URL query parameters - mandatory for filtering
+    lab_name = request.args.get("lab")
+    camera_name = request.args.get("camera")
+
+    # Redirect if either lab or camera not specified.
+    if not lab_name or not camera_name:
+        flash("Lab and camera must be specified to view second incompliances.", "danger")
+        return redirect(url_for("index"))
+
+    # Default selected date to today or get from POST form.
+    selected_date = request.form.get("date") or datetime.now().strftime('%Y-%m-%d')
+    selected_object_type = request.form.get("object_type") or ""
+
+    # Retrieve all labels for dropdown
+    all_labels = label_repo.get_all_labels()
+
+    # User role and camera management
+    cam_management = None
+    user_role_management = None
+
+    results = []
+
+    try:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Check user permission to view incompliances
+        role = session.get("role")
+        if role is None or not check_permission(conn, role, "view_incompliances"):
+            flash("Permission denied to view incompliances.", "danger")
+            return redirect(url_for("index"))
+
+        cam_management = check_permission(conn, role, "camera_management")
+        user_role_management = check_permission(conn, role, "user_role_management")
+
+        # Fetch list of all labs for dropdown
+        cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
+        all_labs = [row["lab_name"] for row in cursor.fetchall()]
+
+        # Fetch cameras only for the selected lab.
+        cursor.execute("""
+                       SELECT c.name
+                       FROM Camera c
+                                JOIN Lab l ON c.camera_lab_id = l.LabId
+                       WHERE l.lab_name = ?
+                       ORDER BY c.name
+                       """, (lab_name,))
+
+        all_cameras = [row["name"] for row in cursor.fetchall()]
+
+        if request.method == "POST":
+            # SQL query to find repeated incompliances for specific lab and camera
+            query = """
+                    SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
+                    FROM Snapshot s
+                             JOIN (SELECT camera_id, object_detected, person_id, MIN(time_generated) AS first_time
+                                   FROM Snapshot
+                                   WHERE person_id IS NOT NULL
+                                   GROUP BY camera_id, object_detected, person_id
+                                   HAVING COUNT(*) > 1) repeats
+                                  ON s.camera_id = repeats.camera_id
+                                      AND s.object_detected = repeats.object_detected
+                                      AND s.person_id = repeats.person_id
+                    WHERE s.time_generated > repeats.first_time
+                      AND EXISTS(SELECT 1
+                                 FROM Camera c
+                                          JOIN Lab l ON c.camera_lab_id = l.LabId
+                                 WHERE c.CameraId = s.camera_id
+                                   AND l.lab_name = ?
+                                   AND c.name = ?) \
+                    """
+
+            params = [lab_name, camera_name]
+
+            # Apply date filter if selected.
+            if selected_date:
+                query += " AND DATE(s.time_generated) = ?"
+                params.append(selected_date)
+
+            # Apply object type filter if selected.
+            if selected_object_type:
+                query += " AND s.object_detected = ?"
+                params.append(selected_object_type)
+
+            query += " ORDER BY s.time_generated DESC"
+
+            cursor.execute(query, params)
+            raw_results = cursor.fetchall()
+
+            # Process results: replace class ID with label.
+            for row in raw_results:
+                time_generated = row["time_generated"]
+                object_detected = row["object_detected"]
+                confidence = row["confidence"]
+                image_url = row["imageURL"]
+
+                try:
+                    label = label_repo.get_label(int(object_detected))
+                except (ValueError, TypeError):
+                    label = object_detected
+
+                results.append((time_generated, label, confidence, image_url))
+
+        conn.close()
+
+    except Exception as e:
+        flash("Error loading second incompliance data.", "danger")
+        print(f"Exception: {e}")
+        return redirect(url_for("index"))
+
+    return render_template(
+        "second_compliance.html",
+        results=results,
+        lab_name=lab_name,
+        camera_name=camera_name,
+        cam_management=cam_management,
+        user_role_management=user_role_management,
+        all_labs=all_labs,
+        all_cameras=all_cameras,
+        all_labels=all_labels,
+        selected_date=selected_date,
+        selected_object_type=selected_object_type,
     )
 
 
