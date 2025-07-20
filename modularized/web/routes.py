@@ -160,6 +160,13 @@ def index():
     date_filter = None
     object_filter = None
     selected_date = today_str
+    repeated_incompliance_filter = None
+    person_id_filter = None
+
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = dict_factory
+    cursor = conn.cursor()
+
 
     role = session.get('role')
     if role is None:
@@ -247,76 +254,92 @@ def index():
     elif is_deleting_camera and not check_permission(role, "delete_camera"):
         flash("Admin access required to delete cameras!", 'danger')
         return redirect(url_for("index", lab=lab_name))
-
-    if request.method == "POST" and check_permission(role, "view_incompliances"):
-        action = request.form.get("action")
-
-        date_filter = request.form.get("date")
-        object_filter = request.form.get("object_type")
-
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = dict_factory
-        cursor = conn.cursor()
-
-        # Get all cameras for the dropdown
-        cursor.execute("SELECT CameraId, name FROM Camera")
-        cameras = cursor.fetchall()
-
-        # Updated query to join Camera table and filter by camera name
-        query = """
-                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
-                FROM Snapshot s
-                         LEFT JOIN Camera c ON s.camera_id = c.CameraId
-                WHERE 1 = 1 \
-                """
+    
+    # Only show incompliances if user has permission
+    if check_permission(role, "view_incompliances"):
         params = []
+        
+        if request.method == "POST":
+            date_filter = request.form.get("date")
+            object_filter = request.form.get("object_type")
+            repeated_incompliance_filter = request.form.get('recent_incompliance_only')
+            person_id_filter = request.form.get("person_id")
 
-        # Add camera filter if a camera is selected
-        if camera_name:
-            query += " AND c.name = ?"
-            params.append(camera_name)
+        # Build query based on filters or show all if no filter
+        if repeated_incompliance_filter:
+            query = """
+                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL,
+                       p.PersonId, p.incompliance_count
+                FROM Snapshot s
+                JOIN Person p ON s.person_id = p.PersonId
+                WHERE p.incompliance_count > 1
+                  AND s.DetectionId = (
+                      SELECT DetectionId FROM Snapshot
+                      WHERE person_id = p.PersonId
+                      ORDER BY time_generated DESC
+                      LIMIT 1
+                  )
+            """
+            if date_filter:
+                query += " AND DATE(s.time_generated) = ?"
+                params.append(date_filter)
+            if object_filter:
+                query += " AND s.object_detected = ?"
+                params.append(object_filter)
+            if camera_name:
+                query += " AND s.camera_id = (SELECT CameraId FROM Camera WHERE name = ?)"
+                params.append(camera_name)
+            if person_id_filter:
+                query += " AND p.PersonId = ?"
+                params.append(person_id_filter)
+            query += " ORDER BY s.time_generated DESC"
 
-        if date_filter:
-            selected_date = date_filter
-            
-            query += " AND DATE(s.time_generated) = ?"
-            params.append(date_filter)
-
-        if object_filter:
-            query += " AND s.object_detected = ?"
-            params.append(object_filter)
-
-        query += " ORDER BY s.time_generated DESC"
-
-        print("Camera filter:", camera_name)
-        print("Query:", query)
-        print("Params:", params)
+        else:
+            # Show all incompliances (optionally filtered)
+            query = """
+                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL,
+                       p.PersonId, p.incompliance_count
+                FROM Snapshot s
+                LEFT JOIN Camera c ON s.camera_id = c.CameraId
+                LEFT JOIN Person p ON s.person_id = p.PersonId
+                WHERE 1=1
+            """
+            if camera_name:
+                query += " AND c.name = ?"
+                params.append(camera_name)
+            if date_filter:
+                query += " AND DATE(s.time_generated) = ?"
+                params.append(date_filter)
+            if object_filter:
+                query += " AND s.object_detected = ?"
+                params.append(object_filter)
+            if person_id_filter:
+                query += " AND p.PersonId = ?"
+                params.append(person_id_filter)
+            query += " ORDER BY s.time_generated DESC"
 
         cursor.execute(query, params)
-
-        # Fetch all raw results from the database
         raw_results = cursor.fetchall()
 
         # Replace class ID with label using mapping.
-        results = []
         for row in raw_results:
             time_generated = row["time_generated"]
             object_detected = row["object_detected"]
             confidence = row["confidence"]
             image_url = row["imageURL"]
-
-            # Try to interpret as int (e.g., if stored as string class ID)
+            person_id = row["PersonId"]
+            incompliance_count = row["incompliance_count"]
             try:
                 label = label_repo.get_label(int(object_detected))
             except ValueError:
-                # If object_detected is already a string label.
                 label = object_detected
-
-            results.append((time_generated, label, confidence, image_url))
-
-        conn.close()
+            results.append((time_generated, label, confidence, image_url, person_id, incompliance_count))
 
     all_labels = label_repo.get_all_labels()
+
+    cursor.execute("SELECT PersonId FROM Person")
+    all_person_ids = [row["PersonId"] for row in cursor.fetchall()]
+    conn.close()
 
     return render_template(
         "index.html",
@@ -328,8 +351,11 @@ def index():
         user_role_management=user_role_management,
         today=today_str,
         all_labels=all_labels,
-        selected_date=selected_date,
+        selected_date=date_filter or today_str,
         selected_object_type=object_filter,
+        recent_incompliance_only=repeated_incompliance_filter,
+        all_person_ids=all_person_ids,
+        selected_person_id=request.form.get("person_id") if request.method == "POST" else None,
     )
 
 

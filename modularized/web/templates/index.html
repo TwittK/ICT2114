@@ -15,31 +15,52 @@
     {% endif %}
 
 
-    <form method="post" class="row g-3 align-items-end mb-4">
-        <div class="col-md-6">
-            <label for="date" class="form-label">Date Time:</label>
-            <input type="date"
-                   class="form-control rounded-pill"
-                   name="date"
-                   id="date"
-                   value="{{ selected_date }}"
-            >
+    <form method="post" class="mb-4">
+        <div class="row g-3 align-items-end mb-2">
+            <div class="col-md-4">
+                <label for="date" class="form-label">Date Time:</label>
+                <input type="date"
+                    class="form-control rounded-pill filter-disable"
+                    name="date"
+                    id="date"
+                    value="{{ selected_date }}">
+            </div>
+            <div class="col-md-4">
+                <label for="object_type" class="form-label">In-Compliance Type:</label>
+                <select name="object_type" class="form-select rounded-pill filter-disable">
+                    <option value="">Select Type</option>
+                    {% for class_id, label in all_labels.items() %}
+                        <option value="{{ class_id }}" {% if selected_object_type == class_id|string %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="person_id" class="form-label">Person ID:</label>
+                <select name="person_id" id="person_id" class="form-select rounded-pill filter-disable">
+                    <option value="">Select Person</option>
+                    {% for pid in all_person_ids %}
+                        <option value="{{ pid }}" {% if selected_person_id == pid|string %}selected{% endif %}>
+                            Person {{ pid }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
 
-        <div class="col-md-6">
-            <label for="object_type" class="form-label">In-Compliance Type:</label>
-            <select name="object_type" class="form-select rounded-pill">
-                <option value="">Select Type</option>
-                {% for class_id, label in all_labels.items() %}
-                    <option value="{{ class_id }}" {% if selected_object_type == class_id|string %}selected{% endif %}>
-                        {{ label }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-dark rounded-pill px-4">Search</button>
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="recent_incompliance_only" class="form-label">Latest Repeated Incompliances:</label>
+                <div class="form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" name="recent_incompliance_only" id="recent_incompliance_only"
+                        {% if recent_incompliance_only %}checked{% endif %}>
+                    <label class="form-check-label ms-2" for="recent_incompliance_only">
+                        Show Only Repeated
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-dark rounded-pill px-4 mt-2 w-auto">Search</button>
+            </div>
         </div>
     </form>
 
@@ -58,15 +79,16 @@
                              data-date="{{ row[0] }}"
                         >
                         <div class="card-body">
+                            <p class="card-text mb-1"><strong>Person ID:</strong> {{ row[4] }}</p>
+                            {% if recent_incompliance_only %}
+                                <p class="card-text mb-1"><strong>Incompliance Count:</strong> {{ row[5] }}</p>
+                            {% endif %}
                             <h6 class="card-title">
                                 {{ row[1] }}
                                 <small class="text-muted">
                                     (Confidence: {{ row[2] }})
                                 </small>
                             </h6>
-                            <p class="card-text text-muted">
-                                {{ row[0] }}
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -128,5 +150,23 @@
                 })
             });
         })
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const repeatedCheckbox = document.getElementById('recent_incompliance_only');
+            const filterInputs = document.querySelectorAll('.filter-disable');
+
+            function toggleFilters() {
+                const disable = repeatedCheckbox.checked;
+                filterInputs.forEach(input => {
+                    input.disabled = disable;
+                });
+            }
+
+            // Initial state
+            toggleFilters();
+
+            // Listen for changes
+            repeatedCheckbox.addEventListener('change', toggleFilters);
+        });
     </script>
 {% endblock %}
