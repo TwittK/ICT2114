@@ -17,7 +17,7 @@ if __name__ == "__main__":
         flask_thread = threading.Thread(target=run_app, daemon=True)
         flask_thread.start()
 
-        time.sleep(3) # Temp: give time to initialize database
+        time.sleep(3) # Give time to initialize database
 
         camera_manager = CameraManager(DATABASE) # Start detection on all cameras stored in database
 
@@ -25,7 +25,6 @@ if __name__ == "__main__":
 
         while True:
             time.sleep(0.01)
-        # time.sleep(4)
         
     except KeyboardInterrupt:
         print("[INFO] Shutting down.")

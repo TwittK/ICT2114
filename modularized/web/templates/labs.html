@@ -60,7 +60,7 @@
                       </td>
                     </form>
 
-                    <form method="post" action="{{ url_for('labs') }}" onsubmit="return confirm('Are you sure you want to delete this lab?')">
+                    <form method="post" action="{{ url_for('labs') }}" onsubmit="return confirm('WARNING: Are you sure you want to delete this lab? This action cannot be undone.')">
                       <td>
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="lab_id" value="{{ lab.LabId }}">
