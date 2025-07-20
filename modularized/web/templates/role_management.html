@@ -2,105 +2,106 @@
 {% block content %}
 
 <div class="alert alert-info mt-4">
-  <i class="fa-solid fa-info-circle"></i> <strong>Role Management Access:</strong> Only users with user management permission can access this page.
+  <i class="fa-solid fa-info-circle"></i> <strong>Role Management Access:</strong> Only users with user management
+  permission can access this page.
 </div>
 
 <h1>Role Management</h1>
 
 {% if user_role_management %}
-  <!-- Add New Role Form -->
-  <div class="card mb-4">
-    <div class="card-header">
-      Create New Role
-    </div>
-    
-    <div class="card-body">
-      <form method="post" action="{{ url_for('role_management') }}">
-        <div class="form-group">
-          <input type="hidden" name="action" value="add_role">
-          <label for="new_role">Role Name:</label>
-          <input type="text" class="form-control" name="role_name" id="new_role" required>
-        </div>
-        <button type="submit" class="btn btn-primary mt-2">Add Role</button>
-      </form>
-    </div>
+<!-- Add New Role Form -->
+<div class="card mb-4">
+  <div class="card-header">
+    Create New Role
   </div>
 
-  {% if roles %}
+  <div class="card-body">
+    <form method="post" action="{{ url_for('role_management') }}">
+      <div class="form-group">
+        <input type="hidden" name="action" value="add_role">
+        <label for="new_role">Role Name:</label>
+        <input type="text" class="form-control" name="role_name" id="new_role" required>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Add Role</button>
+    </form>
+  </div>
+</div>
 
-  <i class="fa-solid fa-info-circle my-3"></i> Admin and user are default roles and cannot be deleted.
+{% if roles %}
 
-  <!-- Permission Matrix Table -->
-  <form method="post" action="{{ url_for('role_management') }}">
-    <input type="hidden" name="action" value="update">
-    <div class="table-responsive">
-      <table class="table table-bordered text-center">
-        <thead>
-          <tr>
-            <th>Role \ Permission</th>
-            {% for perm in permissions %}
-              <th>{{ perm['name'] }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for role in roles %}
-            <tr>
-              <td class="text-start"><strong>{{ role['name'] }}</strong></td>
-              {% for perm in permissions %}
-                <td>
-                  <input type="checkbox"
-                      name="role_perm_{{ role['name'] }}_{{ perm['name'] }}"
-                      {% if (role['id'], perm['id']) in role_permissions %}
-                        checked
-                      {% endif %}>
-                </td>
-              {% endfor %}
-            </tr>
+<i class="fa-solid fa-info-circle my-3"></i> Admin and user are default roles and cannot be deleted.
+
+<!-- Permission Matrix Table -->
+<form method="post" action="{{ url_for('role_management') }}">
+  <input type="hidden" name="action" value="update">
+  <div class="table-responsive">
+    <table class="table table-bordered text-center">
+      <thead>
+        <tr>
+          <th>Role \ Permission</th>
+          {% for perm in permissions %}
+          <th>{{ perm['name'] }}</th>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <button type="submit" class="btn btn-success mt-3" onclick="return confirm('Are you sure you want to save permission changes?');">Save Changes</button>
-  </form>
+        </tr>
+      </thead>
+      <tbody>
+        {% for role in roles %}
+        <tr>
+          <td class="text-start"><strong>{{ role['name'] }}</strong></td>
+          {% for perm in permissions %}
+          <td>
+            <input type="checkbox" name="role_perm_{{ role['name'] }}_{{ perm['name'] }}" {% if (role['id'], perm['id'])
+              in role_permissions %} checked {% endif %}>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button type="submit" class="btn btn-success mt-3 me-2"
+    onclick="return confirm('Are you sure you want to save permission changes?');">Save Changes</button>
   <button type="button" class="btn btn-secondary mt-3">
-    <a class="link-light link-offset-2 link-underline-opacity-0 link-underline-opacity-0-hover" href="{{ url_for('role_management') }}">
+    <a class="link-light link-offset-2 link-underline-opacity-0 link-underline-opacity-0-hover"
+      href="{{ url_for('role_management') }}">
       Revert
     </a>
   </button>
+</form>
 
-  <table class="table table-bordered text-center mt-4">
-    <thead>
-      <tr>
-        <th>Role</th>
-        <th>Delete Role</th>
-      </tr>
-    </thead>
-    <tbody>
-      
-      {% for role in roles %}
-        {% if role['name'] != "admin" and role['name'] != "user" %}
-        <tr>
-          <td>{{ role['name'] }}</td>
-          <td>
-            <form method="post" action="{{ url_for('role_management') }}">
-              <input type="hidden" name="action" value="delete">
-              <input type="hidden" name="role_name" value="{{ role['name'] }}">
-              <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('WARNING: Are you sure you want to delete this role?');">
-                Delete
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endif %}
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-    <p>No roles found.</p>
-  {% endif %}
+<table class="table table-bordered text-center mt-4">
+  <thead>
+    <tr>
+      <th>Role</th>
+      <th>Delete Role</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    {% for role in roles %}
+    {% if role['name'] != "admin" and role['name'] != "user" %}
+    <tr>
+      <td>{{ role['name'] }}</td>
+      <td>
+        <form method="post" action="{{ url_for('role_management') }}">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="role_name" value="{{ role['name'] }}">
+          <button type="submit" class="btn btn-danger btn-sm"
+            onclick="return confirm('WARNING: Are you sure you want to delete this role?');">
+            Delete
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
 {% else %}
-  <p>Not enough permissions. Access denied.</p>
+<p>No roles found.</p>
+{% endif %}
+{% else %}
+<p>Not enough permissions. Access denied.</p>
 {% endif %}
 
 {% endblock %}
