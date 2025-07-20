@@ -374,9 +374,9 @@ def index():
     )
 
 
-@app.route('/second-compliance', methods=["GET", "POST"])
+@app.route('/second-incompliance', methods=["GET", "POST"])
 @login_required
-def second_compliance():
+def second_incompliance():
     # Get lab and camera from URL query parameters - mandatory for filtering
     lab_name = request.args.get("lab")
     camera_name = request.args.get("camera")
@@ -423,7 +423,7 @@ def second_compliance():
 
         if lab_name and camera_name:
             # Redirect with default parameters so page loads correctly.
-            return redirect(url_for("second_compliance", lab=lab_name, camera=camera_name))
+            return redirect(url_for("second_incompliance", lab=lab_name, camera=camera_name))
         else:
             flash("No labs or cameras configured.", "danger")
             return redirect(url_for("index"))
@@ -541,7 +541,7 @@ def second_compliance():
         return redirect(url_for("index"))
 
     return render_template(
-        "second_compliance.html",
+        "second_incompliance.html",
         results=results,
         lab_name=lab_name,
         camera_name=camera_name,

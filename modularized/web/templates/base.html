@@ -38,9 +38,9 @@
                     </a>
 
                     {# Second Compliance link; visible to all users #}
-                    <a href="{{ url_for('second_compliance', lab=lab.lab_name, camera=camera.camera_name) }}"
+                    <a href="{{ url_for('second_incompliance', lab=lab.lab_name, camera=camera.camera_name) }}"
                         class="ms-2 icon-warning text-warning" title="Second Compliance">
-                        <i class="fa-solid fa-rotate-right"></i>
+                        <i class="fa fa-search"></i>
                     </a>
                     {# Live video feed of camera; visible to all users but only accessible to those with video_feed permission #}
                     <a href="{{ url_for('video_feed', camera_id=camera.camera_id) }}"
