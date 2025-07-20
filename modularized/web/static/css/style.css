@@ -235,3 +235,7 @@ button[type="submit"].btn-danger:hover {
 .icon-plus {
     color: green;
 }
+
+.icon-camera {
+    color: ghostwhite;
+}

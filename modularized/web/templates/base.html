@@ -42,7 +42,11 @@
                         class="ms-2 icon-warning text-warning" title="Second Compliance">
                         <i class="fa-solid fa-rotate-right"></i>
                     </a>
-
+                    {# Live video feed of camera; visible to all users but only accessible to those with video_feed permission #}
+                    <a href="{{ url_for('video_feed', camera_id=camera.camera_id) }}"
+                        class="ms-2 icon-camera" title="Live Video Feed">
+                        <i class="fa-solid fa-camera"></i>
+                    </a>
                     {# Admin buttons #}
                     {% if cam_management %}
                     {# Edit camera #}
