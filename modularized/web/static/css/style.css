@@ -102,10 +102,6 @@ button[type="submit"]:hover {
     background-color: #ffffff;
 }
 
-.card:hover {
-    transform: translateY(-4px);
-}
-
 .card-img-top {
     height: 180px;
     object-fit: cover;
@@ -188,6 +184,39 @@ button[type="submit"]:hover {
     padding: 8px 12px;
     border-radius: 6px;
     margin-bottom: 16px;
+}
+
+button[type="submit"].btn-primary {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+}
+
+button[type="submit"].btn-primary:hover {
+    background-color: #0b5ed7 !important;
+    border-color: #0a58ca !important;
+}
+
+button[type="submit"].btn-success {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+    color: white !important;
+}
+
+button[type="submit"].btn-success:hover {
+    background-color: #157347 !important;
+    border-color: #146c43 !important;
+}
+
+button[type="submit"].btn-danger {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+button[type="submit"].btn-danger:hover {
+    background-color: #c82333 !important;
+    border-color: #bd2130 !important;
 }
 
 /* Hide default right-side caret */
