@@ -22,7 +22,7 @@
             <select name="lab"
                     class="form-select rounded-pill"
                     onchange="this.form.submit()">
-                <option value="">-- Select Lab ---</option>
+                <option value="" {% if not lab_name %}selected{% endif %}>-- Select Lab ---</option>
                 {% for lab in all_labs %}
                     <option value="{{ lab }}" {% if lab == lab_name %}selected{% endif %}>
                         {{ lab }}

@@ -141,16 +141,46 @@ def login():
 @app.route('/', methods=["GET", "POST"])
 @login_required
 def index():
+    # Open DB connection to fetch valid labs and cameras
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Get all lab names
+    cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
+    all_labs = [row["lab_name"] for row in cursor.fetchall()]
+    default_lab = "E2-L6-016" if "E2-L6-016" in all_labs else (all_labs[0] if all_labs else None)
+
+    # Get lab from query or fallback.
     lab_name = request.args.get("lab")
+    if lab_name not in all_labs:
+        lab_name = default_lab
+
+    # Get all cameras in this lab
+    cursor.execute("""
+                   SELECT c.name
+                   FROM Camera c
+                            JOIN Lab l ON c.camera_lab_id = l.LabId
+                   WHERE l.lab_name = ?
+                   ORDER BY c.name
+                   """, (lab_name,))
+    all_cameras = [row["name"] for row in cursor.fetchall()]
+    default_camera = all_cameras[0] if all_cameras else None
+
+    # Get camera from query or fallback.
     camera_name = request.args.get("camera")
+    if camera_name not in all_cameras:
+        camera_name = default_camera
 
     # ✅ Store selected camera in session
     if camera_name:
-        session['selected_camera'] = {
-            'name': camera_name,
-            'lab': lab_name
+        session["selected_camera"] = {
+            "name": camera_name,
+            "lab": lab_name,
         }
-        print("✅ Selected camera stored in session:", session['selected_camera'])
+        print("✅ Selected camera stored in session:", session["selected_camera"])
+
+    conn.close()
 
     is_deleting_camera = request.args.get("delete", "0") == "1"
     is_adding_camera = request.args.get("add", "0") == "1"
@@ -205,7 +235,7 @@ def index():
 
             # Add camera into manager and start detection on newly inserted camera
             cm = CameraManager(DATABASE)
-            result = cm.add_new_camera(device_info["ip_address"], "101", True) 
+            result = cm.add_new_camera(device_info["ip_address"], "101", True)
             if not result:
                 flash("Error inserting camera into camera manager.", "danger")
                 return redirect(url_for("index"))
@@ -225,7 +255,7 @@ def index():
     if is_deleting_camera and camera_name and lab_name and cam_management:
         user_id = session.get("user_id")
         dao = CameraDAO(DATABASE)
-        
+
         # Retrieve camera id
         id_success, camera_id = dao.get_camera_id(lab_name, camera_name, user_id)
         if not id_success:
@@ -341,8 +371,50 @@ def second_compliance():
 
     # Redirect if either lab or camera not specified.
     if not lab_name or not camera_name:
-        flash("Lab and camera must be specified to view second incompliances.", "danger")
-        return redirect(url_for("index"))
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+
+            # Get first lab name (e.g., E2-L6-016)
+            cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name LIMIT 1")
+            first_lab = cursor.fetchone()
+            if first_lab:
+                lab_name = first_lab[0]
+            else:
+                lab_name = None
+
+            # Get first camera for the lab.
+            if lab_name:
+                cursor.execute("""
+                               SELECT c.name
+                               FROM Camera c
+                                        JOIN Lab l ON c.camera_lab_id = l.LabId
+                               WHERE l.lab_name = ?
+                               ORDER BY c.name
+                               LIMIT 1
+                               """, (lab_name,))
+
+                first_camera = cursor.fetchone()
+
+                if first_camera:
+                    camera_name = first_camera[0]
+                else:
+                    camera_name = None
+            else:
+                camera_name = None
+
+            conn.close()
+
+        except Exception:
+            flash("Error retrieving default lab and camera.", "danger")
+            return redirect(url_for("index"))
+
+        if lab_name and camera_name:
+            # Redirect with default parameters so page loads correctly.
+            return redirect(url_for("second_compliance", lab=lab_name, camera=camera_name))
+        else:
+            flash("No labs or cameras configured.", "danger")
+            return redirect(url_for("index"))
 
     # Default selected date to today or get from POST form.
     selected_date = request.form.get("date") or datetime.now().strftime('%Y-%m-%d')
@@ -364,12 +436,12 @@ def second_compliance():
 
         # Check user permission to view incompliances
         role = session.get("role")
-        if role is None or not check_permission(conn, role, "view_incompliances"):
+        if role is None or not check_permission(role, "view_incompliances"):
             flash("Permission denied to view incompliances.", "danger")
             return redirect(url_for("index"))
 
-        cam_management = check_permission(conn, role, "camera_management")
-        user_role_management = check_permission(conn, role, "user_role_management")
+        cam_management = check_permission(role, "camera_management")
+        user_role_management = check_permission(role, "user_role_management")
 
         # Fetch list of all labs for dropdown
         cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
@@ -611,7 +683,9 @@ def edit_camera(camera_id):
 
     cam_management = check_permission(session.get('role'), "camera_management")
     user_role_management = check_permission(session.get('role'), "user_role_management")
-    return render_template('edit_camera.html', camera=camera_data, cam_management=cam_management, user_role_management=user_role_management)
+    return render_template('edit_camera.html', camera=camera_data, cam_management=cam_management,
+                           user_role_management=user_role_management)
+
 
 @require_permission('camera_management')
 def apply_device_settings(camera_ip, settings):
@@ -669,6 +743,7 @@ def apply_device_settings(camera_ip, settings):
     except Exception as e:
         raise Exception(f"Failed to apply device settings to {camera_ip}: {str(e)}")
 
+
 @require_permission('camera_management')
 def apply_camera_settings(camera_id, settings):
     """Apply all camera settings to the physical camera"""
@@ -719,9 +794,9 @@ def apply_camera_settings(camera_id, settings):
     except Exception as e:
         raise Exception(f"Failed to apply camera settings: {str(e)}")
 
+
 @require_permission('camera_management')
 def apply_stream_settings(camera_ip, settings):
-
     """Apply stream settings to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
@@ -828,9 +903,9 @@ def apply_stream_settings(camera_ip, settings):
     except Exception as e:
         raise Exception(f"Failed to apply stream settings to {camera_ip}: {str(e)}")
 
+
 @require_permission('camera_management')
 def apply_network_settings(camera_ip, settings):
-
     """Apply network settings to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
@@ -933,9 +1008,9 @@ def apply_network_settings(camera_ip, settings):
     except Exception as e:
         raise Exception(f"Failed to apply network settings to {camera_ip}: {str(e)}")
 
+
 @require_permission('camera_management')
 def apply_time_settings(camera_ip, settings):
-
     """Apply time settings to camera"""
     try:
         from shared.camera_discovery import CameraDiscovery
@@ -1182,7 +1257,6 @@ def add_camera():
 @login_required
 @require_permission('user_role_management')
 def user_management():
-
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
@@ -1234,7 +1308,7 @@ def user_management():
 
             if (is_same_user):
                 return redirect(url_for('logout'))
-            
+
             flash("User deleted successfully.", "success")
 
 
@@ -1257,7 +1331,6 @@ def user_management():
 @login_required
 @require_permission('user_role_management')
 def role_management():
-
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
@@ -1272,7 +1345,7 @@ def role_management():
 
     if request.method == "POST":
         action = request.form.get("action")
-        
+
         # Add a new role
         if action == "add_role":
             new_role_name = request.form.get("role_name").lower()
@@ -1344,7 +1417,6 @@ def role_management():
 @login_required
 @require_permission('camera_management')
 def labs():
-
     role = session.get('role')
     if role is None:
         return redirect(url_for("index"))
@@ -1356,7 +1428,7 @@ def labs():
 
     if request.method == "POST":
         action = request.form.get("action")
-        
+
         if action == "add_lab":
             lab_name = request.form.get("lab_name")
             lab_safety_email = request.form.get("lab_safety_email")
@@ -1376,7 +1448,7 @@ def labs():
         elif action == "delete":
             lab_id = request.form.get("lab_id")
             success = dao.delete_lab(lab_id)
-            
+
             flash(f"Lab deleted succesfully.", "success") if success else flash(f"Error deleting lab.", "danger")
 
         elif action == "update":
@@ -1394,10 +1466,11 @@ def labs():
 
             success = dao.update_lab(new_lab_name, new_lab_email, lab_id)
 
-            flash(f"Lab details updated succesfully.", "success") if success else flash(f"Failed to update lab details.", "danger")
+            flash(f"Lab details updated succesfully.", "success") if success else flash(
+                f"Failed to update lab details.", "danger")
 
         return redirect(url_for("labs"))
-    
+
     all_lab_details = dao.get_all_labs()
 
     return render_template(
