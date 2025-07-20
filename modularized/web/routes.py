@@ -475,13 +475,12 @@ def second_compliance():
             query = """
                     SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
                     FROM Snapshot s
-                             JOIN (SELECT camera_id, object_detected, person_id, MIN(time_generated) AS first_time
+                             JOIN (SELECT object_detected, person_id, MIN(time_generated) AS first_time
                                    FROM Snapshot
                                    WHERE person_id IS NOT NULL
-                                   GROUP BY camera_id, object_detected, person_id
+                                   GROUP BY object_detected, person_id
                                    HAVING COUNT(*) > 1) repeats
-                                  ON s.camera_id = repeats.camera_id
-                                      AND s.object_detected = repeats.object_detected
+                                  ON s.object_detected = repeats.object_detected
                                       AND s.person_id = repeats.person_id
                     WHERE s.time_generated > repeats.first_time
                       AND EXISTS(SELECT 1
@@ -1230,7 +1229,7 @@ def add_camera():
         if not lab_result:
             conn.close()
             return jsonify({'success': False, 'message': f'Lab "{lab_name}" not found'})
-        
+
         lab_id = lab_result[0]
 
         # Get current user ID from session
