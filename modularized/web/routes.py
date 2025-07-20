@@ -475,13 +475,12 @@ def second_compliance():
             query = """
                     SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
                     FROM Snapshot s
-                             JOIN (SELECT object_detected, person_id, MIN(time_generated) AS first_time
+                             JOIN (SELECT person_id, MIN(time_generated) AS first_time
                                    FROM Snapshot
                                    WHERE person_id IS NOT NULL
-                                   GROUP BY object_detected, person_id
+                                   GROUP BY person_id
                                    HAVING COUNT(*) > 1) repeats
-                                  ON s.object_detected = repeats.object_detected
-                                      AND s.person_id = repeats.person_id
+                                  ON s.person_id = repeats.person_id
                     WHERE s.time_generated > repeats.first_time
                       AND EXISTS(SELECT 1
                                  FROM Camera c
