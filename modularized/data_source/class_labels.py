@@ -5,7 +5,7 @@ class ClassLabelRepository:
             39: "Bottle",
             40: "Wine Glass",
             41: "Cup",
-            46: "Fork",
+            46: "Banana",
             47: "Apple",
             48: "Sandwich",
             49: "Orange",
