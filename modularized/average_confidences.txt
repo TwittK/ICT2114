@@ -1,0 +1,5 @@
+Near - Average confidence for last 10 images: 0.81
+Medium - Average confidence for last 10 images: 0.61
+Far - Average confidence for last 10 images: 0.46
+
+
