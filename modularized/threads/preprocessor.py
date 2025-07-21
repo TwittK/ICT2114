@@ -11,6 +11,9 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
     pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
     last_cleared = datetime.min
 
+    confidences = []
+    count = 0
+
     while context.running.is_set():
         
         try:
@@ -58,6 +61,8 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
 
                     cls_id = int(box.cls.cpu())
                     confidence = float(box.conf.cpu())
+                    confidences.append(confidence)
+                    count += 1
                     coords = box.xyxy[0].cpu().numpy()
                     class_name = drink_model.names[cls_id]
                     print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
@@ -77,6 +82,15 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
                             confidence, # Confidence score
                             cls_id, # Class Id of detected object (refer to COCO dataset)
                         ]
+
+            # Save test results every 10 frames
+            if count % 10 == 0:
+                avg_conf = sum(confidences[-10:]) / 10
+                distance = getattr(context, "distance_label", "unknown")
+                output = f"{distance.capitalize()} - Average confidence for last 10 images: {avg_conf:.2f}\n"
+                print(output.strip())
+                with open("average_confidences.txt", "a") as f:
+                    f.write(output)            
 
             pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[
                 0

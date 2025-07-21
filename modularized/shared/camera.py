@@ -3,7 +3,7 @@ import queue
 from shared.camera_manager import CameraManager
 
 class Camera:
-  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager: CameraManager):
+  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager: CameraManager, use_image_folder=False, image_folder=None, distance_label=None):
 
     # Store Camera details
     self.camera_id = camera_id
@@ -11,6 +11,9 @@ class Camera:
     self.channel = channel
     self.use_ip_camera = use_ip_camera
     self.manager = manager
+    self.use_image_folder = use_image_folder
+    self.image_folder = image_folder
+    self.distance_label = distance_label
 
     self.frame_queue = queue.Queue(maxsize=10)
     self.save_queue = queue.Queue(maxsize=10)

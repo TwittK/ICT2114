@@ -2,6 +2,7 @@
 import cv2
 import time
 from shared.camera import Camera
+import os
 
 
 # def read_frames(context: Camera):
@@ -42,6 +43,31 @@ from shared.camera import Camera
 #     print("IP camera connection closed")
 
 def read_frames(context: Camera):
+
+    # Statement to check if image file for testing is used
+    if getattr(context, "use_image_folder", False):
+        image_folder = getattr(context, "image_folder", None)
+        if image_folder and os.path.isdir(image_folder):
+            image_files = sorted([
+                os.path.join(image_folder, f)
+                for f in os.listdir(image_folder)
+                if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+            ])
+            idx = 0
+            while context.running.is_set():
+                img_path = image_files[idx % len(image_files)]
+                frame = cv2.imread(img_path)
+                if frame is not None and not context.frame_queue.full():
+                    context.frame_queue.put(frame)
+                    print(f"🖼️ Loaded test image: {img_path}")
+                    idx += 1
+                time.sleep(0.03)  # ~30 FPS, adjust as needed
+        else:
+            print("❌ Image folder not specified or does not exist.")
+        while context.running.is_set():
+            time.sleep(0.1)
+        return
+
     max_retries = 30  # Maximum reconnection attempts
     retry_delay = 1.0  # Initial delay between retries
     max_delay = 10.0   # Maximum delay between retries
@@ -63,7 +89,7 @@ def read_frames(context: Camera):
 
         print(f"✅ Successfully connected to IP camera: {context.ip_address}")
     else:
-        context.cap = cv2.VideoCapture(0)  # to test with webcam
+        context.cap = cv2.VideoCapture(1)  # to test with webcam
 
     consecutive_failures = 0
     current_delay = retry_delay
