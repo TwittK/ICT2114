@@ -297,5 +297,19 @@ def get_all_users():
 
     return [dict(row) for row in users]
 
+def get_lab_safety_email_by_camera_id(camera_id):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
 
+    cursor.execute('''
+        SELECT Lab.lab_safety_email
+        FROM Camera
+        JOIN Lab ON Camera.camera_lab_id = Lab.LabId
+        WHERE Camera.ROWID = ?
+    ''', (camera_id,))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result else None
 

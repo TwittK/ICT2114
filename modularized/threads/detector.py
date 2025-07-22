@@ -8,11 +8,11 @@ from threads.emailservice import EmailService
 from threads.nvr import NVR
 from threads.process_incompliance import ProcessIncompliance
 from shared.camera import Camera
+from database import get_lab_safety_email_by_camera_id
 
 # Constants
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 3  # Number of detections in that duration
-FACE_DISTANCE_THRESHOLD = 10
 DATABASE = 'users.sqlite'
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
@@ -173,7 +173,11 @@ def detection(context: Camera):
                     continue
 
                 try:
-                    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    # Mock next day
+                    mocked_date = datetime(2025,7,23)
+                    current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     today = current_date[:10]
 
                     # Facial Recognition
@@ -196,8 +200,10 @@ def detection(context: Camera):
                             save_img(context, frame, str(person_id), today)
                 
                             # Send Email for Second Incompliance Detected
-                            email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
-                            
+                            lab_email = get_lab_safety_email_by_camera_id(context.camera_id)
+                            if lab_email:
+                                email_service.send_incompliance_email(lab_email, f"Person {person_id}")
+
                             print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
                             
                         # Incompliance on the same date
@@ -218,7 +224,11 @@ def detection(context: Camera):
                         # Save frame locally in new folder
                         os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
                         save_img(context, frame, str(person_id), today)
-                        
+
+                        lab_email = get_lab_safety_email_by_camera_id(context.camera_id)
+                        if lab_email:
+                            email_service.send_incompliance_email(lab_email, f"Person {person_id}")
+                            
                         print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
                         # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
