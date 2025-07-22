@@ -10,8 +10,6 @@ from threads.process_incompliance import ProcessIncompliance
 from shared.camera import Camera
 
 # Constants
-NOSE_THRESHOLD = 300  # Distance thresholds
-WRIST_THRESHOLD = 170
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 3  # Number of detections in that duration
 FACE_DISTANCE_THRESHOLD = 10
@@ -134,9 +132,20 @@ def detection(context: Camera):
                 dist_nose_to_box = get_dist_nose_to_box(p, food_drinks_bbox)
                 dist = min(np.linalg.norm(p["left_wrist"] - food_drinks_center), np.linalg.norm(p["right_wrist"] - food_drinks_center))
 
-                if dist > WRIST_THRESHOLD or dist_nose_to_box > NOSE_THRESHOLD:
-                    continue
+                # Distance thresholds
+                NOSE_THRESHOLD = abs(y1 - y2) * 1.1
+                DRINKING_THRESHOLD = abs(y1 - y2) * 0.3
+                WRIST_THRESHOLD = abs(y1 - y2) * 0.5
 
+                # Check if drinking
+                if dist_nose_to_box > DRINKING_THRESHOLD:
+                    # Not drinking, check if holding
+                    if dist > WRIST_THRESHOLD or dist_nose_to_box > NOSE_THRESHOLD:
+                        # Not holding, skip
+                        continue
+ 
+                print(f"💬DRINKING OR MOST LIKELY OWNER")
+                # continue
                 now = time.time()
 
                 # Track wrist proximity times
