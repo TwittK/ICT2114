@@ -133,9 +133,9 @@ def detection(context: Camera):
                 dist = min(np.linalg.norm(p["left_wrist"] - food_drinks_center), np.linalg.norm(p["right_wrist"] - food_drinks_center))
 
                 # Distance thresholds
-                NOSE_THRESHOLD = abs(y1 - y2) * 1.1 #previously 300 
+                NOSE_THRESHOLD = abs(y1 - y2) * 1.1
                 DRINKING_THRESHOLD = abs(y1 - y2) * 0.3
-                WRIST_THRESHOLD = abs(y1 - y2) * 0.5 #previously 170
+                WRIST_THRESHOLD = abs(y1 - y2) * 0.5
 
                 # Check if drinking
                 if dist_nose_to_box > DRINKING_THRESHOLD:
@@ -144,8 +144,8 @@ def detection(context: Camera):
                         # Not holding, skip
                         continue
  
-                print(f"💬DRINKING OR MOST LIKELY OWNER: {DRINKING_THRESHOLD}, {WRIST_THRESHOLD}, {NOSE_THRESHOLD}")
-                continue
+                print(f"💬DRINKING OR MOST LIKELY OWNER")
+                # continue
                 now = time.time()
 
                 # Track wrist proximity times
