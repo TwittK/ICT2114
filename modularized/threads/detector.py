@@ -125,7 +125,7 @@ def detection(context: Camera):
                 area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
                 area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
                 area_check = area_food_drinks >= area_head * 4 or area_food_drinks < area_head * 0.1
-                height_check = abs(y1 - y2) >= abs(fy1 - fy2) * 3 or abs(y1 - y2) < abs(fy1 - fy2) * 0.25
+                height_check = abs(y1 - y2) >= abs(fy1 - fy2) * 2.85 or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
                 if (area_check or height_check):
                     print("🔶Food/ drink not at the same depth as person, ignoring.")
                     continue
