@@ -2,4 +2,13 @@ Near - Average confidence for last 10 images: 0.81
 Medium - Average confidence for last 10 images: 0.61
 Far - Average confidence for last 10 images: 0.46
 
-
+1 tile away - 0.80
+2 - 0.80
+3 - 0.76
+4 - 0.74
+5 - 0.67
+6 - 0.55
+7 - 0.52
+8 - 0.48
+9 - 0.48
+10 - 0.53

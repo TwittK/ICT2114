@@ -86,8 +86,9 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
             # Save test results every 10 frames
             if count % 10 == 0:
                 avg_conf = sum(confidences[-10:]) / 10
-                distance = getattr(context, "distance_label", "unknown")
-                output = f"{distance.capitalize()} - Average confidence for last 10 images: {avg_conf:.2f}\n"
+                # distance = getattr(context, "distance_label", "unknown")
+                # output = f"{distance.capitalize()} - Average confidence for last 10 images: {avg_conf:.2f}\n"
+                output = f"Average confidence for last 10 images: {avg_conf:.2f}\n"
                 print(output.strip())
                 with open("average_confidences.txt", "a") as f:
                     f.write(output)            
