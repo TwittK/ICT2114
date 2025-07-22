@@ -120,12 +120,14 @@ def detection(context: Camera):
                     print("Food/ drink is above the nose, ignoring.")
                     continue
 
-                # If area of food/ drink is more than 4 times the area of head, head is likely to be further away so ignore
-                # If area of food/ drink is less than 10% of the area of head, food/ drink is likely to be further away so ignore
+                # If height of food/ drink is a lot larger than height head, person is likely to be further away so ignore
+                # If height of food/ drink is a lot smaller than height of head, food/ drink is likely to be further away so ignore
                 area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
                 area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
-                if (area_food_drinks >= area_head * 4 or area_food_drinks < area_head * 0.1):
-                    print("Food/ drink not at the same depth as person, ignoring.")
+                area_check = area_food_drinks >= area_head * 4 or area_food_drinks < area_head * 0.1
+                height_check = abs(y1 - y2) >= abs(fy1 - fy2) * 3 or abs(y1 - y2) < abs(fy1 - fy2) * 0.25
+                if (area_check or height_check):
+                    print("🔶Food/ drink not at the same depth as person, ignoring.")
                     continue
                 
                 # Filter out poses that are too far away
@@ -143,7 +145,7 @@ def detection(context: Camera):
                     if dist > wrist_threshold or dist_nose_to_box > nose_threshold:
                         # Not holding, skip
                         continue
- 
+
                 now = time.time()
 
                 # Track wrist proximity times
