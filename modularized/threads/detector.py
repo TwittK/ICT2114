@@ -144,8 +144,6 @@ def detection(context: Camera):
                         # Not holding, skip
                         continue
  
-                print(f"💬DRINKING OR MOST LIKELY OWNER")
-                # continue
                 now = time.time()
 
                 # Track wrist proximity times
