@@ -1,8 +1,6 @@
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import sqlite_vec
-
 
 DATABASE = 'users.sqlite'
 
@@ -11,12 +9,6 @@ def init_database():
     cursor = conn.cursor()
 
     conn.execute("PRAGMA foreign_keys = ON;")
-    conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
-
-    sqlite_version, vec_version = conn.execute("select sqlite_version(), vec_version()").fetchone()
-    print(f"sqlite_version={sqlite_version}, vec_version={vec_version}")
 
     # Read and execute the SQL file
     with open('init_db.sql', 'r') as sql_file:
