@@ -133,14 +133,14 @@ def detection(context: Camera):
                 dist = min(np.linalg.norm(p["left_wrist"] - food_drinks_center), np.linalg.norm(p["right_wrist"] - food_drinks_center))
 
                 # Distance thresholds
-                NOSE_THRESHOLD = abs(y1 - y2) * 1.1
-                DRINKING_THRESHOLD = abs(y1 - y2) * 0.3
-                WRIST_THRESHOLD = abs(y1 - y2) * 0.5
+                nose_threshold = abs(y1 - y2) * 1.1
+                consumption_threshold = abs(y1 - y2) * 0.3
+                wrist_threshold = abs(y1 - y2) * 0.5
 
                 # Check if drinking
-                if dist_nose_to_box > DRINKING_THRESHOLD:
+                if dist_nose_to_box > consumption_threshold:
                     # Not drinking, check if holding
-                    if dist > WRIST_THRESHOLD or dist_nose_to_box > NOSE_THRESHOLD:
+                    if dist > wrist_threshold or dist_nose_to_box > nose_threshold:
                         # Not holding, skip
                         continue
  
