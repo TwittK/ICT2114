@@ -224,10 +224,6 @@ def detection(context: Camera):
                         # Save frame locally in new folder
                         os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
                         save_img(context, frame, str(person_id), today)
-
-                        lab_email = get_lab_safety_email_by_camera_id(context.camera_id)
-                        if lab_email:
-                            email_service.send_incompliance_email(lab_email, f"Person {person_id}")
                             
                         print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances

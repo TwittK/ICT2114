@@ -132,12 +132,12 @@ def create_default_labs_and_cameras():
 
     conn.close()
 
-    if lab_count == 0:
-        create_lab("E2-L6-016", "labsafety@gmail.com")
-        create_lab("E2-L6-017", "labsafety@Fgmail.com")
+    # if lab_count == 0:
+    #     create_lab("E2-L6-016", "labsafety@gmail.com")
+    #     create_lab("E2-L6-017", "labsafety@Fgmail.com")
 
-    if camera_count == 0:
-        create_camera("Camera 1", 1, 1, ip_address="192.168.1.64")
+    # if camera_count == 0:
+        # create_camera("Camera 1", 1, 1, ip_address="192.168.1.64")
         # create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
         # Use auto-discovery instead of hardcoded cameras
         # auto_discover_cameras()
