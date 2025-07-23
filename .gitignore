@@ -10,3 +10,4 @@ database
 /modularized/web/static/faces/
 /modularized/web/static/incompliances/
 /modularized/users.sqlite
+/modularized/*.log
