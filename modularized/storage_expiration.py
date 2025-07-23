@@ -6,11 +6,12 @@ from requests.auth import HTTPDigestAuth
 import logging
 
 class StorageExpiration:
-    def __init__(self, db_path, fdid, username, password):
+    def __init__(self, db_path, fdid, username, password, nvr_ip):
         self.db_path = db_path
         self.fdid = fdid
         self.username = username
         self.password = password
+        self.nvr_ip = nvr_ip
 
         logging.basicConfig(
             filename='storage_expiration.log',
@@ -87,7 +88,7 @@ class StorageExpiration:
         logging.info("[END] Database connection closed.")
 
 
-expiration_routine = StorageExpiration('users.sqlite', "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
+expiration_routine = StorageExpiration('users.sqlite', "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345", "192.168.1.63")
 expiration_routine.open()
 expiration_routine.delete_expired()
 expiration_routine.close()
