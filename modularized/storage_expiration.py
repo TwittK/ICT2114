@@ -36,7 +36,7 @@ class StorageExpiration:
         try:
             response = requests.delete(url, auth=HTTPDigestAuth(self.username, self.password))
 
-            if (response.status == 200):
+            if (response.status_code == 200):
                 logging.info(f"Successfully deleted face from NVR: {pid}")
                 return True
             
@@ -62,11 +62,11 @@ class StorageExpiration:
                 self.nvr_delete_face(snapshot_id)
 
                 # Delete locally saved images
-                if image_url and os.path.exists(image_url):
-                    os.remove(image_url)
-                    logging.info(f"Deleted image: {image_url}")
+                if image_url and os.path.exists(os.path.join("web", "static", image_url)):
+                    os.remove(os.path.join("web", "static", image_url))
+                    logging.info(f"Deleted image: {os.path.join("web", "static", image_url)}")
                 else:
-                    logging.warning(f"Image not found: {image_url}")
+                    logging.warning(f"Image not found: {os.path.join("web", "static", image_url)}")
 
                 # Delete from snapshot table
                 self.cursor.execute("DELETE FROM Snapshot WHERE DetectionId = ?", (detection_id,))

@@ -108,7 +108,7 @@ def auto_discover_cameras():
     # Option 1: Scan specific IP addresses
     known_camera_ips = [
         "192.168.1.64",
-        "192.168.1.65"
+        #"192.168.1.65"
     ]
     
     discovery.auto_populate_database(known_camera_ips, lab_name="E2-L6-016", user_id=1)
