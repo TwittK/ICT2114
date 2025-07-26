@@ -3,12 +3,14 @@ from datetime import datetime, timedelta
 import cv2 as cv
 from ultralytics import YOLO
 from shared.camera import Camera
+from detector import safe_crop
 
 # Display annotated frames on dashboard
 def preprocess(context: Camera, target_classes_id, conf_threshold):
     
     drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
     pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
+    classif_model = YOLO(os.path.join("yolo_models", "yolov8n-cls.pt"))
     last_cleared = datetime.min
 
     while context.running.is_set():
@@ -68,6 +70,19 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
                     cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
                     if (track_id not in context.flagged_foodbev):
+
+                        # Check if it's a water bottle or not
+                        object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
+                        results = classif_model(object_crop, verbose=False)
+                        pred = results[0]
+                        label = pred.names[pred.probs.top1]
+                        print(f"Checking if water bottle... {label}")
+
+                        # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
+                        if label == "water_bottle" or label == "milk_can":
+                            print("🚫 Water bottle, skipping")
+                            continue
+
                         context.detected_incompliance[track_id] = [
                             coords, # Coordinates of bbox
                             (
@@ -77,6 +92,8 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
                             confidence, # Confidence score
                             cls_id, # Class Id of detected object (refer to COCO dataset)
                         ]
+
+
 
             pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[
                 0
