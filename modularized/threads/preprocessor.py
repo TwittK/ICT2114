@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import cv2 as cv
 from ultralytics import YOLO
 from shared.camera import Camera
-from detector import safe_crop
+from threads.detector import safe_crop
 
 # Display annotated frames on dashboard
 def preprocess(context: Camera, target_classes_id, conf_threshold):
