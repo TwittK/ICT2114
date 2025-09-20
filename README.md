@@ -1,12 +1,15 @@
 # ICT2114
 
 ## Linux Ubuntu
+
 ### Create Python Virtual Environment
+
 ```bash
 python3 -m venv .venv
 ```
 
 ### Activate and Deactivate the environment
+
 ```bash
 source .venv/bin/activate
 deactivate
@@ -24,9 +27,8 @@ pip install -r ./modularized/requirements.txt
 Create an environment
 
 ```bat
-py -3.10 -m venv .venv
+python -m venv .venv
 ```
-
 
 Activate the environment
 
