@@ -58,7 +58,17 @@ class PoseDetectionModel(BaseModel):
     return self.conf_threshold
   
   def predict(self, frame):
-    pose_results = self.model_instance.predict(frame, self.conf_threshold, self.iou, verbose=False)[0]
+    pose_results = self.model_instance.predict(frame, conf=self.conf_threshold, iou=self.iou, verbose=False)[0]
     keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
 
     return keypoints
+  
+class ImageClassificationModel(BaseModel):
+  def __init__(self, model_name):
+    super().__init__(model_name)
+
+    self.model_instance = YOLO(os.path.join("yolo_models", self.model_name))
+
+  def classify(self, frame):
+    return self.get_model_instance(frame, verbose=False)
+
