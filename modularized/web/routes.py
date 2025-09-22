@@ -235,7 +235,7 @@ def index():
 
             # Add camera into manager and start detection on newly inserted camera
             cm = CameraManager(DATABASE)
-            result = cm.add_new_camera(device_info["ip_address"], "101", True)
+            result = cm.add_new_camera(camera_id, device_info["ip_address"], True)
             if not result:
                 flash("Error inserting camera into camera manager.", "danger")
                 return redirect(url_for("index"))
@@ -1271,7 +1271,7 @@ def add_camera():
         # except RuntimeError:
         #     # If no instance exists, create one with db_path
         #     manager = CameraManager(DATABASE)
-        manager.add_new_camera(camera_id, camera_ip, "101", True)
+        manager.add_new_camera(camera_id, camera_ip, True)
 
         print(f"✅ Camera {camera_ip} added to camera manager")
 
