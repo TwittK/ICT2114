@@ -1,11 +1,12 @@
 import cv2 as cv
 import sqlite3
+import psycopg2
 
 class ProcessIncompliance:
-  def __init__(self, db_path, camera_id):
-    self.db_path = db_path
+  def __init__(self, db_params, camera_id):
+    self.db_params = db_params
     self.camera_id = camera_id
-    self.db = sqlite3.connect(self.db_path)
+    self.db = psycopg2.connect(**self.db_params)
 
   def get_date(self, current_date):
     return current_date[:10]
@@ -14,8 +15,15 @@ class ProcessIncompliance:
   def match_found_new_incompliance(self, matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
 
     # Get the matching person_id and the last incompliance date
-    query = """ SELECT p.PersonId, p.last_incompliance FROM Snapshot AS s JOIN Person p ON s.person_id = p.PersonId WHERE s.snapshotId = ?;"""
-    cursor = self.db.execute(query, (matches_found[1],))
+    query = """ 
+      SELECT p.PersonId, p.last_incompliance 
+      FROM Snapshot AS s 
+      JOIN Person p ON s.person_id = p.PersonId 
+      WHERE s.snapshotId = %s;
+    """
+    # cursor = self.db.execute(query, (matches_found[1],))
+    cursor = self.db.cursor()
+    cursor.execute(query, (matches_found[1],))
     result = cursor.fetchone()
 
     if result:
@@ -31,11 +39,18 @@ class ProcessIncompliance:
 
         if snapshot_id:
           print("[FACE] 🔴 Inserted face into library")
-          update_query = """ UPDATE Person SET last_incompliance = ?, incompliance_count = incompliance_count + 1 WHERE PersonId = ?; """
-          self.db.execute(update_query, (current_date, person_id),)
+          update_query = """ 
+            UPDATE Person 
+            SET last_incompliance = %s, incompliance_count = incompliance_count + 1 
+            WHERE PersonId = %s;
+          """
+          cursor.execute(update_query, (current_date, person_id))
 
-          snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?)"""
-          self.db.execute(
+          snapshot_query = """ 
+            INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s);
+          """
+          cursor.execute(
             snapshot_query,
             (
               snapshot_id,  # snapshot_id = PID from NVR (1 PID for every unique image)
@@ -62,8 +77,13 @@ class ProcessIncompliance:
     today = self.get_date(current_date)
 
     # Insert new record of a person into the database
-    query = " INSERT INTO Person (last_incompliance, incompliance_count) VALUES (?, 1) RETURNING PersonId; "
-    cursor = self.db.execute(query, (current_date,))
+    query = """ 
+      INSERT INTO Person (last_incompliance, incompliance_count) 
+      VALUES (%s, 1) 
+      RETURNING PersonId;
+    """
+    cursor = self.db.cursor()
+    cursor.execute(query, (current_date,))
     person_id = cursor.fetchone()[0]
 
     # Save face into NVR face library
@@ -73,8 +93,11 @@ class ProcessIncompliance:
     # Save incompliance snapshot and record details in database
     if snapshot_id:
       print("[FACE] 🔴 Inserted face into library")
-      snapshot_query = """ INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) VALUES (?, ?, ?, ?, ?, ?, ?);"""
-      self.db.execute(
+      snapshot_query = """ 
+        INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected, imageURL, person_id, camera_id) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s);
+      """
+      cursor.execute(
         snapshot_query,
         (
           snapshot_id,
