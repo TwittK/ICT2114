@@ -11,7 +11,7 @@ from shared.camera import Camera
 from database import get_lab_safety_email_by_camera_id
 
 # Constants
-REQUIRED_DURATION = 2.0  # seconds
+REQUIRED_DURATION = 3.0  # seconds
 REQUIRED_COUNT = 3  # Number of detections in that duration
 DATABASE = 'users.sqlite'
 

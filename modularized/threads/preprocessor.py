@@ -2,16 +2,29 @@ import queue, os
 from datetime import datetime, timedelta
 import cv2 as cv
 from ultralytics import YOLO
+from ultralytics.utils import ThreadingLocked
 from shared.camera import Camera
+from threads.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
+from threads.collaborative_inference import CollaborativeInference
 from threads.detector import safe_crop
 
-# Display annotated frames on dashboard
+
+# YOLO model food/ drinks detection, pose and water bottle detection.
 def preprocess(context: Camera, target_classes_id, conf_threshold):
-    
-    drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
-    pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
-    classif_model = YOLO(os.path.join("yolo_models", "yolov8n-cls.pt"))
+
+    # TODO: see if @ThreadingLocked() can be used to save memory (but reduce concurrency)
+    models = [
+        ObjectDetectionModel("yolo11n.pt", target_classes_id, conf_threshold),
+        ObjectDetectionModel("yolov8n.pt", target_classes_id, conf_threshold),
+        ObjectDetectionModel("yolov8m.pt", target_classes_id, conf_threshold),
+    ]
+
+    pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.80, 0.4)
+    classif_model = ImageClassificationModel("yolov8n-cls.pt")
     last_cleared = datetime.min
+    
+    min_votes = len(models) // 2 + 1
+    collab_inference = CollaborativeInference(context, models, min_votes)
 
     while context.running.is_set():
         
@@ -24,80 +37,76 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
         if frame is None or frame.size == 0:
             continue
 
-        # perform image processing here
-        frame_copy = (
-            frame.copy()
-        )  # copy frame for drawing bounding boxes, ids and conf scores.
+        # Copy frame for drawing bounding boxes, ids and confidence scores on video feed display.
+        frame_copy = frame.copy() 
+        
 
-        # Drink detection
-        result = drink_model.track(
-            frame,
-            persist=True,
-            classes=target_classes_id,
-            conf=conf_threshold,
-            verbose=False,
-        )
-        drink_boxes = result[0].boxes
+        # Collaborative Inference with list of models.
+        collab_inf_results = collab_inference.collaborative_inference(frame)
 
         with context.detected_incompliance_lock:
             context.detected_incompliance.clear()
 
-        if drink_boxes and len(drink_boxes) >= 1:
-            # or (food_boxes and len(food_boxes) >= 1)):
 
-            if datetime.now() - last_cleared >= timedelta(hours=2): # Clear flagged ids every 2 hours
+        if (collab_inf_results):
+
+            # Periodically clear flagged ids every 2 hours.
+            if datetime.now() - last_cleared >= timedelta(hours=2):
                 with context.flagged_foodbev_lock:
                     context.flagged_foodbev.clear()
                 last_cleared = datetime.now()
 
-            # object detection pipeline
+
             with context.detected_incompliance_lock:
-                # Process drinks
-                for box in drink_boxes:
-                    track_id = int(box.id) if box.id is not None else None
-                    if (track_id is None):
-                        continue
 
-                    cls_id = int(box.cls.cpu())
-                    confidence = float(box.conf.cpu())
-                    coords = box.xyxy[0].cpu().numpy()
-                    # class_name = drink_model.names[cls_id]
-                    # print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
+                # Match the same objects across model results and filter out those with confidence less than a certain threshold.
+                matched_filtered, filtered_confidence, filtered_boxes = collab_inference.process_inference_results(frame_copy, collab_inf_results, 0.5)
 
-                    x1, y1, x2, y2 = map(int, coords)
+                # No detections with more than 50% confidence
+                if not matched_filtered:
+                    continue
 
-                    cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                    cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                # Print out all track IDs
+                for i, object_group in enumerate(matched_filtered):
 
-                    if (track_id not in context.flagged_foodbev):
+                    # print(f"Confidence for object {i}: {filtered_confidence[i]}")
 
-                        # Check if it's a water bottle or not
-                        object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
-                        results = classif_model(object_crop, verbose=False)
-                        pred = results[0]
-                        label = pred.names[pred.probs.top1]
+                    for object in object_group:
+                        track_id = object.id
 
-                        # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
-                        if label == "water_bottle" or label == "milk_can":
-                            print("🚫 Water bottle, skipping")
+                        if track_id is None:
                             continue
 
-                        context.detected_incompliance[track_id] = [
-                            coords, # Coordinates of bbox
+                        # print(f"Track ID: {track_id.item()}")
+
+                # TODO: Pass crops of detected objects into classification model to filter out water bottles
+
+
+        #             if (track_id not in context.flagged_foodbev):
+
+        #                 # Check if it's a water bottle or not
+        #                 object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
+        #                 results = classif_model(object_crop, verbose=False)
+        #                 pred = results[0]
+        #                 label = pred.names[pred.probs.top1]
+
+        #                 # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
+        #                 if label == "water_bottle" or label == "milk_can":
+        #                     print("🚫 Water bottle, skipping")
+        #                     continue
+
+                        context.detected_incompliance[track_id.item()] = [
+                            filtered_boxes[i], # Coordinates of bbox
                             (
-                                (coords[0] + coords[2]) // 2, # Center of bbox
-                                (coords[1] + coords[3]) // 2,
+                                (filtered_boxes[i][0] + filtered_boxes[i][2]) // 2, # Center of bbox
+                                (filtered_boxes[i][1] + filtered_boxes[i][3]) // 2,
                             ),
-                            confidence, # Confidence score
-                            cls_id, # Class Id of detected object (refer to COCO dataset)
+                            filtered_confidence[i], # Confidence score
+                            object.cls.item(), # Class Id of detected object (refer to COCO dataset)
                         ]
+                        # print(context.detected_incompliance[track_id])
 
-
-
-            pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[
-                0
-            ]
-            keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
+            keypoints = pose_model.predict(frame)
             with context.pose_points_lock:
                 context.pose_points.clear()
 
