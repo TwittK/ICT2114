@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threads.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
-
+SENTINEL = object()
 
 class CameraManager:
   _instance = None
@@ -66,42 +66,59 @@ class CameraManager:
 
     while True:
       try:
-        camera, frame = self.preprocess_queue.get(timeout=2)
+        item = self.preprocess_queue.get(timeout=2)
+        if item is SENTINEL:
+          break
+
+        camera, frame = item
         processed_frame = preprocess(camera, frame, models, pose_model, classif_model)
         self.detection_queue.put((camera, processed_frame))
-      except Exception:
+      except queue.Empty:
         continue
 
   def _detection_worker(self):
     from threads.detector import detection
     while True:
       try:
-        camera, processed_frame = self.detection_queue.get(timeout=2)
+        item = self.detection_queue.get(timeout=2)
+        if item is SENTINEL:
+          break
+
+        camera, processed_frame = item
         detection(camera, processed_frame)
-      except Exception:
+      except queue.Empty:
         continue
 
   def shutdown_all_cameras(self):
     """
     Gracefully shuts down all active cameras in the camera pool.
-    Ensures that all camera threads are properly terminated.
-
-    For each camera, this method:
-    - Clears the 'running' event to stop detection.
-    - Join all associated threads.
+    Ensures that all camera and worker threads are properly terminated.
     """
 
+    # Stop all camera threads.
     for camera_id, camera_info in self.camera_pool.items():
-      # Stop functions in threads.
       camera = camera_info.get("camera")
       if camera:
         camera.running.clear()
 
-      # Stop all threads of camera.
       threads = camera_info.get("threads", {})
       for thread_name, thread in threads.items():
         thread.join(timeout=2)
         print(f"[INFO] Thread '{thread_name}' for camera {camera_id} joined.")
+
+    self.camera_pool.clear()
+
+    # Stop worker threads via sentinel
+    for _ in range(self.preprocess_pool._max_workers):
+      self.preprocess_queue.put(SENTINEL)
+    for _ in range(self.detection_pool._max_workers):
+      self.detection_queue.put(SENTINEL)
+
+    # Shutdown thread pools
+    self.preprocess_pool.shutdown(wait=True)
+    self.detection_pool.shutdown(wait=True)
+
+    print("[INFO] All worker and camera threads shut down successfully.")
 
   def remove_camera(self, camera_id):
     """

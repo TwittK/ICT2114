@@ -3,45 +3,31 @@ import cv2
 import time
 from shared.camera import Camera
 
-
-# def read_frames(context: Camera):
-
-#     if context.use_ip_camera:
-#         # Camera config
-#         username = "admin"
-#         password = "Sit12345"
-#         # last digit of channel: Use 1 for main stream (better qual, but more bandwidth), 2 for sub stream
-#         # rtsp_url = f"rtsp://{username}:{password}@{context.camera_ip}/Streaming/Channels/{context.channel}"
-#         rtsp_url = f"rtsp://{username}:{password}@{context.ip_address}/Streaming/Channels/{context.channel}"
-
-#         # Initialize IP camera instead of webcam
-#         context.cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-
-#         # Check if camera connection is successful
-#         if not (context.cap).isOpened():
-#             print("Failed to connect to the RTSP stream.")
-#             print(f"Attempted URL: {rtsp_url}")
-#             return
-
-#         print(f"✅ Successfully connected to IP camera: {context.ip_address}")
-#     else:
-#         context.cap = cv2.VideoCapture(0)  # to test with webcam
-
-#     while context.running:
-#         ret, frame = (context.cap).read()
-#         if not ret:
-#             print("Failed to read frame from IP camera")
-#             time.sleep(0.1)  # Wait a bit before retrying
-#             continue
-
-#         if not (context.frame_queue).full():
-#             (context.frame_queue).put(frame)
-#         time.sleep(0.01)
-
-#     (context.cap).release()
-#     print("IP camera connection closed")
-
 def read_frames(context: Camera):
+    """
+    Continuously reads frames from a camera source (IP camera or local webcam) and enqueues them for preprocessing.
+
+    Implements reconnection logic with exponential backoff for IP cameras when frame reading fails repeatedly.
+
+    Parameters:
+        context (Camera): A Camera object containing camera configuration and state, including:
+            - use_ip_camera (bool): Whether to use an IP camera (True) or local webcam (False, for testing only).
+            - ip_address (str): IP address of the IP camera.
+            - channel (str): Channel for the IP camera.
+            - running (threading.Event): Event flag controlling the reading loop.
+            - cap (cv2.VideoCapture): OpenCV video capture object.
+            - manager (CameraManager): Reference to the central manager, to access shared queues.
+            - frame_queue (queue.Queue): Local queue for buffering frames.
+    
+    Behavior:
+        - Opens video capture based on whether IP camera or webcam is used.
+        - Reads frames in a loop while the `running` event is set.
+        - On frame read failure, counts consecutive failures.
+        - For IP cameras, attempts to reconnect after multiple failures with exponential backoff.
+        - Successfully read frames are put into the preprocessing queue of the manager.
+        - Releases video capture on termination.
+
+    """
     max_retries = 30  # Maximum reconnection attempts
     retry_delay = 1.0  # Initial delay between retries
     max_delay = 10.0   # Maximum delay between retries

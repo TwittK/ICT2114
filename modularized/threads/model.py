@@ -4,15 +4,12 @@ import os
 class BaseModel:
   """
   Base class for all model types.
-  
-  Attributes:
-    model_name (str): Name or path of the YOLO model file. (.pt file)
   """
   def __init__(self, model_name):
     """
     Initializes the BaseModel with the given model name.
     
-    Args:
+    Parameters:
       model_name (str): Name (not the path) of model file. (.pt file)
     """
     self.model_name = model_name

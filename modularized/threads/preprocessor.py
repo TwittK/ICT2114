@@ -119,5 +119,6 @@ def preprocess(context: Camera, frame, models, pose_model, classif_model):
         if context.pose_points and context.detected_incompliance:
             return frame
         
+        # No detections found
         return None
 

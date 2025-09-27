@@ -160,14 +160,6 @@ class CollaborativeInference:
     return filtered, filtered_confidence, filtered_boxes
   
   def collaborative_inference(self, frame):
-    """
-    Parameters:
-        gpu_ids: list of GPU device IDs, e.g. [0, 1, 2]
-
-    Returns:
-        
-    """
-
     model_results = []
     with ThreadPoolExecutor(max_workers=len(self.model_list)) as executor:
       futures = []
@@ -180,8 +172,6 @@ class CollaborativeInference:
         # Add to results if theres at least 1 element in the tensor (one detection found)
         if future.result().cls.numel() > 0:
           model_results.append(future.result())
-
-    # print(len(model_results))
 
     return model_results
   
