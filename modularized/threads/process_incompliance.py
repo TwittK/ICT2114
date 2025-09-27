@@ -54,6 +54,8 @@ class ProcessIncompliance:
         else:
           return None # Incompliance on the same date detected, skipping
 
+    self.db.close()
+    
     return None        
   
   # When NO face match is found in exisiting incompliance (a new person does incompliance)
@@ -87,6 +89,8 @@ class ProcessIncompliance:
         ),
       )
       self.db.commit()
+
+    self.db.close()
 
     return person_id
   

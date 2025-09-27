@@ -1,5 +1,7 @@
 # shared/camera_manager.py
-import threading, sqlite3
+import threading, sqlite3, queue
+from concurrent.futures import ThreadPoolExecutor
+from threads.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
@@ -28,6 +30,19 @@ class CameraManager:
     self.camera_pool = {}
     self.db = sqlite3.connect(db_path)
 
+    # Shared queues for all cameras
+    self.preprocess_queue = queue.Queue()
+    self.detection_queue = queue.Queue()
+
+    # Shared thread pools for processing
+    self.preprocess_pool = ThreadPoolExecutor(max_workers=1)
+    self.detection_pool = ThreadPoolExecutor(max_workers=4)
+
+    # Start background workers for each processing step
+    for _ in range(4):
+      self.preprocess_pool.submit(self._preprocess_worker)
+      self.detection_pool.submit(self._detection_worker)
+
     # Select all existing cameras in database 
     with self.db as conn:
       cursor = conn.execute("SELECT CameraId, ip_address FROM Camera;")
@@ -38,7 +53,34 @@ class CameraManager:
       self.add_new_camera(camera_id, ip_address, True) 
 
     self._initialized = True
-  
+
+  def _preprocess_worker(self):
+    from threads.preprocessor import preprocess
+    models = [
+      ObjectDetectionModel("yolo11n.pt", target_class_list, 0.3),
+      ObjectDetectionModel("yolov8n.pt", target_class_list, 0.3),
+      ObjectDetectionModel("yolov8m.pt", target_class_list, 0.3),
+    ]
+    pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.80, 0.4)
+    classif_model = ImageClassificationModel("yolov8n-cls.pt")
+
+    while True:
+      try:
+        camera, frame = self.preprocess_queue.get(timeout=2)
+        processed_frame = preprocess(camera, frame, models, pose_model, classif_model)
+        self.detection_queue.put((camera, processed_frame))
+      except Exception:
+        continue
+
+  def _detection_worker(self):
+    from threads.detector import detection
+    while True:
+      try:
+        camera, processed_frame = self.detection_queue.get(timeout=2)
+        detection(camera, processed_frame)
+      except Exception:
+        continue
+
   def shutdown_all_cameras(self):
     """
     Gracefully shuts down all active cameras in the camera pool.
@@ -121,27 +163,21 @@ class CameraManager:
     from shared.camera import Camera
 
     try:
-      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
+      camera = Camera(camera_id, ip_address, channel, False, self)
 
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))
-      preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
-      detection_thread = threading.Thread(target=detection, args=(camera,))
       save_thread = threading.Thread(target=image_saver, args=(camera,))
 
 
       read_thread.start()
-      preprocess_thread.start()
-      detection_thread.start()
       save_thread.start()
 
       self.camera_pool[camera_id] = {
         "camera": camera,
         "threads": {
           "read": read_thread,
-          "detection": detection_thread,
           "save": save_thread,
-          "preprocess": preprocess_thread
         },
       }
 

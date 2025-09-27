@@ -75,163 +75,150 @@ def flag_track_id(context, track_id):
         context.flagged_foodbev.append(track_id)
 
 # Mapping detected food/ drinks to person
-def detection(context: Camera):
+def detection(context: Camera, frame):
 
+    if frame is None or frame.size == 0:
+        return
+    
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance(DATABASE, context.camera_id)
 
-    while context.running.is_set():
-        try:
-            frame = context.process_queue.get(timeout=1)
+    # Shallow copy for reading in this thread
+    with context.detected_incompliance_lock, context.pose_points_lock:
+        local_pose_points = list(context.pose_points)
+        local_detected_food_drinks = dict(context.detected_incompliance)
 
-        except queue.Empty:
-            continue
+    for p in local_pose_points:
+        for track_id in local_detected_food_drinks:
 
-        if frame is None or frame.size == 0:
-            continue
-
-        # Shallow copy for reading in this thread
-        with context.detected_incompliance_lock, context.pose_points_lock:
-            local_pose_points = list(context.pose_points)
-            local_detected_food_drinks = dict(context.detected_incompliance)
-
-        for p in local_pose_points:
-            for track_id in local_detected_food_drinks:
-
-                with context.flagged_foodbev_lock:
-                    if track_id in context.flagged_foodbev:
-                        continue
-
-                food_drinks_bbox = local_detected_food_drinks[track_id][0]
-                food_drinks_center = local_detected_food_drinks[track_id][1]
-                x1, y1, x2, y2 = food_drinks_bbox
-
-                try:
-                    face_bbox = extract_face_from_nose(p, frame)
-                    fx1, fy1, fx2, fy2 = map(int, face_bbox)
-
-                except ValueError:
-                    print("can't extract the face")
+            with context.flagged_foodbev_lock:
+                if track_id in context.flagged_foodbev:
                     continue
 
-                # If the top of food/ drink bbox is a percentage above the nose, ignore
-                if y1 < p["nose"][1] * 0.65:
-                    print("Food/ drink is above the nose, ignoring.")
+            food_drinks_bbox = local_detected_food_drinks[track_id][0]
+            food_drinks_center = local_detected_food_drinks[track_id][1]
+            x1, y1, x2, y2 = food_drinks_bbox
+
+            try:
+                face_bbox = extract_face_from_nose(p, frame)
+                fx1, fy1, fx2, fy2 = map(int, face_bbox)
+
+            except ValueError:
+                print("can't extract the face")
+                continue
+
+            # If the top of food/ drink bbox is a percentage above the nose, ignore
+            if y1 < p["nose"][1] * 0.65:
+                print("Food/ drink is above the nose, ignoring.")
+                continue
+
+            # If height of food/ drink is a lot larger than height head, person is likely to be further away so ignore
+            # If height of food/ drink is a lot smaller than height of head, food/ drink is likely to be further away so ignore
+            area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
+            area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
+            area_check = area_food_drinks >= area_head * 4 or area_food_drinks < area_head * 0.1
+            height_check = abs(y1 - y2) >= abs(fy1 - fy2) * 2.85 or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
+            if (area_check or height_check):
+                print("🔶Food/ drink not at the same depth as person, ignoring.")
+                continue
+            
+            # Filter out poses that are too far away
+            dist_nose_to_box = get_dist_nose_to_box(p, food_drinks_bbox)
+            dist = min(np.linalg.norm(p["left_wrist"] - food_drinks_center), np.linalg.norm(p["right_wrist"] - food_drinks_center))
+
+            # Distance thresholds
+            nose_threshold = abs(y1 - y2) * 1.1
+            consumption_threshold = abs(y1 - y2) * 0.3
+            wrist_threshold = abs(y1 - y2) * 0.5
+
+            # Check if drinking
+            if dist_nose_to_box > consumption_threshold:
+                # Not drinking, check if holding
+                if dist > wrist_threshold or dist_nose_to_box > nose_threshold:
+                    # Not holding, skip
                     continue
 
-                # If height of food/ drink is a lot larger than height head, person is likely to be further away so ignore
-                # If height of food/ drink is a lot smaller than height of head, food/ drink is likely to be further away so ignore
-                area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
-                area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
-                area_check = area_food_drinks >= area_head * 4 or area_food_drinks < area_head * 0.1
-                height_check = abs(y1 - y2) >= abs(fy1 - fy2) * 2.85 or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
-                if (area_check or height_check):
-                    print("🔶Food/ drink not at the same depth as person, ignoring.")
-                    continue
+            now = time.time()
+
+            # Track wrist proximity times
+            if track_id not in context.wrist_proximity_history:
+                context.wrist_proximity_history[track_id] = []
+
+            context.wrist_proximity_history[track_id].append(now)
+
+            # Logging detection frame per track_Id
+            for track_id, timestamps in context.wrist_proximity_history.items():
+                print(f"Track ID {track_id} has {len(timestamps)} proximity detections")
+
+            # Keep only timestamps within the last 2 seconds
+            recent_times = [t for t in context.wrist_proximity_history[track_id] if now - t <= REQUIRED_DURATION]
+            context.wrist_proximity_history[track_id] = (recent_times)  # Prune old entries
+
+            if len(recent_times) < REQUIRED_COUNT:
+                continue
+            
+            face_crop = None
+            face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=30)
+            
+            # Face crop failed
+            if face_crop is None or face_crop.size <= 0:
+                continue
+
+            try:
+                # Mock next day
+                mocked_date = datetime(2025,7,23)
+                current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Filter out poses that are too far away
-                dist_nose_to_box = get_dist_nose_to_box(p, food_drinks_bbox)
-                dist = min(np.linalg.norm(p["left_wrist"] - food_drinks_center), np.linalg.norm(p["right_wrist"] - food_drinks_center))
+                # current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                today = current_date[:10]
 
-                # Distance thresholds
-                nose_threshold = abs(y1 - y2) * 1.1
-                consumption_threshold = abs(y1 - y2) * 0.3
-                wrist_threshold = abs(y1 - y2) * 0.5
-
-                # Check if drinking
-                if dist_nose_to_box > consumption_threshold:
-                    # Not drinking, check if holding
-                    if dist > wrist_threshold or dist_nose_to_box > nose_threshold:
-                        # Not holding, skip
-                        continue
-
-                now = time.time()
-
-                # Track wrist proximity times
-                if track_id not in context.wrist_proximity_history:
-                    context.wrist_proximity_history[track_id] = []
-
-                context.wrist_proximity_history[track_id].append(now)
-
-                # Logging detection frame per track_Id
-                for track_id, timestamps in context.wrist_proximity_history.items():
-                    print(f"Track ID {track_id} has {len(timestamps)} proximity detections")
-
-                # Keep only timestamps within the last 2 seconds
-                recent_times = [t for t in context.wrist_proximity_history[track_id] if now - t <= REQUIRED_DURATION]
-                context.wrist_proximity_history[track_id] = (recent_times)  # Prune old entries
-
-                if len(recent_times) < REQUIRED_COUNT:
-                    continue
+                # Facial Recognition
+                mode_data = nvr.get_mode_data(frame)
+                matches_found = nvr.get_face_comparison(mode_data)
                 
-                face_crop = None
-                face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=30)
-                
-                # Face crop failed
-                if face_crop is None or face_crop.size <= 0:
+                if matches_found[0] == None:
                     continue
 
-                try:
-                    # Mock next day
-                    mocked_date = datetime(2025,7,23)
-                    current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    today = current_date[:10]
+                # Match found
+                if int(matches_found[0]) >= 1:
 
-                    # Facial Recognition
-                    mode_data = nvr.get_mode_data(frame)
-                    matches_found = nvr.get_face_comparison(mode_data)
-                    
-                    if matches_found[0] == None:
-                        continue
+                    print("Match found")
+                    person_id = process_incompliance.match_found_new_incompliance(matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
 
-                    # Match found
-                    if int(matches_found[0]) >= 1:
-
-                        print("Match found")
-                        person_id = process_incompliance.match_found_new_incompliance(matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
-
-                        # Incompliance on different date
-                        if person_id is not None:
-                                            
-                            # Save frame locally
-                            save_img(context, frame, str(person_id), today)
-                
-                            # Send Email for Second Incompliance Detected
-                            lab_email = get_lab_safety_email_by_camera_id(context.camera_id)
-                            if lab_email:
-                                email_service.send_incompliance_email(lab_email, f"Person {person_id}")
-
-                            print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
-                            
-                        # Incompliance on the same date
-                        else:
-                            print("[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
-                            # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
-
-
-                        flag_track_id(context, track_id)
-
-                    # No match found
-                    elif int(matches_found[0]) < 1:
-                        print("No match found")
-                        flag_track_id(context, track_id)
-
-                        person_id = process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
-                        
-                        # Save frame locally in new folder
-                        os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
+                    # Incompliance on different date
+                    if person_id is not None:
+                                        
+                        # Save frame locally
                         save_img(context, frame, str(person_id), today)
-                            
-                        print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
-                        time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
-                        # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
+            
+                        # # Send Email for Second Incompliance Detected
+                        # lab_email = get_lab_safety_email_by_camera_id(context.camera_id)
+                        # if lab_email:
+                        #     email_service.send_incompliance_email(lab_email, f"Person {person_id}")
 
+                        print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                        
+                    # Incompliance on the same date
+                    else:
+                        print("[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
 
-                except Exception as e:
-                    print(e)
-                    continue
+                    flag_track_id(context, track_id)
 
-    process_incompliance.close_connection()
+                # No match found
+                elif int(matches_found[0]) < 1:
+                    print("No match found")
+                    flag_track_id(context, track_id)
+
+                    person_id = process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
+                    
+                    # Save frame locally in new folder
+                    os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
+                    save_img(context, frame, str(person_id), today)
+                        
+                    print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+                    time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
+
+            except Exception as e:
+                print(e)
+                continue

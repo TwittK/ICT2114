@@ -124,7 +124,8 @@ def read_frames(context: Camera):
             current_delay = retry_delay
 
         if not (context.frame_queue).full():
-            (context.frame_queue).put(frame)
+            context.manager.preprocess_queue.put((context, frame))
+            # (context.frame_queue).put(frame)
         time.sleep(0.01)
 
     if context.cap:
