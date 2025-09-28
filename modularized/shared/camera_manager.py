@@ -1,5 +1,5 @@
 # shared/camera_manager.py
-import threading, sqlite3
+import threading, psycopg2
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
@@ -13,7 +13,7 @@ class CameraManager:
   _instance = None
 
   # Singleton
-  def __new__(cls, db_path):
+  def __new__(cls, db_params):
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
@@ -25,18 +25,19 @@ class CameraManager:
       raise RuntimeError("CameraManager has not been initialized yet.")
     return cls._instance
 
-  def __init__(self, db_path):
+  def __init__(self, db_params):
 
     if self._initialized: # Singleton
       return 
     
     self.camera_pool = {}
-    self.db = sqlite3.connect(db_path)
+    self.db = psycopg2.connect(**db_params)
 
-    # Select all existing cameras in database 
-    with self.db as conn:
-      cursor = conn.execute("SELECT CameraId, ip_address FROM Camera;")
-      rows = cursor.fetchall()
+    # Select all existing cameras
+    cursor = self.db.cursor()
+    cursor.execute("SELECT CameraId, ip_address FROM Camera;")
+    rows = cursor.fetchall()
+    cursor.close()
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:

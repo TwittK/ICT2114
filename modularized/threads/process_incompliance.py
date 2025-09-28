@@ -1,5 +1,4 @@
 import cv2 as cv
-import sqlite3
 import psycopg2
 
 class ProcessIncompliance:

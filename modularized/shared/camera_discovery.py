@@ -1,11 +1,19 @@
-import requests
+import requests, psycopg2, os
 from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
-import sqlite3
+from dotenv import load_dotenv
 from database import create_camera
 from datetime import datetime
 
-DATABASE = 'users.sqlite'
+# Load environment variables from .env
+load_dotenv()
+DB_PARAMS = {
+    "dbname": os.getenv("POSTGRES_DB"),
+    "user": os.getenv("POSTGRES_USER"),
+    "password": os.getenv("POSTGRES_PASSWORD"),
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
+}
 DEFAULT_TIMEZONE = 'Asia/Singapore'
 DATETIME_FORMAT =  '%Y-%m-%dT%H:%M:%S'
 
@@ -335,11 +343,11 @@ class CameraDiscovery:
 
     def auto_populate_database(self, camera_ips, lab_name="E2-L6-016", user_id=1):
         """Auto-populate database with discovered cameras"""
-        conn = sqlite3.connect(DATABASE)
+        conn = psycopg2.connect(**DB_PARAMS)
         cursor = conn.cursor()
         
         # Get lab ID
-        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
+        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = %s", (lab_name,))
         lab_result = cursor.fetchone()
         if not lab_result:
             print(f"❌ Lab '{lab_name}' not found")
@@ -354,7 +362,7 @@ class CameraDiscovery:
             
             if config:
                 # Check if camera already exists
-                cursor.execute("SELECT COUNT(*) FROM Camera WHERE ip_address = ?", (camera_ip,))
+                cursor.execute("SELECT COUNT(*) FROM Camera WHERE ip_address = %s", (camera_ip,))
                 if cursor.fetchone()[0] > 0:
                     print(f"⚠️ Camera {camera_ip} already exists in database")
                     continue

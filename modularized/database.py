@@ -5,23 +5,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # Load environment variables from .env
 load_dotenv()
-
-# Get values from .env
-DB_NAME = os.getenv("POSTGRES_DB")
-DB_USER = os.getenv("POSTGRES_USER")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-DB_HOST = os.getenv("POSTGRES_HOST", "localhost")  # fallback to localhost
-DB_PORT = os.getenv("POSTGRES_PORT", "5432")       # fallback to 5432
+DB_PARAMS = {
+    "dbname": os.getenv("POSTGRES_DB"),
+    "user": os.getenv("POSTGRES_USER"),
+    "password": os.getenv("POSTGRES_PASSWORD"),
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
+}
 
 def init_database():
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -38,13 +32,7 @@ def init_database():
 
 def insert_default_roles():
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -73,13 +61,7 @@ def insert_default_roles():
 
 def create_default_admin():
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -110,13 +92,7 @@ def create_default_admin():
         print("Default user account created: user/user123")
 
 def create_user(username, email, password, role_name='user'):
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
 
     password_hash = generate_password_hash(password)
@@ -148,13 +124,7 @@ def create_user(username, email, password, role_name='user'):
 
 def create_default_labs_and_cameras():
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -182,13 +152,7 @@ def create_default_labs_and_cameras():
 
 def create_lab(lab_name, lab_safety_email):
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -223,13 +187,7 @@ def create_camera(
 
 ):
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -257,13 +215,7 @@ def create_camera(
 
 def get_lab_safety_email_by_camera_id(camera_id):
     # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    conn = psycopg2.connect(**DB_PARAMS)
 
     cursor = conn.cursor()
 
@@ -278,6 +230,112 @@ def get_lab_safety_email_by_camera_id(camera_id):
     conn.close()
 
     return result[0] if result else None
+
+def create_new_camera(
+        name,
+        camera_user_id,
+        camera_lab_id,
+        resolution,
+        frame_rate,
+        encoding,
+        camera_ip_type,
+        ip_address,
+        subnet_mask,
+        gateway,
+        timezone,
+        sync_with_ntp,
+        ntp_server_address,
+        time
+):
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(**DB_PARAMS)
+
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+                       INSERT INTO Camera (name, resolution, frame_rate,
+                                           encoding, camera_ip_type, ip_address,
+                                           subnet_mask, gateway, timezone,
+                                           sync_with_ntp, ntp_server_address, time,
+                                           camera_user_id, camera_lab_id)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       RETURNING camera_id;
+                       ''', (name, resolution, frame_rate,
+                             encoding, camera_ip_type, ip_address,
+                             subnet_mask, gateway, timezone,
+                             sync_with_ntp, ntp_server_address, time,
+                             camera_user_id, camera_lab_id)
+                       )
+
+        camera_id = cursor.fetchone()[0]  # Fetch the camera_id returned by the query
+        conn.commit()
+        return True, camera_id
+    except psycopg2.IntegrityError:
+        return False, None
+    finally:
+        conn.close()
+
+def verify_user(email, password):
+
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(**DB_PARAMS)
+
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT u.id, u.email, u.username, u.password_hash,
+               r.name AS role_name, u.is_active
+        FROM users u
+        JOIN Roles r ON u.role = r.id
+        WHERE u.email = %s
+          AND u.is_active = TRUE
+    ''', (email,))
+
+    user = cursor.fetchone()
+    conn.close()
+
+    if user and check_password_hash(user[3], password):
+        return {
+            'id': user[0],
+            'email': user[1],
+            'username': user[2],
+            'role': user[4],
+        }
+    
+    return None
+
+def update_last_login(user_id):
+
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(**DB_PARAMS)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+                   UPDATE users
+                   SET last_login = CURRENT_TIMESTAMP
+                   WHERE id = %s
+                   ''', (user_id,))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def get_all_users():
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(**DB_PARAMS)
+
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM users')
+    columns = [desc[0] for desc in cursor.description]  # Extract column names
+    users = cursor.fetchall()
+
+    conn.close()
+
+    # return [dict(row) for row in users]
+    # Convert rows to dictionaries
+    return [dict(zip(columns, row)) for row in users]
 
 if __name__ == "__main__":
     init_database()

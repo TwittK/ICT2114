@@ -4,10 +4,12 @@ from data_source.camera_dao import CameraDAO
 from data_source.role_dao import RoleDAO
 from data_source.lab_dao import LabDAO
 from datetime import datetime
-import sqlite3
+import psycopg2, os
+from psycopg2.extras import RealDictCursor
 import requests
 from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
+from dotenv import load_dotenv
 
 import cv2
 from database import verify_user, update_last_login, get_all_users
@@ -18,7 +20,15 @@ from web.utils import check_permission, validate_and_sanitize_text
 from werkzeug.security import generate_password_hash
 from data_source.class_labels import ClassLabelRepository
 
-DATABASE = "users.sqlite"
+# Load environment variables from .env
+load_dotenv()
+DB_PARAMS = {
+    "dbname": os.getenv("POSTGRES_DB"),
+    "user": os.getenv("POSTGRES_USER"),
+    "password": os.getenv("POSTGRES_PASSWORD"),
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432")
+}
 SNAPSHOT_FOLDER = "snapshots"
 NO_PRIVILEGES = "Not enough privileges to complete action"
 
@@ -27,12 +37,12 @@ app = Flask(__name__)
 label_repo = ClassLabelRepository()
 
 
-def dict_factory(cursor, row):
-    """Convert sqlite3.Row to dictionary"""
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
+# def dict_factory(cursor, row):
+#     """Convert sqlite3.Row to dictionary"""
+#     d = {}
+#     for idx, col in enumerate(cursor.description):
+#         d[col[0]] = row[idx]
+#     return d
 
 
 def login_required(f):
@@ -73,7 +83,7 @@ def require_permission(permission_name):
 
 @app.context_processor
 def inject_labs_with_cameras():
-    conn = sqlite3.connect(DATABASE)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -142,8 +152,9 @@ def login():
 @login_required
 def index():
     # Open DB connection to fetch valid labs and cameras
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(**DB_PARAMS)
+    # conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
     cursor = conn.cursor()
 
     # Get all lab names
@@ -161,7 +172,7 @@ def index():
                    SELECT c.name
                    FROM Camera c
                             JOIN Lab l ON c.camera_lab_id = l.LabId
-                   WHERE l.lab_name = ?
+                   WHERE l.lab_name = %s
                    ORDER BY c.name
                    """, (lab_name,))
     all_cameras = [row["name"] for row in cursor.fetchall()]
@@ -214,7 +225,7 @@ def index():
                 return redirect(url_for("index"))
 
             user_id = session.get("user_id")
-            dao = CameraDAO(DATABASE)
+            dao = CameraDAO(DB_PARAMS)
 
             # Validate and sanitize string
             try:
@@ -234,7 +245,7 @@ def index():
                 return redirect(url_for("index"))
 
             # Add camera into manager and start detection on newly inserted camera
-            cm = CameraManager(DATABASE)
+            cm = CameraManager(DB_PARAMS)
             result = cm.add_new_camera(device_info["ip_address"], "101", True)
             if not result:
                 flash("Error inserting camera into camera manager.", "danger")
@@ -254,7 +265,7 @@ def index():
     # Delete camera - ADMIN ONLY
     if is_deleting_camera and camera_name and lab_name and cam_management:
         user_id = session.get("user_id")
-        dao = CameraDAO(DATABASE)
+        dao = CameraDAO(DB_PARAMS)
 
         # Retrieve camera id
         id_success, camera_id = dao.get_camera_id(lab_name, camera_name, user_id)
@@ -263,7 +274,7 @@ def index():
             return redirect(url_for("index", lab=lab_name))
 
         # Remove camera from manager, stop detection and join threads
-        camera_manager = CameraManager(DATABASE)
+        camera_manager = CameraManager(DB_PARAMS)
         remove_success = camera_manager.remove_camera(camera_id)
         if not remove_success:
             flash("Failed to stop camera threads properly.", "danger")
@@ -284,9 +295,10 @@ def index():
         date_filter = request.form.get("date")
         object_filter = request.form.get("object_type")
 
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = dict_factory
-        cursor = conn.cursor()
+        conn = psycopg2.connect(**DB_PARAMS)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # conn.row_factory = dict_factory
+        # cursor = conn.cursor()
 
         # Get all cameras for the dropdown
         cursor.execute("SELECT CameraId, name FROM Camera")
@@ -303,28 +315,28 @@ def index():
 
         # Add camera filter if a camera is selected
         if camera_name:
-            query += " AND c.name = ?"
+            query += " AND c.name = %s"
             params.append(camera_name)
 
         if date_filter:
             selected_date = date_filter
-            query += " AND DATE(s.time_generated) = ?"
+            query += " AND DATE(s.time_generated) = %s"
             params.append(date_filter)
 
         if object_filter:
             if object_filter == "food":
                 food_ids = label_repo.get_food_class_ids()
-                placeholders = ",".join("?" for _ in food_ids)
+                placeholders = ",".join("%s" for _ in food_ids)
                 query += f" AND s.object_detected IN ({placeholders})"
                 params.extend(food_ids)
             elif object_filter == "drink":
                 drinks_ids = label_repo.get_drink_class_ids()
-                placeholders = ",".join("?" for _ in drinks_ids)
+                placeholders = ",".join("%s" for _ in drinks_ids)
                 query += f" AND s.object_detected IN ({placeholders})"
                 params.extend(drinks_ids)
             else:
                 # Assume it's a specific class ID
-                query += " AND s.object_detected = ?"
+                query += " AND s.object_detected = %s"
                 params.append(object_filter)
 
         query += " ORDER BY s.time_generated DESC"
@@ -384,7 +396,7 @@ def second_incompliance():
     # Redirect if either lab or camera not specified.
     if not lab_name or not camera_name:
         try:
-            conn = sqlite3.connect(DATABASE)
+            conn = psycopg2.connect(**DB_PARAMS)
             cursor = conn.cursor()
 
             # Get first lab name (e.g., E2-L6-016)
@@ -401,7 +413,7 @@ def second_incompliance():
                                SELECT c.name
                                FROM Camera c
                                         JOIN Lab l ON c.camera_lab_id = l.LabId
-                               WHERE l.lab_name = ?
+                               WHERE l.lab_name = %s
                                ORDER BY c.name
                                LIMIT 1
                                """, (lab_name,))
@@ -442,8 +454,9 @@ def second_incompliance():
     results = []
 
     try:
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row
+        conn = psycopg2.connect(**DB_PARAMS)
+        # conn.row_factory = sqlite3.Row
+        conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
         cursor = conn.cursor()
 
         # Check user permission to view incompliances
@@ -464,7 +477,7 @@ def second_incompliance():
                        SELECT c.name
                        FROM Camera c
                                 JOIN Lab l ON c.camera_lab_id = l.LabId
-                       WHERE l.lab_name = ?
+                       WHERE l.lab_name = %s
                        ORDER BY c.name
                        """, (lab_name,))
 
@@ -486,32 +499,32 @@ def second_incompliance():
                                  FROM Camera c
                                           JOIN Lab l ON c.camera_lab_id = l.LabId
                                  WHERE c.CameraId = s.camera_id
-                                   AND l.lab_name = ?
-                                   AND c.name = ?) \
+                                   AND l.lab_name = %s
+                                   AND c.name = %s) \
                     """
 
             params = [lab_name, camera_name]
 
             # Apply date filter if selected.
             if selected_date:
-                query += " AND DATE(s.time_generated) = ?"
+                query += " AND DATE(s.time_generated) = %s"
                 params.append(selected_date)
 
             # Apply object type filter if selected.
             if selected_object_type:
                 if selected_object_type == "food":
                     food_ids = label_repo.get_food_class_ids()
-                    placeholders = ",".join("?" for _ in food_ids)
+                    placeholders = ",".join("%s" for _ in food_ids)
                     query += f" AND s.object_detected IN ({placeholders})"
                     params.extend(food_ids)
                 elif selected_object_type == "drink":
                     drinks_ids = label_repo.get_drink_class_ids()
-                    placeholders = ",".join("?" for _ in drinks_ids)
+                    placeholders = ",".join("%s" for _ in drinks_ids)
                     query += f" AND s.object_detected IN ({placeholders})"
                     params.extend(drinks_ids)
                 else:
                     # Assume it's a specific class ID
-                    query += " AND s.object_detected = ?"
+                    query += " AND s.object_detected = %s"
                     params.append(selected_object_type)
 
             query += " ORDER BY s.time_generated DESC"
@@ -563,8 +576,9 @@ def logout():
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(**DB_PARAMS)
+    # conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
     return conn
 
 
@@ -572,9 +586,10 @@ def get_db():
 @login_required
 @require_permission('camera_management')
 def edit_camera(camera_id):
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = dict_factory  # Enable dictionary-style access
-    cursor = conn.cursor()
+    conn = psycopg2.connect(**DB_PARAMS)
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    # conn.row_factory = dict_factory  # Enable dictionary-style access
+    # cursor = conn.cursor()
 
     if request.method == 'POST':
         # Handle form submission - update camera settings
@@ -607,19 +622,19 @@ def edit_camera(camera_id):
             # Update camera in database
             cursor.execute('''
                            UPDATE Camera
-                           SET name               = ?,
-                               resolution         = ?,
-                               frame_rate         = ?,
-                               encoding           = ?,
-                               camera_ip_type     = ?,
-                               ip_address         = ?,
-                               subnet_mask        = ?,
-                               gateway            = ?,
-                               timezone           = ?,
-                               sync_with_ntp      = ?,
-                               ntp_server_address = ?,
-                               time               = ?
-                           WHERE CameraId = ?
+                           SET name               = %s,
+                               resolution         = %s,
+                               frame_rate         = %s,
+                               encoding           = %s,
+                               camera_ip_type     = %s,
+                               ip_address         = %s,
+                               subnet_mask        = %s,
+                               gateway            = %s,
+                               timezone           = %s,
+                               sync_with_ntp      = %s,
+                               ntp_server_address = %s,
+                               time               = %s
+                           WHERE CameraId = %s
                            ''', (name, resolution, frame_rate, encoding, camera_ip_type,
                                  ip_address, subnet_mask, gateway, timezone, sync_with_ntp,
                                  ntp_server_address, time_value, camera_id))
@@ -672,7 +687,7 @@ def edit_camera(camera_id):
                           l.lab_name
                    FROM Camera c
                             JOIN Lab l ON c.camera_lab_id = l.LabId
-                   WHERE c.CameraId = ?
+                   WHERE c.CameraId = %s
                    ''', (camera_id,))
 
     camera = cursor.fetchone()
@@ -771,10 +786,10 @@ def apply_camera_settings(camera_id, settings):
     try:
         print("TRYING ISAPI UPDATE")
         # Get camera IP address from database
-        conn = sqlite3.connect(DATABASE)
+        conn = psycopg2.connect(**DB_PARAMS)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT ip_address FROM Camera WHERE CameraId = ?", (camera_id,))
+        cursor.execute("SELECT ip_address FROM Camera WHERE CameraId = %s", (camera_id,))
         result = cursor.fetchone()
         conn.close()
 
@@ -1214,16 +1229,16 @@ def add_camera():
             return jsonify({'success': False, 'message': 'Lab name is required'})
 
         # Check if camera already exists
-        conn = sqlite3.connect(DATABASE)
+        conn = psycopg2.connect(**DB_PARAMS)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM Camera WHERE ip_address = ?", (camera_ip,))
+        cursor.execute("SELECT COUNT(*) FROM Camera WHERE ip_address = %s", (camera_ip,))
         if cursor.fetchone()[0] > 0:
             print(f"❌ Camera {camera_ip} already exists in database")
             conn.close()
             return jsonify({'success': False, 'message': f'Camera {camera_ip} already exists!'})
 
         # Get the actual lab ID for the specified lab
-        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
+        cursor.execute("SELECT LabId FROM Lab WHERE lab_name = %s", (lab_name,))
         lab_result = cursor.fetchone()
         if not lab_result:
             conn.close()
@@ -1240,7 +1255,7 @@ def add_camera():
                                            encoding,
                                            subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp,
                                            ntp_server_address, time)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                        """, (
                            device_info.get('device_name', f'Camera_{camera_ip}'),
                            camera_ip,
@@ -1258,7 +1273,8 @@ def add_camera():
                            device_info.get('time', '2025-01-01T00:00:00')  # Added: time is required (NOT NULL)
                        ))
 
-        camera_id = cursor.lastrowid
+        # camera_id = cursor.lastrowid
+        camera_id = cursor.fetchone()[0]
         conn.commit()
         conn.close()
 
@@ -1294,7 +1310,7 @@ def user_management():
     user_role_management = check_permission(role, "user_role_management")
 
     if request.method == "GET":
-        dao = RoleDAO(DATABASE)
+        dao = RoleDAO(DB_PARAMS)
         users = get_all_users()
         roles = dao.get_all_roles()
 
@@ -1311,15 +1327,15 @@ def user_management():
         user_id = request.form.get("user_id")
         action = request.form.get("action")
 
-        conn = sqlite3.connect(DATABASE)
+        conn = psycopg2.connect(**DB_PARAMS)
 
         if action == "delete":
 
-            cm = CameraManager(DATABASE)
+            cm = CameraManager(DB_PARAMS)
 
             # Stop detection on cameras created by deleted user and join threads
             cursor = conn.cursor()
-            cursor.execute('SELECT CameraId FROM Camera WHERE camera_user_id = ?', (user_id,))
+            cursor.execute('SELECT CameraId FROM Camera WHERE camera_user_id = %s', (user_id,))
             camera_id = cursor.fetchone()
 
             if camera_id is not None:
@@ -1330,9 +1346,9 @@ def user_management():
 
             is_same_user = int(session.get('user_id')) == int(user_id)
 
-            conn.execute("PRAGMA foreign_keys = ON")
+            # conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
             conn.commit()
 
             if (is_same_user):
@@ -1345,10 +1361,10 @@ def user_management():
             new_role = request.form.get("new_role")
 
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM Roles WHERE name = ?", (new_role,))
+            cursor.execute("SELECT id FROM Roles WHERE name = %s", (new_role,))
             role_exists = cursor.fetchone()
             if role_exists:
-                cursor.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
+                cursor.execute("UPDATE users SET role = %s WHERE id = %s", (new_role, user_id))
                 conn.commit()
                 flash("User role updated successfully.", "success")
 
@@ -1367,7 +1383,7 @@ def role_management():
     cam_management = check_permission(role, "camera_management")
     user_role_management = check_permission(role, "user_role_management")
 
-    dao = RoleDAO(DATABASE)
+    dao = RoleDAO(DB_PARAMS)
     roles = dao.get_all_roles()
     permissions = dao.get_all_permissions()
     role_permissions = dao.get_all_rolepermissions()
@@ -1453,7 +1469,7 @@ def labs():
     cam_management = check_permission(role, "camera_management")
     user_role_management = check_permission(role, "user_role_management")
 
-    dao = LabDAO(DATABASE)
+    dao = LabDAO(DB_PARAMS)
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -1521,7 +1537,7 @@ def create_account():
     cam_management = check_permission(role, "camera_management")
     user_role_management = check_permission(role, "user_role_management")
 
-    dao = RoleDAO(DATABASE)
+    dao = RoleDAO(DB_PARAMS)
     roles = dao.get_all_roles()
 
     if request.method == "POST":
@@ -1559,9 +1575,9 @@ def create_account():
             )
 
         # Check email uniqueness
-        conn = sqlite3.connect(DATABASE)
+        conn = psycopg2.connect(**DB_PARAMS)
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE email = ?", (email_form,))
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email_form,))
         if cursor.fetchone():
             flash("❌ An account with this email already exists.", "danger")
             return render_template("create_account.html",
@@ -1576,12 +1592,12 @@ def create_account():
         try:
             cursor.execute("""
                            INSERT INTO users (username, email, password_hash, role)
-                           VALUES (?, ?, ?, ?)
+                           VALUES (%s, %s, %s, %s)
                            """, (username_form, email_form, password_hash, role_form))
             conn.commit()
             flash("✅ Account created successfully!", "success")
             return redirect(url_for("user_management"))
-        except sqlite3.IntegrityError:
+        except psycopg2.IntegrityError:
             flash("❌ Username or email already exists.", "danger")
         except Exception as e:
             flash(f"❌ Failed to create user: {str(e)}", "danger")

@@ -16,5 +16,5 @@ def run_app():
     insert_default_roles()
     create_default_admin()
     # Mock lab and cameras
-    # create_default_labs_and_cameras()
+    create_default_labs_and_cameras()
     app.run(debug=False, use_reloader=False)
