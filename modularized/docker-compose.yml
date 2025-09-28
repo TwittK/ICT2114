@@ -1,3 +1,39 @@
+# version: '3.8'
+
+# services:
+#   lab-monitoring:
+#     build: .
+#     container_name: lab-monitoring-app
+#     ports:
+#       - "5000:5000"
+#     volumes:
+#       - ./web/static/incompliances:/app/web/static/incompliances
+#       - ./users.sqlite:/app/users.sqlite
+#       - ./yolo_models:/app/yolo_models
+#     environment:
+#       - FLASK_ENV=production
+#       - PYTHONPATH=/app
+#     restart: unless-stopped
+#     devices:
+#       - /dev/video0:/dev/video0  # For camera access (Linux)
+#     privileged: true  # Required for camera access
+
+#   # Optional: Add a database service if you want to use PostgreSQL instead of SQLite
+#   # postgres:
+#   #   image: postgres:13
+#   #   container_name: lab-monitoring-db
+#   #   environment:
+#   #     POSTGRES_DB: lab_monitoring
+#   #     POSTGRES_USER: labuser
+#   #     POSTGRES_PASSWORD: labpass
+#   #   volumes:
+#   #     - postgres_data:/var/lib/postgresql/data
+#   #   ports:
+#   #     - "5432:5432"
+
+# volumes:
+#   postgres_data:
+
 version: '3.8'
 
 services:
@@ -8,28 +44,36 @@ services:
       - "5000:5000"
     volumes:
       - ./web/static/incompliances:/app/web/static/incompliances
-      - ./users.sqlite:/app/users.sqlite
       - ./yolo_models:/app/yolo_models
     environment:
-      - FLASK_ENV=production
-      - PYTHONPATH=/app
+      - FLASK_ENV=${FLASK_ENV}
+      - PYTHONPATH=${PYTHONPATH}
+      - DB_HOST=${POSTGRES_HOST}
+      - DB_PORT=${POSTGRES_PORT}
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
     restart: unless-stopped
     devices:
-      - /dev/video0:/dev/video0  # For camera access (Linux)
-    privileged: true  # Required for camera access
+      - /dev/video0:/dev/video0
+    privileged: true
+    depends_on:
+      - postgres
 
-  # Optional: Add a database service if you want to use PostgreSQL instead of SQLite
-  # postgres:
-  #   image: postgres:13
-  #   container_name: lab-monitoring-db
-  #   environment:
-  #     POSTGRES_DB: lab_monitoring
-  #     POSTGRES_USER: labuser
-  #     POSTGRES_PASSWORD: labpass
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+  postgres:
+    image: postgres:13
+    container_name: lab-monitoring-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+
+

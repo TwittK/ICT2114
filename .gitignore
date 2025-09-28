@@ -2,6 +2,7 @@
 .idea/
 __pycache__/
 .venv/
+/modularized/venv/
 /*.sqlite
 static/faces
 static/incompliances

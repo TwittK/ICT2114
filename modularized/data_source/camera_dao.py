@@ -1,26 +1,31 @@
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from database import create_camera, create_new_camera
 
 LAB_NOT_FOUND = "Lab not found"
 
 class CameraDAO:
-    def __init__(self, db_path):
-        self.db_path = db_path
+    def __init__(self, db_params):
+        self.db_params = db_params
+
+    def _get_conn(self):
+        """Helper to open a new connection with dict-style rows."""
+        return psycopg2.connect(**self.db_params, cursor_factory=RealDictCursor)
 
     def get_lab_id(self, lab_name):
         """Return lab ID for a given lab name."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT LabId FROM Lab WHERE lab_name = ?", (lab_name,))
-            row = cursor.fetchone()
-            return row[0] if row else None
+        with self._get_conn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT \"LabId\" FROM \"Lab\" WHERE lab_name = %s", (lab_name,))
+                row = cursor.fetchone()
+                return row["LabId"] if row else None
 
     def count_cameras_in_lab(self, lab_id):
         """Return number of cameras in a given lab."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM Camera WHERE camera_lab_id = ?", (lab_id,))
-            return cursor.fetchone()[0]
+        with self._get_conn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) AS count FROM \"Camera\" WHERE camera_lab_id = %s", (lab_id,))
+                return cursor.fetchone()["count"]
 
     def add_default_camera(self, lab_name, user_id):
         """Creates a default-named camera in a given lab."""
@@ -48,17 +53,16 @@ class CameraDAO:
         if lab_id is None:
             return False, LAB_NOT_FOUND
 
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                           DELETE
-                           FROM Camera
-                           WHERE name = ?
-                             AND camera_lab_id = ?
-                             AND camera_user_id = ?
-                           """, (camera_name, lab_id, user_id))
-            conn.commit()
-            affected_rows = cursor.rowcount
+        with self._get_conn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM "Camera"
+                    WHERE name = %s
+                      AND camera_lab_id = %s
+                      AND camera_user_id = %s
+                """, (camera_name, lab_id, user_id))
+                affected_rows = cursor.rowcount
+                conn.commit()
 
         if affected_rows > 0:
             return True, f"Camera '{camera_name}' deleted successfully."
@@ -69,20 +73,26 @@ class CameraDAO:
         """Get a camera id by its name, lab name, and user ID."""
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
-            return False, None # Lab not found
+            return False, None  # Lab not found
 
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT CameraId FROM Camera WHERE name = ? AND camera_lab_id = ? AND camera_user_id = ?", (camera_name, lab_id, user_id))
+        with self._get_conn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT "CameraId"
+                    FROM "Camera"
+                    WHERE name = %s
+                      AND camera_lab_id = %s
+                      AND camera_user_id = %s
+                """, (camera_name, lab_id, user_id))
 
-            row = cursor.fetchone()
-            if row is None:
-                return False, None
+                row = cursor.fetchone()
+                if row is None:
+                    return False, None
 
-            return True, row[0]
+                return True, row["CameraId"]
     
     def add_new_camera(self, lab_name, user_id, device_info):
-        """Creates a default-named camera in a given lab."""
+        """Creates a new camera in a given lab."""
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
             return False, LAB_NOT_FOUND
