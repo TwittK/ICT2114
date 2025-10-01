@@ -67,5 +67,6 @@ class ImageClassificationModel(BaseModel):
     self.model_instance = YOLO(os.path.join("yolo_models", self.model_name))
 
   def classify(self, frame):
-    return self.get_model_instance(frame, verbose=False)
+    model = self.get_model_instance()
+    return model(frame, verbose=False)
 

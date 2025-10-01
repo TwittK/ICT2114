@@ -15,7 +15,7 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
     # TODO: see if @ThreadingLocked() can be used to save memory (but reduce concurrency)
     models = [
         ObjectDetectionModel("yolo11n.pt", target_classes_id, conf_threshold, 0),
-        ObjectDetectionModel("yolov8n.pt", target_classes_id, conf_threshold),
+        #ObjectDetectionModel("yolov8n.pt", target_classes_id, conf_threshold),
         #ObjectDetectionModel("yolov8m.pt", target_classes_id, conf_threshold),
     ]
 
@@ -68,42 +68,36 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
 
                 # Print out all track IDs
                 for i, object_group in enumerate(matched_filtered):
-
-                    # print(f"Confidence for object {i}: {filtered_confidence[i]}")
-
                     for object in object_group:
                         track_id = object.id
 
                         if track_id is None:
                             continue
 
-                        # print(f"Track ID: {track_id.item()}")
+                        # Pass crops of detected objects into classification model to filter out water bottles
+                        if (track_id not in context.flagged_foodbev):
 
-                # TODO: Pass crops of detected objects into classification model to filter out water bottles
+                            # Check if it's a water bottle or not
+                            x1, y1, x2, y2 = map(int, filtered_boxes[i])
+                            object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
+                            results = classif_model.classify(object_crop)
+                            pred = results[0]
+                            label = pred.names[pred.probs.top1]
 
+                            # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
+                            if label == "water_bottle" or label == "milk_can":
+                                print("🚫 Water bottle, skipping")
+                                continue
 
-        #             if (track_id not in context.flagged_foodbev):
-
-        #                 # Check if it's a water bottle or not
-        #                 object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
-        #                 results = classif_model(object_crop, verbose=False)
-        #                 pred = results[0]
-        #                 label = pred.names[pred.probs.top1]
-
-        #                 # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
-        #                 if label == "water_bottle" or label == "milk_can":
-        #                     print("🚫 Water bottle, skipping")
-        #                     continue
-
-                        context.detected_incompliance[track_id.item()] = [
-                            filtered_boxes[i], # Coordinates of bbox
-                            (
-                                (filtered_boxes[i][0] + filtered_boxes[i][2]) // 2, # Center of bbox
-                                (filtered_boxes[i][1] + filtered_boxes[i][3]) // 2,
-                            ),
-                            filtered_confidence[i], # Confidence score
-                            object.cls.item(), # Class Id of detected object (refer to COCO dataset)
-                        ]
+                            context.detected_incompliance[track_id.item()] = [
+                                filtered_boxes[i], # Coordinates of bbox
+                                (
+                                    (filtered_boxes[i][0] + filtered_boxes[i][2]) // 2, # Center of bbox
+                                    (filtered_boxes[i][1] + filtered_boxes[i][3]) // 2,
+                                ),
+                                filtered_confidence[i], # Confidence score
+                                object.cls.item(), # Class Id of detected object (refer to COCO dataset)
+                            ]
                         # print(context.detected_incompliance[track_id])
 
             keypoints = pose_model.predict(frame)
