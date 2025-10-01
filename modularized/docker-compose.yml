@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   lab-monitoring:
@@ -7,10 +7,11 @@ services:
     ports:
       - "5001:5000"
     volumes:
+      - ./:/app # mount everything inside modularized (keep for developement)
       - ./web/static/incompliances:/app/web/static/incompliances
       - ./yolo_models:/app/yolo_models
     env_file:
-      - .env  # This tells Docker Compose to load environment variables from the .env file
+      - .env # This tells Docker Compose to load environment variables from the .env file
     environment:
       - FLASK_ENV=${FLASK_ENV}
       - PYTHONPATH=${PYTHONPATH}
@@ -25,7 +26,7 @@ services:
     privileged: true
     depends_on:
       postgres:
-        condition: service_healthy  # Ensure the DB is healthy before starting app
+        condition: service_healthy # Ensure the DB is healthy before starting app
 
   postgres:
     image: postgres:13
@@ -40,7 +41,8 @@ services:
       - "5432:5432"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      test:
+        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
       interval: 10s
       retries: 5
       timeout: 5s
@@ -48,5 +50,3 @@ services:
 
 volumes:
   postgres_data:
-
-

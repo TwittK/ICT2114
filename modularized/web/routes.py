@@ -365,6 +365,7 @@ def index():
 
         # Fetch all raw results from the database
         raw_results = cursor.fetchall()
+        print("[DEBUG PHOTOS]: ", raw_results)
 
         # Replace class ID with label using mapping.
         results = []
@@ -372,7 +373,7 @@ def index():
             time_generated = row["time_generated"]
             object_detected = row["object_detected"]
             confidence = row["confidence"]
-            image_url = row["imageURL"]
+            image_url = row["imageurl"]
 
             # Try to interpret as int (e.g., if stored as string class ID)
             try:
@@ -636,7 +637,8 @@ def edit_camera(camera_id):
             subnet_mask = request.form.get("subnet_mask")
             gateway = request.form.get("gateway")
             timezone = request.form.get("timezone", "Asia/Singapore")
-            sync_with_ntp = 1 if request.form.get("sync_with_ntp") else 0
+            # sync_with_ntp = 1 if request.form.get("sync_with_ntp") else 0
+            sync_with_ntp = True if request.form.get("sync_with_ntp") else False
             ntp_server_address = request.form.get("ntp_server_address", "pool.ntp.org")
             manual_time = request.form.get("manual_time")
 
@@ -745,8 +747,8 @@ def edit_camera(camera_id):
 
     # Ensure all required fields have default values
     camera_data = {
-        "CameraId": camera["CameraId"],
-        "name": camera["name"] or f'Camera_{camera["CameraId"]}',
+        "CameraId": camera["cameraid"],
+        "name": camera["name"] or f'Camera_{camera["cameraid"]}',
         # 'model': camera['model'] or 'Unknown',
         "resolution": camera["resolution"] or 1080,
         "frame_rate": camera["frame_rate"] or 30,
@@ -756,7 +758,9 @@ def edit_camera(camera_id):
         "subnet_mask": camera["subnet_mask"] or "255.255.255.0",
         "gateway": camera["gateway"] or "192.168.1.1",
         "timezone": camera["timezone"] or "Asia/Singapore",
-        "sync_with_ntp": camera["sync_with_ntp"] or 0,
+        "sync_with_ntp": (
+            camera["sync_with_ntp"] if camera["sync_with_ntp"] is not None else 0
+        ),
         "ntp_server_address": camera["ntp_server_address"] or "pool.ntp.org",
         "time": camera["time"] or "",
         "lab_name": camera["lab_name"] or "Unknown Lab",
@@ -1186,7 +1190,7 @@ def apply_time_settings(camera_ip, settings):
 
         # Update time mode based on NTP setting
         if "sync_with_ntp" in settings:
-            sync_with_ntp = settings["sync_with_ntp"]
+            sync_with_ntp = request.form.get("sync_with_ntp") == "1"
             time_mode = "NTP" if sync_with_ntp else "manual"
 
             if "hikvision.com" in response.text:
@@ -1393,7 +1397,7 @@ def add_camera():
                                            encoding,
                                            subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp,
                                            ntp_server_address, time)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cameraid
                        """,
             (
                 device_info.get("device_name", f"Camera_{camera_ip}"),
@@ -1407,9 +1411,7 @@ def add_camera():
                 device_info.get("gateway", "192.168.1.1"),
                 device_info.get("camera_ip_type", "static"),
                 device_info.get("timezone", "Asia/Singapore"),
-                device_info.get(
-                    "sync_with_ntp", 1 if device_info.get("sync_with_ntp") else 0
-                ),
+                bool(device_info.get("sync_with_ntp", True)),
                 device_info.get(
                     "ntp_server_address", "pool.ntp.org"
                 ),  # Fixed: use correct key

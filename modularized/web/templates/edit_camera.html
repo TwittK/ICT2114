@@ -214,7 +214,7 @@
                         <i class="fa-solid fa-clock me-1"></i> Manual Time Setting:
                       </label>
                       <input type="datetime-local" name="manual_time" class="form-control"
-                        value="{{ camera['time'][:16] if camera['time'] else '' }}">
+                        value="{{ camera['time'].strftime('%Y-%m-%dT%H:%M') if camera['time'] else '' }}">
                       <small class="form-text text-muted">Current: {{ camera['time'] if camera['time'] else 'Not set'
                         }}</small>
                     </div>
@@ -238,7 +238,7 @@
   </div>
 </div>
 {% else %}
-  <p>Not enough permissions. Access denied.</p>
+<p>Not enough permissions. Access denied.</p>
 {% endif %}
 
 <script>
