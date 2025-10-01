@@ -12,15 +12,18 @@ class CollaborativeInference:
   def run_model_detection(self, model, frame, target_classes_id, conf_threshold, gpu_id):
     
     device_str = f"cuda:{gpu_id}" if gpu_id is not None else "cpu"
+
     # Main food/ drink object detection
+    #with self.context.manager.gpu_locks[gpu_id]:
     result = model.track(
-        frame,
-        persist=True,
-        classes=target_classes_id,
-        conf=conf_threshold,
-        verbose=False,
-        device=torch.device('cpu' if gpu_id == None else gpu_id) 
+      frame,
+      persist=True,
+      classes=target_classes_id,
+      conf=conf_threshold,
+      verbose=False,
+      device=torch.device(device_str)
     )
+
     boxes = result[0].boxes
     return boxes
 
@@ -118,12 +121,16 @@ class CollaborativeInference:
     return matched
 
   def calculate_avg_confidence(self, matched_objects, avg_conf_threshold):
-    
+  
     filtered = []
     filtered_confidence = []
     filtered_boxes = []
     for object_group in matched_objects:
-      avg_conf = sum(obj.conf.item() for obj in object_group) / len(object_group)
+
+      obj_confs = [obj.conf.item() for obj in object_group]
+      avg_conf = sum(obj_confs) / len(object_group)
+      print(f"Object conf across models: {obj_confs} || Average conf: {avg_conf:2f}")
+
       if avg_conf >= avg_conf_threshold:
 
         # Merge bounding boxes
@@ -142,18 +149,19 @@ class CollaborativeInference:
   
   def collaborative_inference(self, frame):
     model_results = []
-    with self.context.manager.inference_lock:
-      with ThreadPoolExecutor(max_workers=len(self.model_list)) as executor:
-        futures = []
-        for model in self.model_list:
-          futures.append(
-            executor.submit(self.run_model_detection, model.get_model_instance(), frame, model.get_target_classes_id(), model.get_conf_threshold(), model.get_gpu_device())
-          )
+    with ThreadPoolExecutor(max_workers=len(self.model_list)) as executor:
+      futures = []
+      for model in self.model_list:
+        futures.append(
+          executor.submit(self.run_model_detection, model.get_model_instance(), frame, model.get_target_classes_id(), model.get_conf_threshold(), model.get_gpu_device())
+        )
 
-        for future in futures:
-          # Add to results if theres at least 1 element in the tensor (one detection found)
-          if future.result().cls.numel() > 0:
-            model_results.append(future.result())
+      for future in futures:
+        # Add to results if theres at least 1 element in the tensor (one detection found)
+        if future.result().cls.numel() > 0:
+          model_results.append(future.result())
+
+      del futures
 
     return model_results
   
@@ -183,16 +191,16 @@ class CollaborativeInference:
 
       # print(model_results)
       matched_objects = self.match_objects(model_results)
+      del model_results
 
       # print(f"Matched count: {len(matched_objects)}")
       if matched_objects:
 
         filtered_obj_group, filtered_confidence, filtered_boxes = self.calculate_avg_confidence(matched_objects, avg_conf_threshold)
 
-        for i in range(len(filtered_obj_group)):
-          print(f"Average confidence of object {i}: {filtered_confidence[i]:2f}, at {filtered_boxes[i]}")
-
         return filtered_obj_group, filtered_confidence, filtered_boxes
-    
+      
+      del matched_objects, model_results
+
     return None, None, None
     

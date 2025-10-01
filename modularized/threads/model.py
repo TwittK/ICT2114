@@ -60,6 +60,26 @@ class PoseDetectionModel(BaseModel):
 
     return keypoints
   
+  def parse_keypoints(self, keypoints):
+    # Save landmarks for each person
+    results = []
+    for person in keypoints:
+      try:
+        person_lm = person.cpu().numpy()
+        results.append({
+            "nose": person_lm[0],
+            "left_wrist": person_lm[9],
+            "right_wrist": person_lm[10],
+            "left_ear": person_lm[3],
+            "right_ear": person_lm[4],
+            "left_eye": person_lm[1],
+            "right_eye": person_lm[2],
+          })
+      except Exception:
+        continue
+      
+    return results
+
 class ImageClassificationModel(BaseModel):
   def __init__(self, model_name):
     super().__init__(model_name)
@@ -68,5 +88,11 @@ class ImageClassificationModel(BaseModel):
 
   def classify(self, frame):
     model = self.get_model_instance()
-    return model(frame, verbose=False)
+
+    # Run inference on classification model and extract predicted label
+    results = model(frame, verbose=False)
+    pred = results[0]
+    label = pred.names[pred.probs.top1]
+
+    return label
 

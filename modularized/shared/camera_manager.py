@@ -28,6 +28,8 @@ class CameraManager:
     
     self.camera_pool = {}
     self.inference_lock = threading.Lock()
+    #self.gpu_locks = {0: threading.Lock(), 1: threading.Lock(), 2: threading.Lock()}
+
     self.db = psycopg2.connect(**db_params)
 
     # Select all existing cameras

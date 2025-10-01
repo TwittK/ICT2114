@@ -1,6 +1,6 @@
 # threads/reader.py
 import cv2
-import time
+import time, queue
 from shared.camera import Camera
 
 def read_frames(context: Camera):
@@ -111,6 +111,13 @@ def read_frames(context: Camera):
 
         if not (context.frame_queue).full():
             (context.frame_queue).put(frame)
+        else:
+            try:
+                _ = context.frame_queue.get_nowait()  # Remove oldest frame
+            except queue.Empty:
+                pass
+            (context.frame_queue).put(frame)
+
         time.sleep(0.01)
 
     if context.cap:

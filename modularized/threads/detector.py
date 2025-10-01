@@ -236,20 +236,20 @@ def detection(context: Camera):
                     if int(matches_found[0]) >= 1:
 
                         print("Match found")
-                        person_id = process_incompliance.match_found_new_incompliance(matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
+                        db_person_id = process_incompliance.match_found_new_incompliance(matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date)
 
                         # Incompliance on different date
-                        if person_id is not None:
+                        if db_person_id is not None:
                                             
                             # Save frame locally
-                            save_img(context, frame, str(person_id), today)
+                            save_img(context, frame, str(db_person_id), today)
                 
                             # Send Email for Second Incompliance Detected
                             lab_email = get_lab_safety_email_by_camera_id(context.camera_id)
                             if lab_email:
-                                email_service.send_incompliance_email(lab_email, f"Person {person_id}")
+                                email_service.send_incompliance_email(lab_email, f"Person {db_person_id}")
 
-                            print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                            print(f"[ACTION] Similar face found 🟢: {db_person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
                             
                         # Incompliance on the same date
                         else:
@@ -264,15 +264,15 @@ def detection(context: Camera):
                         print("No match found")
                         flag_track_id(context, track_id)
 
-                        person_id = 1 #process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
+                        db_person_id = process_incompliance.no_match_new_incompliance(nvr, local_detected_food_drinks, track_id, face_crop, current_date)
                         
                         # Save frame locally in new folder
-                        os.makedirs(os.path.join("web", "static", "incompliances", str(person_id),), exist_ok=True,)
-                        save_img(context, frame, str(person_id), today)
+                        os.makedirs(os.path.join("web", "static", "incompliances", str(db_person_id),), exist_ok=True,)
+                        save_img(context, frame, str(db_person_id), today)
                             
                         print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         time.sleep(3)  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
-                        # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
+                        # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {db_person_id}")
 
 
                 except Exception as e:

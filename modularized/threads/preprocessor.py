@@ -7,16 +7,15 @@ from shared.camera import Camera
 from threads.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
 from threads.collaborative_inference import CollaborativeInference
 from threads.detector import safe_crop
-
+import torch
 
 # YOLO model food/ drinks detection, pose and water bottle detection.
 def preprocess(context: Camera, target_classes_id, conf_threshold):
-
-    # TODO: see if @ThreadingLocked() can be used to save memory (but reduce concurrency)
+    
     models = [
         ObjectDetectionModel("yolo11n.pt", target_classes_id, conf_threshold, 0),
         #ObjectDetectionModel("yolov8n.pt", target_classes_id, conf_threshold),
-        #ObjectDetectionModel("yolov8m.pt", target_classes_id, conf_threshold),
+        #ObjectDetectionModel("yolov8s.pt", target_classes_id, conf_threshold),
     ]
 
     pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.80, 0.4)
@@ -39,14 +38,18 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
 
         # Copy frame for drawing bounding boxes, ids and confidence scores on video feed display.
         frame_copy = frame.copy() 
-        
+        # frame_count += 1
+        # if frame_count % 50 == 0:
+        #     print_cpu_memory_usage(f"After processing {frame_count} frames: ")
 
         # Collaborative Inference with list of models.
+
         collab_inf_results = collab_inference.collaborative_inference(frame)
 
         with context.detected_incompliance_lock:
             context.detected_incompliance.clear()
-
+        with context.pose_points_lock:
+            context.pose_points.clear()
 
         if (collab_inf_results):
 
@@ -80,9 +83,7 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
                             # Check if it's a water bottle or not
                             x1, y1, x2, y2 = map(int, filtered_boxes[i])
                             object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
-                            results = classif_model.classify(object_crop)
-                            pred = results[0]
-                            label = pred.names[pred.probs.top1]
+                            label = classif_model.classify(object_crop)
 
                             # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
                             if label == "water_bottle" or label == "milk_can":
@@ -101,29 +102,12 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
                         # print(context.detected_incompliance[track_id])
 
             keypoints = pose_model.predict(frame)
-            with context.pose_points_lock:
-                context.pose_points.clear()
 
             with context.detected_incompliance_lock and context.pose_points_lock:
                 # only process if theres both faces and food/beverages in frame
                 if context.detected_incompliance and (keypoints is not None):
-                    # save landmarks for each person
-                    for person in keypoints:
-                        try:
-                            person_lm = person.cpu().numpy()
-                            context.pose_points.append(
-                                {
-                                    "nose": person_lm[0],
-                                    "left_wrist": person_lm[9],
-                                    "right_wrist": person_lm[10],
-                                    "left_ear": person_lm[3],
-                                    "right_ear": person_lm[4],
-                                    "left_eye": person_lm[1],
-                                    "right_eye": person_lm[2],
-                                }
-                            )
-                        except Exception:
-                            continue
+                    landmark_dict = pose_model.parse_keypoints(keypoints)
+                    context.pose_points = landmark_dict
 
             # Put into process queue for the next step (mapping food/ drinks to faces)
             with context.detected_incompliance_lock and context.pose_points_lock:
@@ -151,3 +135,7 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
             except queue.Empty:
                 pass
             context.display_queue.put(frame_copy)
+
+        
+        del frame, frame_copy
+        torch.cuda.empty_cache()
