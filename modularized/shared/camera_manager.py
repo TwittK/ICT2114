@@ -1,5 +1,5 @@
 # shared/camera_manager.py
-import threading, sqlite3, queue
+import threading, psycopg2, queue
 from concurrent.futures import ThreadPoolExecutor
 from threads.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
 
@@ -10,7 +10,7 @@ class CameraManager:
   _instance = None
 
   # Singleton
-  def __new__(cls, db_path):
+  def __new__(cls, db_params):
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
@@ -22,13 +22,13 @@ class CameraManager:
       raise RuntimeError("CameraManager has not been initialized yet.")
     return cls._instance
 
-  def __init__(self, db_path):
+  def __init__(self, db_params):
 
     if self._initialized: # Singleton
       return 
     
     self.camera_pool = {}
-    self.db = sqlite3.connect(db_path)
+    self.db = psycopg2.connect(**db_params)
 
     # Shared queues for all cameras
     self.preprocess_queue = queue.Queue()
@@ -43,10 +43,16 @@ class CameraManager:
       self.preprocess_pool.submit(self._preprocess_worker)
       self.detection_pool.submit(self._detection_worker)
 
-    # Select all existing cameras in database 
-    with self.db as conn:
-      cursor = conn.execute("SELECT CameraId, ip_address FROM Camera;")
-      rows = cursor.fetchall()
+    # # Select all existing cameras in database 
+    # with self.db as conn:
+    #   cursor = conn.execute("SELECT CameraId, ip_address FROM Camera;")
+    #   rows = cursor.fetchall()
+
+    # Select all existing cameras
+    cursor = self.db.cursor()
+    cursor.execute("SELECT CameraId, ip_address FROM Camera;")
+    rows = cursor.fetchall()
+    cursor.close()
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:

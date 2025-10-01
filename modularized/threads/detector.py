@@ -1,5 +1,6 @@
 import queue, time, os
 import numpy as np
+from dotenv import load_dotenv
 from datetime import datetime
 from threads.saver import save_img
 
@@ -13,7 +14,16 @@ from database import get_lab_safety_email_by_camera_id
 # Constants
 REQUIRED_DURATION = 3.0  # seconds
 REQUIRED_COUNT = 3  # Number of detections in that duration
-DATABASE = 'users.sqlite'
+# DATABASE = 'users.sqlite'
+load_dotenv()
+db_params = {
+    'dbname': os.getenv("POSTGRES_DB"),
+    'user': os.getenv("POSTGRES_USER"),
+    'password': os.getenv("POSTGRES_PASSWORD"),
+    'host': os.getenv("POSTGRES_HOST", "localhost"),  
+    'port': os.getenv("POSTGRES_PORT", "5432")   
+}
+
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
     """
@@ -117,7 +127,8 @@ def detection(context: Camera, frame):
     
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
-    process_incompliance = ProcessIncompliance(DATABASE, context.camera_id)
+    process_incompliance = ProcessIncompliance(db_params, context.camera_id)
+    # process_incompliance = ProcessIncompliance(DATABASE, context.camera_id)
 
     # Shallow copy for reading in this thread
     with context.detected_incompliance_lock, context.pose_points_lock:

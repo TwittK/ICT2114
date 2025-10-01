@@ -1,134 +1,86 @@
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 class RoleDAO:
-  def __init__(self, db_path):
-    self.db_path = db_path
-  
+  def __init__(self, db_params):
+    self.db_params = db_params
+
+  def _get_conn(self):
+      """Helper to return a new connection with dict-style rows."""
+      return psycopg2.connect(**self.db_params, cursor_factory=RealDictCursor)
+
   def get_all_roles(self):
-    """Return roles in dict"""
-    conn = sqlite3.connect(self.db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM Roles")
-    roles = cursor.fetchall()
-
-    conn.close()
-    
-    return list(roles)
+    """Return roles in list of dicts"""
+    with self._get_conn() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM roles")
+        return cursor.fetchall()
 
   def get_all_permissions(self):
-    """Return permissions in dict"""
-    conn = sqlite3.connect(self.db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM Permission")
-    permissions = cursor.fetchall()
-
-    conn.close()
-    
-    return list(permissions)
+      """Return permissions in list of dicts"""
+      with self._get_conn() as conn, conn.cursor() as cursor:
+          cursor.execute("SELECT * FROM permission")
+          return cursor.fetchall()
 
   def get_all_rolepermissions(self):
-    """Return list of tuples (role id, permission id)"""
-    conn = sqlite3.connect(self.db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM RolePermission")
-    role_perms = cursor.fetchall()
-
-    conn.close()
-      
-    return [tuple(rp) for rp in role_perms]
+    """Return list of tuples (role_id, permission_id)"""
+    with self._get_conn() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM rolepermission")
+        rows = cursor.fetchall()
+        # rows will be list of dicts (with RealDictCursor)
+        return [(row["role_id"], row["permission_id"]) for row in rows]
   
   def insert_new_role(self, role_name):
     """Creates a new role with no permissions."""
     try:
-      conn = sqlite3.connect(self.db_path)
-      cursor = conn.cursor()
-      cursor.execute("INSERT INTO Roles (name) VALUES (?)", (role_name,))
-      conn.commit()
-
-      return True
-
-    except sqlite3.IntegrityError:
-      return False
-    
-    finally:
-      conn.close()
+        with self._get_conn() as conn, conn.cursor() as cursor:
+            cursor.execute("INSERT INTO roles (name) VALUES (%s)", (role_name,))
+            conn.commit()
+            return True
+    except psycopg2.IntegrityError:
+        return False
 
   def delete_role(self, role_name):
-    """Deletes a role using its name. Update all affected users' roles to default 'user' role. """
+    """Deletes a role using its name. Update all affected users' roles to default 'user' role."""
     try:
-      conn = sqlite3.connect(self.db_path)
-      cursor = conn.cursor()
-      cursor.execute("UPDATE users SET role = ? WHERE role = ?", ('user', role_name))
-      cursor.execute("DELETE FROM Roles WHERE name = ?", (role_name,))
-      conn.commit()
-
-      return True
-
-    except sqlite3.IntegrityError:
-      return False
-    
-    finally:
-      conn.close()
+        with self._get_conn() as conn, conn.cursor() as cursor:
+            cursor.execute("UPDATE users SET role = %s WHERE role = %s", ('user', role_name))
+            cursor.execute("DELETE FROM roles WHERE name = %s", (role_name,))
+            conn.commit()
+            return True
+    except psycopg2.IntegrityError:
+        return False
 
   def update_role_permissions(self, permissions_map):
     """
     Transaction to update role to permission mappings.
-    permissions_map: Dictionary of (role_id, perm_id) tuples
+    permissions_map: set of (role_id, perm_id) tuples
     """
-    conn = sqlite3.connect(self.db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    try:
-      cursor = conn.cursor()
-      cursor.execute("BEGIN TRANSACTION;")
-
-      # Clear all permissions first
-      cursor.execute("DELETE FROM RolePermission")
-
-      # Insert all new permissions
-      for role_id, perm_id in permissions_map:
-        cursor.execute("INSERT INTO RolePermission (role_id, permission_id) VALUES (?, ?)", (role_id, perm_id))
-
-      conn.commit()
-
-    except Exception as e:
-      conn.rollback()
-      raise e
-    
-    finally:
-      conn.close()
+    with self._get_conn() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("BEGIN;")
+            # Clear all permissions first
+            cursor.execute("DELETE FROM rolepermission")
+            # Insert all new mappings
+            for role_id, perm_id in permissions_map:
+                cursor.execute(
+                    "INSERT INTO rolepermission (role_id, permission_id) VALUES (%s, %s)",
+                    (role_id, perm_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
   
   def get_role_id_by_name(self, role_name):
     """Returns role ID using role name."""
-    try:
-      conn = sqlite3.connect(self.db_path)
-      cursor = conn.cursor()
-      cursor.execute("SELECT id FROM Roles WHERE name = ?", (role_name,))
-
-      return cursor.fetchone()[0]
-
-    except sqlite3.IntegrityError:
-      return None
-    
-    finally:
-      conn.close()
+    with self._get_conn() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM roles WHERE name = %s", (role_name,))
+        row = cursor.fetchone()
+        return row["id"] if row else None
 
   def get_permission_id_by_name(self, permission_name):
-    """Returns permission ID using role name."""
-    try:
-      conn = sqlite3.connect(self.db_path)
-      cursor = conn.cursor()
-      cursor.execute("SELECT id FROM Permission WHERE name = ?", (permission_name,))
-
-      return cursor.fetchone()[0]
-
-    except sqlite3.IntegrityError:
-      return None
-    
-    finally:
-      conn.close()
+    """Returns permission ID using permission name."""
+    with self._get_conn() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM permission WHERE name = %s", (permission_name,))
+        row = cursor.fetchone()
+        return row["id"] if row else None

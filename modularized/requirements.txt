@@ -1,3 +1,8 @@
 ultralytics==8.3.162
-Flask==3.1.1
-bleach==4.1.0
+Flask
+opencv-python-headless
+numpy
+Pillow
+bleach
+python-dotenv
+psycopg2-binary

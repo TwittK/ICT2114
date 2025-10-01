@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  lab-monitoring:
+    build: .
+    container_name: lab-monitoring-app
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./web/static/incompliances:/app/web/static/incompliances
+      - ./yolo_models:/app/yolo_models
+    env_file:
+      - .env  # This tells Docker Compose to load environment variables from the .env file
+    environment:
+      - FLASK_ENV=${FLASK_ENV}
+      - PYTHONPATH=${PYTHONPATH}
+      - DB_HOST=${POSTGRES_HOST}
+      - DB_PORT=${POSTGRES_PORT}
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+    restart: unless-stopped
+    devices:
+      - /dev/video0:/dev/video0
+    privileged: true
+    depends_on:
+      postgres:
+        condition: service_healthy  # Ensure the DB is healthy before starting app
+
+  postgres:
+    image: postgres:13
+    container_name: lab-monitoring-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+      start_period: 10s
+
+volumes:
+  postgres_data:
+
+
