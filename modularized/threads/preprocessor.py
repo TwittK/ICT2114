@@ -38,9 +38,6 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
 
         # Copy frame for drawing bounding boxes, ids and confidence scores on video feed display.
         frame_copy = frame.copy() 
-        # frame_count += 1
-        # if frame_count % 50 == 0:
-        #     print_cpu_memory_usage(f"After processing {frame_count} frames: ")
 
         # Collaborative Inference with list of models.
 

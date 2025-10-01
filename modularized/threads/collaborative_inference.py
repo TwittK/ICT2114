@@ -191,16 +191,15 @@ class CollaborativeInference:
 
       # print(model_results)
       matched_objects = self.match_objects(model_results)
-      del model_results
 
       # print(f"Matched count: {len(matched_objects)}")
       if matched_objects:
 
         filtered_obj_group, filtered_confidence, filtered_boxes = self.calculate_avg_confidence(matched_objects, avg_conf_threshold)
 
+        del matched_objects, model_results
+
         return filtered_obj_group, filtered_confidence, filtered_boxes
       
-      del matched_objects, model_results
-
     return None, None, None
     
