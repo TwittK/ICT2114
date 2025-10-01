@@ -10,7 +10,8 @@ class CollaborativeInference:
     self.min_model_votes = min_model_votes
 
   def run_model_detection(self, model, frame, target_classes_id, conf_threshold, gpu_id):
-      
+    
+    device_str = f"cuda:{gpu_id}" if gpu_id is not None else "cpu"
     # Main food/ drink object detection
     result = model.track(
         frame,
@@ -34,33 +35,21 @@ class CollaborativeInference:
     Returns:
       float: IoU value in the range [0, 1]. Returns 0 if boxes do not overlap.
     """
-    # Unpack coordinates
-    x1_1, y1_1, x2_1, y2_1 = box1
-    x1_2, y1_2, x2_2, y2_2 = box2
+    # Intersection coords
+    inter_x1 = torch.max(box1[0], box2[0])
+    inter_y1 = torch.max(box1[1], box2[1])
+    inter_x2 = torch.min(box1[2], box2[2])
+    inter_y2 = torch.min(box1[3], box2[3])
 
-    # Calculate the coordinates of the intersection rectangle
-    inter_x1 = max(x1_1, x1_2)
-    inter_y1 = max(y1_1, y1_2)
-    inter_x2 = min(x2_1, x2_2)
-    inter_y2 = min(y2_1, y2_2)
+    # Clamping, so that no negative areas
+    inter_area = (inter_x2 - inter_x1).clamp(min=0) * (inter_y2 - inter_y1).clamp(min=0)
 
-    # Compute intersection area
-    inter_width = max(0, inter_x2 - inter_x1)
-    inter_height = max(0, inter_y2 - inter_y1)
-    inter_area = inter_width * inter_height
+    # Calculate the total union area of the boxes
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union_area = area1 + area2 - inter_area
 
-    # Calculate area of both boxes, add together to get union area
-    area_box1 = (x2_1 - x1_1) * (y2_1 - y1_1)
-    area_box2 = (x2_2 - x1_2) * (y2_2 - y1_2)
-    union_area = area_box1 + area_box2 - inter_area
-
-    # Avoid division by zero
-    if union_area == 0:
-      return 0.0
-
-    # IoU = Area of intersection / Area of union
-    iou = inter_area / union_area
-    return iou
+    return inter_area / union_area if union_area > 0 else torch.tensor(0.0, device=box1.device)
 
   def match_objects(self, model_results, iou_threshold=0.9):
     """
@@ -83,28 +72,17 @@ class CollaborativeInference:
 
     # Flatten all detections
     all_detections = []
+    
     for model_idx, model_boxes in enumerate(model_results):
-      # print(f"Model id: {model_idx}")
-      # print(f"Detected count in model {model_idx}: {len(model_boxes)}")
-
       for i in range(len(model_boxes)):
-        
-        # Prints out all bounding box from model
-        box = model_boxes.xyxy[i].tolist()
-        cls = model_boxes.cls[i].item()
-        conf = model_boxes.conf[i].item()
-        track_id = int(model_boxes.id[i].item()) if model_boxes.id is not None else None
-
-        # print(f"Item detected in model: {cls}, {conf}, {box}")
-
         all_detections.append({
-          'model_idx': model_idx,
-          'box_idx': i,
-          'box': box,
-          'cls': cls,
-          'conf': conf,
-          'track_id': track_id,
-          'boxes_obj': model_boxes
+            'model_idx': model_idx,
+            'box_idx': i,
+            'box': model_boxes.xyxy[i],  # GPU tensor
+            'cls': model_boxes.cls[i],   # GPU tensor
+            'conf': model_boxes.conf[i], # GPU tensor
+            'track_id': model_boxes.id[i] if model_boxes.id is not None else None,
+            'boxes_obj': model_boxes
         })
 
     # Match all detection across different models
@@ -122,11 +100,13 @@ class CollaborativeInference:
       for j, detection2 in enumerate(all_detections):
           if j in used or (detection1['model_idx'] == detection2['model_idx'] and len(all_detections) != 1):
             continue
+
+          # Class different, so not the same object
           if detection1['cls'] != detection2['cls']:
             continue
+          
           iou = self.compute_iou(detection1['box'], detection2['box'])
 
-          # print(iou)
           if iou > iou_threshold:
             group.append(detection2)
             used.add(j)
@@ -207,9 +187,12 @@ class CollaborativeInference:
       # print(f"Matched count: {len(matched_objects)}")
       if matched_objects:
 
-        filtered_conf, filtered_confidence, filtered_boxes = self.calculate_avg_confidence(matched_objects, avg_conf_threshold)
+        filtered_obj_group, filtered_confidence, filtered_boxes = self.calculate_avg_confidence(matched_objects, avg_conf_threshold)
 
-        return filtered_conf, filtered_confidence, filtered_boxes
+        for i in range(len(filtered_obj_group)):
+          print(f"Average confidence of object {i}: {filtered_confidence[i]:2f}, at {filtered_boxes[i]}")
+
+        return filtered_obj_group, filtered_confidence, filtered_boxes
     
     return None, None, None
     
