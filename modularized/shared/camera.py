@@ -37,6 +37,7 @@ class Camera:
 
     self.frame_queue = queue.Queue(maxsize=10)
     self.save_queue = queue.Queue(maxsize=10)
+    self.process_queue = queue.Queue(maxsize=10)
     self.display_queue = queue.Queue(maxsize=10)
 
     self.cap = None

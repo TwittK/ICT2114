@@ -1,6 +1,7 @@
 from shared.camera import Camera
 from concurrent.futures import ThreadPoolExecutor
 import cv2 as cv
+import torch
 
 class CollaborativeInference:
   def __init__(self, context: Camera, model_list, min_model_votes):
@@ -17,7 +18,7 @@ class CollaborativeInference:
         classes=target_classes_id,
         conf=conf_threshold,
         verbose=False,
-        #device=gpu_id
+        device=torch.device('cpu' if gpu_id == None else gpu_id) 
     )
     boxes = result[0].boxes
     return boxes
@@ -119,7 +120,7 @@ class CollaborativeInference:
 
       # Compare every detection against every other detection
       for j, detection2 in enumerate(all_detections):
-          if j in used or detection1['model_idx'] == detection2['model_idx']:
+          if j in used or (detection1['model_idx'] == detection2['model_idx'] and len(all_detections) != 1):
             continue
           if detection1['cls'] != detection2['cls']:
             continue
@@ -130,7 +131,7 @@ class CollaborativeInference:
             group.append(detection2)
             used.add(j)
 
-      if len(group) > 1:
+      if len(group) > 1 or len(all_detections) == 1:
         # Only return groups that include multiple detections
         matched.append([d['boxes_obj'][d['box_idx']] for d in group])
 
@@ -161,17 +162,18 @@ class CollaborativeInference:
   
   def collaborative_inference(self, frame):
     model_results = []
-    with ThreadPoolExecutor(max_workers=len(self.model_list)) as executor:
-      futures = []
-      for model in self.model_list:
-        futures.append(
-          executor.submit(self.run_model_detection, model.get_model_instance(), frame, model.get_target_classes_id(), model.get_conf_threshold(), model.get_gpu_device())
-        )
+    with self.context.manager.inference_lock:
+      with ThreadPoolExecutor(max_workers=len(self.model_list)) as executor:
+        futures = []
+        for model in self.model_list:
+          futures.append(
+            executor.submit(self.run_model_detection, model.get_model_instance(), frame, model.get_target_classes_id(), model.get_conf_threshold(), model.get_gpu_device())
+          )
 
-      for future in futures:
-        # Add to results if theres at least 1 element in the tensor (one detection found)
-        if future.result().cls.numel() > 0:
-          model_results.append(future.result())
+        for future in futures:
+          # Add to results if theres at least 1 element in the tensor (one detection found)
+          if future.result().cls.numel() > 0:
+            model_results.append(future.result())
 
     return model_results
   

@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from threads.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
-SENTINEL = object()
 
 class CameraManager:
   _instance = None
@@ -28,25 +27,8 @@ class CameraManager:
       return 
     
     self.camera_pool = {}
+    self.inference_lock = threading.Lock()
     self.db = psycopg2.connect(**db_params)
-
-    # Shared queues for all cameras
-    self.preprocess_queue = queue.Queue()
-    self.detection_queue = queue.Queue()
-
-    # Shared thread pools for processing
-    self.preprocess_pool = ThreadPoolExecutor(max_workers=1)
-    self.detection_pool = ThreadPoolExecutor(max_workers=4)
-
-    # Start background workers for each processing step
-    for _ in range(4):
-      self.preprocess_pool.submit(self._preprocess_worker)
-      self.detection_pool.submit(self._detection_worker)
-
-    # # Select all existing cameras in database 
-    # with self.db as conn:
-    #   cursor = conn.execute("SELECT CameraId, ip_address FROM Camera;")
-    #   rows = cursor.fetchall()
 
     # Select all existing cameras
     cursor = self.db.cursor()
@@ -56,44 +38,9 @@ class CameraManager:
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
-      self.add_new_camera(camera_id, ip_address, True) 
+      self.add_new_camera(camera_id, ip_address, False) 
 
     self._initialized = True
-
-  def _preprocess_worker(self):
-    from threads.preprocessor import preprocess
-    models = [
-      ObjectDetectionModel("yolo11n.pt", target_class_list, 0.3),
-      ObjectDetectionModel("yolov8n.pt", target_class_list, 0.3),
-      ObjectDetectionModel("yolov8m.pt", target_class_list, 0.3),
-    ]
-    pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.80, 0.4)
-    classif_model = ImageClassificationModel("yolov8n-cls.pt")
-
-    while True:
-      try:
-        item = self.preprocess_queue.get(timeout=2)
-        if item is SENTINEL:
-          break
-
-        camera, frame = item
-        processed_frame = preprocess(camera, frame, models, pose_model, classif_model)
-        self.detection_queue.put((camera, processed_frame))
-      except queue.Empty:
-        continue
-
-  def _detection_worker(self):
-    from threads.detector import detection
-    while True:
-      try:
-        item = self.detection_queue.get(timeout=2)
-        if item is SENTINEL:
-          break
-
-        camera, processed_frame = item
-        detection(camera, processed_frame)
-      except queue.Empty:
-        continue
 
   def shutdown_all_cameras(self):
     """
@@ -113,17 +60,6 @@ class CameraManager:
         print(f"[INFO] Thread '{thread_name}' for camera {camera_id} joined.")
 
     self.camera_pool.clear()
-
-    # Stop worker threads via sentinel
-    for _ in range(self.preprocess_pool._max_workers):
-      self.preprocess_queue.put(SENTINEL)
-    for _ in range(self.detection_pool._max_workers):
-      self.detection_queue.put(SENTINEL)
-
-    # Shutdown thread pools
-    self.preprocess_pool.shutdown(wait=True)
-    self.detection_pool.shutdown(wait=True)
-
     print("[INFO] All worker and camera threads shut down successfully.")
 
   def remove_camera(self, camera_id):
@@ -186,21 +122,27 @@ class CameraManager:
     from shared.camera import Camera
 
     try:
-      camera = Camera(camera_id, ip_address, channel, False, self)
+      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
 
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))
+      preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
+      detection_thread = threading.Thread(target=detection, args=(camera,))
       save_thread = threading.Thread(target=image_saver, args=(camera,))
 
 
       read_thread.start()
+      preprocess_thread.start()
+      detection_thread.start()
       save_thread.start()
 
       self.camera_pool[camera_id] = {
         "camera": camera,
         "threads": {
           "read": read_thread,
+          "detection": detection_thread,
           "save": save_thread,
+          "preprocess": preprocess_thread
         },
       }
 
