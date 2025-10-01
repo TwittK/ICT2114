@@ -4,6 +4,7 @@ from database import create_camera, create_new_camera
 
 LAB_NOT_FOUND = "Lab not found"
 
+
 class CameraDAO:
     def __init__(self, db_params):
         self.db_params = db_params
@@ -16,15 +17,18 @@ class CameraDAO:
         """Return lab ID for a given lab name."""
         with self._get_conn() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT \"LabId\" FROM \"Lab\" WHERE lab_name = %s", (lab_name,))
+                cursor.execute("SELECT LabId FROM Lab WHERE lab_name = %s", (lab_name,))
                 row = cursor.fetchone()
-                return row["LabId"] if row else None
+                return row["labid"] if row else None
 
     def count_cameras_in_lab(self, lab_id):
         """Return number of cameras in a given lab."""
         with self._get_conn() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) AS count FROM \"Camera\" WHERE camera_lab_id = %s", (lab_id,))
+                cursor.execute(
+                    "SELECT COUNT(*) AS count FROM Camera WHERE camera_lab_id = %s",
+                    (lab_id,),
+                )
                 return cursor.fetchone()["count"]
 
     def add_default_camera(self, lab_name, user_id):
@@ -55,12 +59,15 @@ class CameraDAO:
 
         with self._get_conn() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM "Camera"
+                cursor.execute(
+                    """
+                    DELETE FROM Camera
                     WHERE name = %s
                       AND camera_lab_id = %s
                       AND camera_user_id = %s
-                """, (camera_name, lab_id, user_id))
+                """,
+                    (camera_name, lab_id, user_id),
+                )
                 affected_rows = cursor.rowcount
                 conn.commit()
 
@@ -77,20 +84,23 @@ class CameraDAO:
 
         with self._get_conn() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT "CameraId"
-                    FROM "Camera"
+                cursor.execute(
+                    """
+                    SELECT CameraId
+                    FROM Camera
                     WHERE name = %s
                       AND camera_lab_id = %s
                       AND camera_user_id = %s
-                """, (camera_name, lab_id, user_id))
+                """,
+                    (camera_name, lab_id, user_id),
+                )
 
                 row = cursor.fetchone()
                 if row is None:
                     return False, None
 
-                return True, row["CameraId"]
-    
+                return True, row["cameraid"]
+
     def add_new_camera(self, lab_name, user_id, device_info):
         """Creates a new camera in a given lab."""
         lab_id = self.get_lab_id(lab_name)
@@ -114,10 +124,13 @@ class CameraDAO:
             timezone=device_info["timezone"],
             sync_with_ntp=device_info["sync_with_ntp"],
             ntp_server_address=device_info["ntp_server_address"],
-            time=device_info["time"]
+            time=device_info["time"],
         )
 
         if success:
-            return camera_id, f"{default_name} added to {lab_name} as CameraId {camera_id}"
+            return (
+                camera_id,
+                f"{default_name} added to {lab_name} as CameraId {camera_id}",
+            )
         else:
             return None, "Failed to add camera"
