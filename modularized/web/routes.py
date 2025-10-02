@@ -1590,3 +1590,16 @@ def create_account():
 
     return render_template("create_account.html", roles=roles, cam_management=cam_management,
                            user_role_management=user_role_management, )
+
+
+@app.route('/profile')
+@login_required
+def profile():
+    # Get user information from the session
+    user_info = {
+        "username": session.get("username"),
+        "email": session.get("email"),
+        "role": session.get("role"),
+    }
+
+    return render_template("profile.html", user=user_info)
