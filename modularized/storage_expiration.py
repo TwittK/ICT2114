@@ -82,9 +82,9 @@ class StorageExpiration:
                 # Delete locally saved images
                 if image_url and os.path.exists(os.path.join("web", "static", image_url)):
                     os.remove(os.path.join("web", "static", image_url))
-                    logging.info(f"Deleted image: {os.path.join("web", "static", image_url)}")
+                    logging.info(f"Deleted image: {os.path.join('web', 'static', image_url)}")
                 else:
-                    logging.warning(f"Image not found: {os.path.join("web", "static", image_url)}")
+                    logging.warning(f"Image not found: {os.path.join('web', 'static', image_url)}")
 
                 # Delete from snapshot table
                 self.cursor.execute("DELETE FROM Snapshot WHERE DetectionId = %s", (detection_id,))
