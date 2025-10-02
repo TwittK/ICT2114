@@ -1,15 +1,18 @@
-FROM python:3.11-slim
+FROM nvidia/cuda:12.4.0-base-ubuntu22.04
 
 # Install system dependencies with correct package names for newer Debian
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
     libsm6 \
     libxext6 \
     libxrender1 \
-    libfontconfig1 \
-    && rm -rf /var/lib/apt/lists/*
+    libfontconfig1 && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
