@@ -68,6 +68,8 @@ services:
       - "8080:80"
     depends_on:
       - postgres  # your PostgreSQL container name
+    volumes:
+      - ./pgadmin_config/servers/servers.json:/pgadmin4/servers.json
 
 volumes:
   postgres_data:
