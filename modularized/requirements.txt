@@ -6,3 +6,4 @@ Pillow
 bleach
 python-dotenv
 psycopg2-binary
+watchdog==6.0.0
