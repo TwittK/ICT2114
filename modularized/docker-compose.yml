@@ -3,14 +3,14 @@ version: "3.8"
 services:
   lab-monitoring:
     build: .
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [gpu]
+#    runtime: nvidia
     container_name: lab-monitoring-app
     ports:
       - "5001:5000"
@@ -21,6 +21,7 @@ services:
     env_file:
       - .env # This tells Docker Compose to load environment variables from the .env file
     environment:
+      - FLASK_APP=app.py
       - FLASK_ENV=${FLASK_ENV}
       - PYTHONPATH=${PYTHONPATH}
       - DB_HOST=${POSTGRES_HOST}

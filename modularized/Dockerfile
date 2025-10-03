@@ -30,8 +30,8 @@ RUN pip uninstall -y torch
 # Install torch for CUDA Version 12.4
 RUN pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
-# Copy application code
-COPY . .
+# Copy all contents of the current folder into /app
+COPY . /app
 
 # Create necessary directories
 RUN mkdir -p web/static/incompliances
@@ -40,4 +40,5 @@ RUN mkdir -p web/static/incompliances
 EXPOSE 5000
 
 # Run the application
-CMD ["python", "app.py"]
+ENV PYTHONPATH=/app
+CMD ["watchmedo", "auto-restart", "--patterns=*.py", "--recursive", "--", "python", "app.py"]
