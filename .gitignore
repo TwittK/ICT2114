@@ -1,4 +1,5 @@
 .env
+modularized/.env
 .idea/
 __pycache__/
 .venv/
