@@ -13,3 +13,4 @@ def setup_app():
     init_database()
     insert_default_roles()
     create_default_admin()
+    create_default_labs_and_cameras()
