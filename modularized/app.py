@@ -33,25 +33,7 @@ DB_PARAMS = {
 # Set Flask secret key
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
-
-def start_camera_manager():
-    """Initialise camera detection in a background thread."""
-    time.sleep(3)  # Give time to initialize database
-
-    camera_manager = CameraManager(
-        DB_PARAMS
-    )  # Start detection on all cameras stored in database
-
-    try:
-        while True:
-            time.sleep(0.01)
-    finally:
-        camera_manager.shutdown_all_cameras()
-        print("[INFO] Camera manager shut down cleanly.")
-
-
 if __name__ == "__main__":
-
     try:
         # Initialise database and defaults
         setup_app()
