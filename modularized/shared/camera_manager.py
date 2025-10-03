@@ -1,5 +1,6 @@
 # shared/camera_manager.py
 import threading, psycopg2
+from shared.model import ObjectDetectionModel
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
@@ -21,6 +22,7 @@ class CameraManager:
     return cls._instance
 
   def __init__(self, db_params):
+    from shared.detection_manager import DetectionManager
 
     if self._initialized: # Singleton
       return 
@@ -33,6 +35,9 @@ class CameraManager:
     cursor.execute("SELECT CameraId, ip_address FROM Camera;")
     rows = cursor.fetchall()
     cursor.close()
+    
+    workers_count = 1
+    self.detection_manager = DetectionManager(workers_count)
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
@@ -116,7 +121,7 @@ class CameraManager:
       bool: True if the camera was added successfully, False otherwise.
     """
     from threads.reader import read_frames
-    from threads.preprocessor import preprocess
+    #from threads.preprocessor import preprocess
     from threads.detector import detection
     from threads.saver import image_saver
     from shared.camera import Camera
@@ -126,13 +131,13 @@ class CameraManager:
 
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))
-      preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
+      #preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
       detection_thread = threading.Thread(target=detection, args=(camera,))
       save_thread = threading.Thread(target=image_saver, args=(camera,))
 
 
       read_thread.start()
-      preprocess_thread.start()
+      #preprocess_thread.start()
       detection_thread.start()
       save_thread.start()
 
@@ -142,7 +147,7 @@ class CameraManager:
           "read": read_thread,
           "detection": detection_thread,
           "save": save_thread,
-          "preprocess": preprocess_thread
+          #"preprocess": preprocess_thread
         },
       }
 

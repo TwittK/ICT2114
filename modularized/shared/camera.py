@@ -33,7 +33,9 @@ class Camera:
     self.ip_address = ip_address
     self.channel = channel
     self.use_ip_camera = use_ip_camera
+
     self.manager = manager
+    self.detection_manager = manager.detection_manager
 
     self.frame_queue = queue.Queue(maxsize=10)
     self.save_queue = queue.Queue(maxsize=10)
