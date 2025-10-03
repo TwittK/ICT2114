@@ -3,6 +3,14 @@ version: "3.8"
 services:
   lab-monitoring:
     build: .
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    runtime: nvidia
     container_name: lab-monitoring-app
     ports:
       - "5001:5000"
@@ -20,6 +28,7 @@ services:
       - DB_NAME=${POSTGRES_DB}
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - NVIDIA_VISIBLE_DEVICES=all
     restart: unless-stopped
     devices:
       - /dev/video0:/dev/video0
@@ -35,6 +44,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

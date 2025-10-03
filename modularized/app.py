@@ -16,8 +16,8 @@ DB_PARAMS = {
     "dbname": os.getenv("POSTGRES_DB"),
     "user": os.getenv("POSTGRES_USER"),
     "password": os.getenv("POSTGRES_PASSWORD"),
-    "host": os.getenv("POSTGRES_HOST", "localhost"),
-    "port": os.getenv("POSTGRES_PORT", "5432")
+    "host": os.getenv("POSTGRES_HOST", "postgres"),
+    "port": os.getenv("POSTGRES_PORT", "5432"),
 }
 
 if __name__ == "__main__":
@@ -27,15 +27,19 @@ if __name__ == "__main__":
         flask_thread = threading.Thread(target=run_app, daemon=True)
         flask_thread.start()
 
-        time.sleep(3) # Give time to initialize database
+        time.sleep(3)  # Give time to initialize database
 
-        camera_manager = CameraManager(DB_PARAMS) # Start detection on all cameras stored in database
+        camera_manager = CameraManager(
+            DB_PARAMS
+        )  # Start detection on all cameras stored in database
 
-        print("[INFO] Flask server started and all cameras in database started detection")
+        print(
+            "[INFO] Flask server started and all cameras in database started detection"
+        )
 
         while True:
             time.sleep(0.01)
-        
+
     except KeyboardInterrupt:
         print("[INFO] Shutting down.")
 
