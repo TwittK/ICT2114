@@ -58,7 +58,12 @@
                     </form>
 
                 {% elif section == 'role' %}
-                    <p>Role</p>
+                    <form>
+                        <div class="mb-3">
+                            <input type="text" id="role" name="role" class="form-control no-focus"
+                                   value="{{ user_role }}" readonly tabindex="-1">
+                        </div>
+                    </form>
 
                 {% elif section == 'permission' %}
                     <p>Permissions</p>

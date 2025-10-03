@@ -1851,7 +1851,8 @@ def profile(section):
         return render_template("profile.html", section="basic", user=user)
 
     elif section == "role":
-        return render_template("profile.html", section="role")
+        role_name = dao.get_user_role(session['user_id'])
+        return render_template("profile.html", section="role", user_role=role_name)
 
     elif section == "permission":
         return render_template("profile.html", section="permission")

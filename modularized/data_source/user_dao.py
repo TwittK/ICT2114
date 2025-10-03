@@ -30,6 +30,24 @@ class UserDAO:
         finally:
             conn.close()
 
+    def get_user_role(self, user_id):
+        """Return the role name for a user (single role)."""
+        conn = psycopg2.connect(**self.db_params)
+
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                           SELECT r.name
+                           FROM users u
+                                    JOIN roles r ON u.role = r.id
+                           WHERE u.id = %s
+                           """, (user_id,))
+
+            row = cursor.fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
     def update_user(self, user_id, username, email, password=None):
         """Update a user's username, email, and optionally password."""
         conn = psycopg2.connect(**self.db_params)
@@ -49,8 +67,8 @@ class UserDAO:
                 cursor.execute("""
                                UPDATE users
                                SET username=%s,
-                                   email=%s,
-                                   WHERE id = %s
+                                   email=%s
+                               WHERE id = %s
                                """, (username, email, user_id))
 
             conn.commit()

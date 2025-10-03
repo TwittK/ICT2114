@@ -266,3 +266,11 @@ button[type="submit"].btn-danger:hover {
     color: white;
     text-decoration: underline;
 }
+
+/* Prevent focus/cursor */
+.no-focus {
+    /* Disables clicking/focus */
+    pointer-events: none;
+    background-color: #e9ecef;
+    color: #495057;
+}
