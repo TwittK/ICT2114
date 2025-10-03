@@ -48,6 +48,40 @@ class UserDAO:
         finally:
             conn.close()
 
+    def get_all_permissions(self):
+        """Return a list of all permission names."""
+        conn = psycopg2.connect(**self.db_params)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM permission ORDER BY id")
+            rows = cursor.fetchall()
+            return [row[0] for row in rows] if rows else []
+        finally:
+            conn.close()
+
+    def get_user_permissions(self, user_id):
+        """
+        Return a list of permission names for the user's role.
+        """
+        conn = psycopg2.connect(**self.db_params)
+
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                           SELECT p.name
+                           FROM users u
+                                    JOIN roles r ON u.role = r.id
+                                    JOIN rolepermission rp ON rp.role_id = r.id
+                                    JOIN permission p ON rp.permission_id = p.id
+                           WHERE u.id = %s
+                           ORDER BY p.name
+                           """, (user_id,))
+            rows = cursor.fetchall()
+            # List of permission names
+            return [row[0] for row in rows] if rows else []
+        finally:
+            conn.close()
+
     def update_user(self, user_id, username, email, password=None):
         """Update a user's username, email, and optionally password."""
         conn = psycopg2.connect(**self.db_params)

@@ -1855,7 +1855,15 @@ def profile(section):
         return render_template("profile.html", section="role", user_role=role_name)
 
     elif section == "permission":
-        return render_template("profile.html", section="permission")
+        user_permissions = dao.get_user_permissions(session['user_id'])
+        all_permissions = dao.get_all_permissions()
+        return render_template(
+            "profile.html",
+            section="permission",
+            user=user,
+            permissions=user_permissions,
+            all_permissions=all_permissions
+        )
 
     else:
         # If an invalid section is given → fallback to basic

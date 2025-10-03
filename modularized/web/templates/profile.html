@@ -66,9 +66,22 @@
                     </form>
 
                 {% elif section == 'permission' %}
-                    <p>Permissions</p>
+                    <div class="row">
+                        <div class="col-md col-lg-6">
+                            {% for perm in all_permissions %}
+                                {% set formatted_perm = perm.replace('_', ' ').title() %}
+                                {% if perm in permissions %}
+                                    <div class="alert alert-success" role="alert">
+                                        {{ formatted_perm }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-danger" role="alert">
+                                        {{ formatted_perm }}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
                 {% endif %}
             </div>
-        </div>
-    </div>
 {% endblock %}
