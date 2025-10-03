@@ -32,6 +32,8 @@ from data_source.class_labels import ClassLabelRepository
 
 import logging
 
+from data_source.user_dao import UserDAO
+
 logging.basicConfig(level=logging.DEBUG)
 
 # Load environment variables from .env
@@ -1793,6 +1795,8 @@ def profile():
     logging.debug(f"📝 WORKING!!!!")
     logging.debug(f"📝 Session user_id: {session.get('user_id')}")
 
+    dao = UserDAO(DB_PARAMS)
+
     if request.method == 'POST':
         # Get data from the form
         email_form = request.form.get("email", "")
@@ -1809,50 +1813,28 @@ def profile():
             flash("Passwords do not match!", "danger")
             return redirect(url_for("profile"))
 
-        if password_form and len(password_form) < 8:
-            flash("❌ Password must be at least 8 characters long.", "danger")
-            return redirect(url_for("profile"))
-
-        conn = psycopg2.connect(**DB_PARAMS)
-        cursor = conn.cursor()
-
-        # Hash password if provided
-        password_hash = generate_password_hash(password_form) if password_form else None
-
         try:
-            if password_hash:
-                cursor.execute("""
-                               UPDATE users
-                               SET username=%s,
-                                   email=%s,
-                                   password_hash=%s
-                               WHERE id = %s
-                               """, (username_form, email_form, password_hash, session['user_id']))
+            # Use DAO to update the user
+            rows_affected = dao.update_user(
+                session['user_id'],
+                username_form,
+                email_form,
+                password_form if password_form else None
+            )
+
+            logging.debug(f"📝 Rows affected: {rows_affected}")
+
+            if rows_affected > 0:
+                # Update session values if DB update succeeded
+                session['username'] = username_form
+                session['email'] = email_form
+                flash("Profile updated successfully!", "success")
             else:
-                cursor.execute("""
-                               UPDATE users
-                               SET username=%s,
-                                   email=%s
-                               WHERE id = %s
-                               """, (username_form, email_form, session['user_id']))
+                flash("❌ No changes were made.", "warning")
 
-            logging.debug(f"📝 Rows affected: {cursor.rowcount}")
-
-            conn.commit()
-            # Update session values.
-            session['username'] = username_form
-            session['email'] = email_form
-            flash("Profile updated successfully!", "success")
         except Exception as e:
             flash(f"❌ Failed to update profile: {str(e)}", "danger")
-        finally:
-            conn.close()
 
-    # Get user information from the session
-    session_data = {
-        "username": session.get("username"),
-        "email": session.get("email"),
-        "role": session.get("role"),
-    }
-
+    # Fetch user data for rendering (from session or DB if you want fresh values)
+    session_data = dao.get_user_by_id(session['user_id'])
     return render_template("profile.html", user=session_data)
