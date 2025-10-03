@@ -30,6 +30,10 @@ from web.utils import check_permission, validate_and_sanitize_text
 from werkzeug.security import generate_password_hash
 from data_source.class_labels import ClassLabelRepository
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 # Load environment variables from .env
 load_dotenv()
 DB_PARAMS = {
@@ -98,14 +102,14 @@ def inject_labs_with_cameras():
 
     cursor.execute(
         """
-                   SELECT l.LabId,
-                          l.lab_name,
-                          c.CameraId,
-                          c.name
-                   FROM Lab l
-                            LEFT JOIN Camera c ON c.camera_lab_id = l.LabId
-                   ORDER BY l.lab_name ASC, c.name ASC
-                   """
+        SELECT l.LabId,
+               l.lab_name,
+               c.CameraId,
+               c.name
+        FROM Lab l
+                 LEFT JOIN Camera c ON c.camera_lab_id = l.LabId
+        ORDER BY l.lab_name ASC, c.name ASC
+        """
     )
 
     rows = cursor.fetchall()
@@ -182,12 +186,12 @@ def index():
     # Get all cameras in this lab
     cursor.execute(
         """
-                   SELECT c.name
-                   FROM Camera c
-                            JOIN Lab l ON c.camera_lab_id = l.LabId
-                   WHERE l.lab_name = %s
-                   ORDER BY c.name
-                   """,
+        SELECT c.name
+        FROM Camera c
+                 JOIN Lab l ON c.camera_lab_id = l.LabId
+        WHERE l.lab_name = %s
+        ORDER BY c.name
+        """,
         (lab_name,),
     )
     all_cameras = [row["name"] for row in cursor.fetchall()]
@@ -428,13 +432,12 @@ def second_incompliance():
             if lab_name:
                 cursor.execute(
                     """
-                               SELECT c.name
-                               FROM Camera c
-                                        JOIN Lab l ON c.camera_lab_id = l.LabId
-                               WHERE l.lab_name = %s
-                               ORDER BY c.name
-                               LIMIT 1
-                               """,
+                    SELECT c.name
+                    FROM Camera c
+                             JOIN Lab l ON c.camera_lab_id = l.LabId
+                    WHERE l.lab_name = %s
+                    ORDER BY c.name LIMIT 1
+                    """,
                     (lab_name,),
                 )
 
@@ -497,12 +500,12 @@ def second_incompliance():
         # Fetch cameras only for the selected lab.
         cursor.execute(
             """
-                       SELECT c.name
-                       FROM Camera c
-                                JOIN Lab l ON c.camera_lab_id = l.LabId
-                       WHERE l.lab_name = %s
-                       ORDER BY c.name
-                       """,
+            SELECT c.name
+            FROM Camera c
+                     JOIN Lab l ON c.camera_lab_id = l.LabId
+            WHERE l.lab_name = %s
+            ORDER BY c.name
+            """,
             (lab_name,),
         )
 
@@ -648,21 +651,21 @@ def edit_camera(camera_id):
             # Update camera in database
             cursor.execute(
                 """
-                           UPDATE Camera
-                           SET name               = %s,
-                               resolution         = %s,
-                               frame_rate         = %s,
-                               encoding           = %s,
-                               camera_ip_type     = %s,
-                               ip_address         = %s,
-                               subnet_mask        = %s,
-                               gateway            = %s,
-                               timezone           = %s,
-                               sync_with_ntp      = %s,
-                               ntp_server_address = %s,
-                               time               = %s
-                           WHERE CameraId = %s
-                           """,
+                UPDATE Camera
+                SET name               = %s,
+                    resolution         = %s,
+                    frame_rate         = %s,
+                    encoding           = %s,
+                    camera_ip_type     = %s,
+                    ip_address         = %s,
+                    subnet_mask        = %s,
+                    gateway            = %s,
+                    timezone           = %s,
+                    sync_with_ntp      = %s,
+                    ntp_server_address = %s,
+                    time               = %s
+                WHERE CameraId = %s
+                """,
                 (
                     name,
                     resolution,
@@ -718,24 +721,24 @@ def edit_camera(camera_id):
     # GET request - fetch camera data
     cursor.execute(
         """
-                   SELECT c.CameraId,
-                          c.name,
-                          c.resolution,
-                          c.frame_rate,
-                          c.encoding,
-                          c.camera_ip_type,
-                          c.ip_address,
-                          c.subnet_mask,
-                          c.gateway,
-                          c.timezone,
-                          c.sync_with_ntp,
-                          c.ntp_server_address,
-                          c.time,
-                          l.lab_name
-                   FROM Camera c
-                            JOIN Lab l ON c.camera_lab_id = l.LabId
-                   WHERE c.CameraId = %s
-                   """,
+        SELECT c.CameraId,
+               c.name,
+               c.resolution,
+               c.frame_rate,
+               c.encoding,
+               c.camera_ip_type,
+               c.ip_address,
+               c.subnet_mask,
+               c.gateway,
+               c.timezone,
+               c.sync_with_ntp,
+               c.ntp_server_address,
+               c.time,
+               l.lab_name
+        FROM Camera c
+                 JOIN Lab l ON c.camera_lab_id = l.LabId
+        WHERE c.CameraId = %s
+        """,
         (camera_id,),
     )
 
@@ -1393,12 +1396,12 @@ def add_camera():
         # Add to database with correct column names and all required fields
         cursor.execute(
             """
-                       INSERT INTO Camera (name, ip_address, camera_lab_id, camera_user_id, resolution, frame_rate,
-                                           encoding,
-                                           subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp,
-                                           ntp_server_address, time)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cameraid
-                       """,
+            INSERT INTO Camera (name, ip_address, camera_lab_id, camera_user_id, resolution, frame_rate,
+                                encoding,
+                                subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp,
+                                ntp_server_address, time)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cameraid
+            """,
             (
                 device_info.get("device_name", f"Camera_{camera_ip}"),
                 camera_ip,
@@ -1575,7 +1578,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_") :]
+                    rp = key[len("role_perm_"):]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1761,9 +1764,9 @@ def create_account():
         try:
             cursor.execute(
                 """
-                           INSERT INTO users (username, email, password_hash, role)
-                           VALUES (%s, %s, %s, %s)
-                           """,
+                INSERT INTO users (username, email, password_hash, role)
+                VALUES (%s, %s, %s, %s)
+                """,
                 (username_form, email_form, password_hash, role_form),
             )
             conn.commit()
@@ -1784,14 +1787,72 @@ def create_account():
     )
 
 
-@app.route("/profile")
+@app.route("/profile", methods=['GET', 'POST'])
 @login_required
 def profile():
+    logging.debug(f"📝 WORKING!!!!")
+    logging.debug(f"📝 Session user_id: {session.get('user_id')}")
+
+    if request.method == 'POST':
+        # Get data from the form
+        email_form = request.form.get("email", "")
+        username_form = request.form.get("username", "")
+        password_form = request.form.get("password", "")
+        cPassword_form = request.form.get("cPassword", "")
+
+        if not username_form or not email_form:
+            flash("❌ Username and email are required.", "danger")
+            return redirect(url_for("profile"))
+
+        # Validate password match.
+        if password_form and password_form != cPassword_form:
+            flash("Passwords do not match!", "danger")
+            return redirect(url_for("profile"))
+
+        if password_form and len(password_form) < 8:
+            flash("❌ Password must be at least 8 characters long.", "danger")
+            return redirect(url_for("profile"))
+
+        conn = psycopg2.connect(**DB_PARAMS)
+        cursor = conn.cursor()
+
+        # Hash password if provided
+        password_hash = generate_password_hash(password_form) if password_form else None
+
+        try:
+            if password_hash:
+                cursor.execute("""
+                               UPDATE users
+                               SET username=%s,
+                                   email=%s,
+                                   password_hash=%s
+                               WHERE id = %s
+                               """, (username_form, email_form, password_hash, session['user_id']))
+            else:
+                cursor.execute("""
+                               UPDATE users
+                               SET username=%s,
+                                   email=%s
+                               WHERE id = %s
+                               """, (username_form, email_form, session['user_id']))
+
+            logging.debug(f"📝 Rows affected: {cursor.rowcount}")
+
+            conn.commit()
+            # Update session values.
+            session['username'] = username_form
+            session['email'] = email_form
+            flash("Profile updated successfully!", "success")
+        except Exception as e:
+            flash(f"❌ Failed to update profile: {str(e)}", "danger")
+        finally:
+            conn.close()
+
     # Get user information from the session
-    user_info = {
+    session_data = {
         "username": session.get("username"),
         "email": session.get("email"),
         "role": session.get("role"),
     }
 
-    return render_template("profile.html", user=user_info)
+    return render_template("profile.html", user=session_data)

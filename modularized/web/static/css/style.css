@@ -239,3 +239,15 @@ button[type="submit"].btn-danger:hover {
 .icon-camera {
     color: ghostwhite;
 }
+
+.btn-main {
+    background-color: #274C77;
+    color: white;
+    border: none;
+    text-transform: uppercase;
+}
+
+.btn-main:hover {
+    background-color: #3A5B85;
+    color: white;
+}
