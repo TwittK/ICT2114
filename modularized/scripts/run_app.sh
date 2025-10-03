@@ -16,3 +16,4 @@ cd modularized || exit
 
 # Run the Python application
 python app.py
+

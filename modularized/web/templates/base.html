@@ -205,6 +205,12 @@
                                     <i class="fas fa-user"></i>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userProfileDropdown">
+                                {# Profile Link #}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('profile') }}">
+                                            <i class="fas fa-user-circle me-2"></i> Profile
+                                        </a>
+                                    </li>
                                 </ul>
                             </div>
                             <div class="nav-item d-flex align-items-center">
