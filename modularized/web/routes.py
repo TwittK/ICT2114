@@ -34,6 +34,8 @@ import logging
 
 from data_source.user_dao import UserDAO
 
+# Silence Watchdog debug spam.
+logging.getLogger("watchdog").setLevel(logging.WARNING)
 logging.basicConfig(level=logging.DEBUG)
 
 # Load environment variables from .env
@@ -1789,52 +1791,74 @@ def create_account():
     )
 
 
-@app.route("/profile", methods=['GET', 'POST'])
+@app.route("/profile", methods=['GET'])
 @login_required
-def profile():
-    logging.debug(f"📝 WORKING!!!!")
-    logging.debug(f"📝 Session user_id: {session.get('user_id')}")
+def profile_redirect():
+    # If user just visits /profile, redirect to /profile/basic
+    return redirect("/profile/basic")
 
+
+@app.route("/profile/<section>", methods=['GET', 'POST'])
+@login_required
+def profile(section):
+    # logging.debug(f"📝 WORKING!!!!")
+    # logging.debug(f"📝 Session user_id: {session.get('user_id')}")
+    logging.debug(f"📝 Profile section: {section}")
     dao = UserDAO(DB_PARAMS)
 
-    if request.method == 'POST':
-        # Get data from the form
-        email_form = request.form.get("email", "")
-        username_form = request.form.get("username", "")
-        password_form = request.form.get("password", "")
-        cPassword_form = request.form.get("cPassword", "")
+    # Get the current user from DB
+    user = dao.get_user_by_id(session["user_id"])
 
-        if not username_form or not email_form:
-            flash("❌ Username and email are required.", "danger")
-            return redirect(url_for("profile"))
+    if section == "basic":
+        if request.method == 'POST':
+            # Get data from the form
+            email_form = request.form.get("email", "")
+            username_form = request.form.get("username", "")
+            password_form = request.form.get("password", "")
+            cPassword_form = request.form.get("cPassword", "")
 
-        # Validate password match.
-        if password_form and password_form != cPassword_form:
-            flash("Passwords do not match!", "danger")
-            return redirect(url_for("profile"))
+            if not username_form or not email_form:
+                flash("❌ Username and email are required.", "danger")
+                return redirect(url_for("profile", section="basic"))
 
-        try:
-            # Use DAO to update the user
-            rows_affected = dao.update_user(
-                session['user_id'],
-                username_form,
-                email_form,
-                password_form if password_form else None
-            )
+            # Validate password match.
+            if password_form and password_form != cPassword_form:
+                flash("Passwords do not match!", "danger")
+                return redirect(url_for("profile", section="basic"))
 
-            logging.debug(f"📝 Rows affected: {rows_affected}")
+            try:
+                # Use DAO to update the user
+                rows_affected = dao.update_user(
+                    session['user_id'],
+                    username_form,
+                    email_form,
+                    password_form if password_form else None
+                )
 
-            if rows_affected > 0:
-                # Update session values if DB update succeeded
-                session['username'] = username_form
-                session['email'] = email_form
-                flash("Profile updated successfully!", "success")
-            else:
-                flash("❌ No changes were made.", "warning")
+                logging.debug(f"📝 Rows affected: {rows_affected}")
 
-        except Exception as e:
-            flash(f"❌ Failed to update profile: {str(e)}", "danger")
+                if rows_affected > 0:
+                    # Update session values if DB update succeeded
+                    session['username'] = username_form
+                    session['email'] = email_form
+                    flash("Profile updated successfully!", "success")
+                else:
+                    flash("❌ No changes were made.", "warning")
 
+            except Exception as e:
+                flash(f"❌ Failed to update profile: {str(e)}", "danger")
+
+        return render_template("profile.html", section="basic", user=user)
+
+    elif section == "role":
+        return render_template("profile.html", section="role")
+
+    elif section == "permission":
+        return render_template("profile.html", section="permission")
+
+    else:
+        # If an invalid section is given → fallback to basic
+        return redirect(url_for("profile", section="basic"))
     # Fetch user data for rendering (from session or DB if you want fresh values)
     session_data = dao.get_user_by_id(session['user_id'])
     return render_template("profile.html", user=session_data)
