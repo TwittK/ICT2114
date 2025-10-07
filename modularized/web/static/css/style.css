@@ -239,3 +239,38 @@ button[type="submit"].btn-danger:hover {
 .icon-camera {
     color: ghostwhite;
 }
+
+.btn-main {
+    background-color: #274C77;
+    color: white;
+    border: none;
+    text-transform: uppercase;
+    text-decoration: none;
+}
+
+.btn-main:hover {
+    background-color: #3A5B85;
+    color: white;
+}
+
+.btn-main.active {
+    background-color: #274C77;
+    color: white;
+    border: none;
+    text-transform: uppercase;
+    text-decoration: underline;
+}
+
+.btn-main.active:hover {
+    background-color: #3A5B85;
+    color: white;
+    text-decoration: underline;
+}
+
+/* Prevent focus/cursor */
+.no-focus {
+    /* Disables clicking/focus */
+    pointer-events: none;
+    background-color: #e9ecef;
+    color: #495057;
+}

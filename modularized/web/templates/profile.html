@@ -1,10 +1,87 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h2>User Profile</h2>
-        <p><strong>Username:</strong> {{ user.username }}</p>
-        <p><strong>Email:</strong> {{ user.email  }}</p>
-        <p><strong>Role:</strong> {{ user.role  }}</p>
-    </div>
+    <div class="container mt-4 pt-4 pr-4 pb-4 pl-0 bg-white">
+        <div class="row">
+            <!-- First column with three buttons stacked vertically (spans both rows) -->
+            <div class="col-md-3 d-flex flex-column gap-2"></div>
+
+            <!-- Second column first row -->
+            <!-- Header -->
+            <div class="col-md-9 mb-3">
+                <h2>
+                    {% if section == 'basic' %}Basic Info{% elif section == 'role' %}
+                        Roles{% elif section == 'permission' %}Permissions{% endif %}
+                </h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Side navigation -->
+            <div class="col-md-3 d-flex flex-column gap-2">
+                <button type="button" class="btn btn-main {% if section=='basic' %}active{% endif %}"
+                        onclick="window.location='{{ url_for('profile', section='basic') }}'">
+                    Basic Info
+                </button>
+                <button type="button" class="btn btn-main {% if section=='role' %}active{% endif %}"
+                        onclick="window.location='{{ url_for('profile', section='role') }}'">
+                    Role
+                </button>
+                <button type="button" class="btn btn-main {% if section=='permission' %}active{% endif %}"
+                        onclick="window.location='{{ url_for('profile', section='permission') }}'">
+                    Permission
+                </button>
+            </div>
+
+            <!-- Main content -->
+            <div class="col-md-9 mt-3 mt-md-0">
+                {% if section == 'basic' %}
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email: </label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username: </label>
+                            <input type="text" class="form-control" id="username" name="username"
+                                   value="{{ user.username }}">
+                        </div>
+                        <div class=" mb-3">
+                            <label for="password" class="form-label">Password: </label>
+                            <input type="password" class="form-control" id="password" name="password">
+                        </div>
+                        <div class="mb-3">
+                            <label for="cPassword" class="form-label">Confirm Password: </label>
+                            <input type="password" class="form-control" id="cPassword" name="cPassword">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </form>
+
+                {% elif section == 'role' %}
+                    <form>
+                        <div class="mb-3">
+                            <input type="text" id="role" name="role" class="form-control no-focus"
+                                   value="{{ user_role }}" readonly tabindex="-1">
+                        </div>
+                    </form>
+
+                {% elif section == 'permission' %}
+                    <div class="row">
+                        <div class="col-md col-lg-6">
+                            {% for perm in all_permissions %}
+                                {% set formatted_perm = perm.replace('_', ' ').title() %}
+                                {% if perm in permissions %}
+                                    <div class="alert alert-success" role="alert">
+                                        {{ formatted_perm }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-danger" role="alert">
+                                        {{ formatted_perm }}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
 {% endblock %}
