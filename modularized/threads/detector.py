@@ -26,6 +26,18 @@ db_params = {
 
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
+    """
+    Safely crops a region from an image, ensuring the crop area stays within image boundaries.
+
+    Parameters:
+        img (np.ndarray): The frame from which to crop.
+        x1, y1 (int): Top-left coordinates of the crop rectangle.
+        x2, y2 (int): Bottom-right coordinates of the crop rectangle.
+        padding (int, optional): Number of pixels to expand the crop area in all directions. Default is 0.
+
+    Returns:
+        np.ndarray: Cropped image region with padding applied, clipped to the image size.
+    """
     h, w, _ = img.shape
     x1 = max(x1 - padding, 0)
     y1 = max(y1 - padding, 0)
@@ -36,6 +48,22 @@ def safe_crop(img, x1, y1, x2, y2, padding=0):
 
 # Estimates the facial area based on the nose, eyes and ears
 def extract_face_from_nose(pose_points, frame):
+    """
+    Estimates a bounding box for the face based on detected keypoints: nose, eyes, and ears.
+
+    The bounding box is calculated vertically using the distance from nose to eyes (value is tripled),
+    and horizontally using the ears and eye positions with some offsets.
+
+    Parameters:
+        pose_points (dict): Dictionary that has 'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear' keypoints as (x, y) tuples.
+        frame (np.ndarray): The frame from which to extract the face area.
+
+    Returns:
+        tuple: Coordinates (x1, y1, x2, y2) defining the bounding box of the estimated face region.
+
+    Raises:
+        ValueError: If the calculated bounding box dimensions are invalid (x2 <= x1 or y2 <= y1).
+    """
     h, _ = frame.shape[:2]
 
     nose = np.array(pose_points["nose"])
@@ -66,7 +94,16 @@ def extract_face_from_nose(pose_points, frame):
 
 
 def get_dist_nose_to_box(pose_points, food_drinks_bbox):
+    """
+    Calculates the shortest Euclidean distance from the nose keypoint to the edges of a given bounding box.
 
+    Parameters:
+        pose_points (dict): Dictionary containing 'nose' keypoint as an (x, y) tuple.
+        food_drinks_bbox (tuple): Coordinates (x1, y1, x2, y2) of the bounding box representing food or drink.
+
+    Returns:
+        float: The Euclidean distance between the nose point and the closest edge of the bounding box.
+    """
     # Compute edge of food/drink bbox edges to nose point
     # Get nose point
     nose = np.array(pose_points["nose"])

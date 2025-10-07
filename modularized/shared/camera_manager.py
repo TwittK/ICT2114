@@ -22,6 +22,16 @@ class CameraManager:
     return cls._instance
 
   def __init__(self, db_params, detection_manager):
+    """
+    Initializes a Camera Manager and prepares all cameras for detection.
+
+    Gets all cameras from the database, starts detection threads on each of them.
+    Stores references of all cameras in its camera pool for management.
+
+    Parameters:
+      db_params (dict): A dictionary containing parameters required to connect to the PostgreSQL database.
+      detection_manager (DetectionManager): An instance of DetectionManager responsible for submitting frames to worker threads.
+    """
     
     if self._initialized: # Singleton
       return 
@@ -119,7 +129,6 @@ class CameraManager:
       bool: True if the camera was added successfully, False otherwise.
     """
     from threads.reader import read_frames
-    #from threads.preprocessor import preprocess
     from threads.detector import detection
     from threads.saver import image_saver
     from shared.camera import Camera
@@ -129,13 +138,11 @@ class CameraManager:
 
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))
-      #preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
       detection_thread = threading.Thread(target=detection, args=(camera,))
       save_thread = threading.Thread(target=image_saver, args=(camera,))
 
 
       read_thread.start()
-      #preprocess_thread.start()
       detection_thread.start()
       save_thread.start()
 
@@ -144,8 +151,7 @@ class CameraManager:
         "threads": {
           "read": read_thread,
           "detection": detection_thread,
-          "save": save_thread,
-          #"preprocess": preprocess_thread
+          "save": save_thread
         },
       }
 

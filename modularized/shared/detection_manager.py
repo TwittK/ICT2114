@@ -4,6 +4,13 @@ from threads.preprocessor import DetectionWorker
 
 
 class DetectionManager:
+  """
+  Singleton class that manages multiple DetectionWorker threads to process incoming frames.
+
+  Distsributes frames among a fixed number of workers (according to number of available GPUs, defined in .env file)
+  using round-robin scheduling.
+  """
+
   _instance = None
 
   # Singleton
@@ -20,7 +27,12 @@ class DetectionManager:
     return cls._instance
 
   def __init__(self, num_workers):
+    """
+    Initializes the DetectionManager with a specified number of DetectionWorker threads. 1 Worker = 1 YOLO Detection Queue = 1 GPU
 
+    Parameters:
+      num_workers (int): The number of workers to create.
+    """
     if self._initialized: # Singleton
       return 
     
@@ -34,7 +46,16 @@ class DetectionManager:
 
   
   def submit(self, frame, camera):
-    """Distribute frames round-robin to worker queues."""
+    """
+    Submit a frame and its associated camera to a worker for processing.
+
+    This method uses round-robin scheduling to distribute incoming
+    frames across all detection workers.
+
+    Parameters:
+      frame: The frame data to be processed (e.g., an image or video frame).
+      camera: Metadata or identifier associated with the camera that provided the frame.
+    """
     with self.lock:
 
       # Set the current worker
@@ -45,5 +66,8 @@ class DetectionManager:
     worker.submit(frame, camera)
 
   def stop_all(self):
+    """
+    Stops all DetectionWorker threads managed by this DetectionManager.
+    """
     for worker in self.workers:
       worker.stop()
