@@ -28,7 +28,7 @@ class DetectionManager:
     self.next_worker_index = 0 # For round-robin selection
     self.lock = threading.Lock() 
 
-    for i in range(num_workers):
+    for i in range(int(num_workers)):
       worker = DetectionWorker(i)
       self.workers.append(worker)
 

@@ -39,12 +39,15 @@ if __name__ == "__main__":
         setup_app()
 
         # Start detection on all cameras stored in database
+        # gpu_count = os.getenv("GPU_COUNT")
+        # detection_manager = DetectionManager(gpu_count)
+        # camera_manager = CameraManager(DB_PARAMS) #detection_manager)
         camera_manager = CameraManager(DB_PARAMS)
 
         print("[INFO] Flask server started and all cameras in database started detection")
 
         # Run Flask in main thread for hot reload
-        app.run(host="0.0.0.0", port=5000, debug=True)
+        app.run(host="0.0.0.0", port=5000)
 
     except KeyboardInterrupt:
         print("[INFO] Shutting down.")
