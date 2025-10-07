@@ -9,7 +9,7 @@ class CameraManager:
   _instance = None
 
   # Singleton
-  def __new__(cls, db_params):
+  def __new__(cls, db_params, detection_manager):
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
@@ -21,9 +21,8 @@ class CameraManager:
       raise RuntimeError("CameraManager has not been initialized yet.")
     return cls._instance
 
-  def __init__(self, db_params):
-    from shared.detection_manager import DetectionManager
-
+  def __init__(self, db_params, detection_manager):
+    
     if self._initialized: # Singleton
       return 
     
@@ -36,8 +35,7 @@ class CameraManager:
     rows = cursor.fetchall()
     cursor.close()
     
-    workers_count = 1
-    self.detection_manager = DetectionManager(workers_count)
+    self.detection_manager = detection_manager
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:

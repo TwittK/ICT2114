@@ -14,6 +14,7 @@ sys.path.insert(0, PROJECT_ROOT)
 from threads.server import setup_app
 from web.routes import app
 from shared.camera_manager import CameraManager
+from shared.detection_manager import DetectionManager
 
 # Create folders for faces and incompliances
 os.makedirs(os.path.join("web", "static", "incompliances"), exist_ok=True)
@@ -39,10 +40,9 @@ if __name__ == "__main__":
         setup_app()
 
         # Start detection on all cameras stored in database
-        # gpu_count = os.getenv("GPU_COUNT")
-        # detection_manager = DetectionManager(gpu_count)
-        # camera_manager = CameraManager(DB_PARAMS) #detection_manager)
-        camera_manager = CameraManager(DB_PARAMS)
+        gpu_count = os.getenv("GPU_COUNT")
+        detection_manager = DetectionManager(gpu_count)
+        camera_manager = CameraManager(DB_PARAMS, detection_manager)
 
         print("[INFO] Flask server started and all cameras in database started detection")
 
