@@ -10,9 +10,9 @@ import torch
 
 
 class DetectionWorker:
-    def __init__(self, worker_id, gpu_id=None):
+    def __init__(self, worker_id):
         self.queue = queue.Queue()
-        self.thread = threading.Thread(target=self.preprocess, args=(gpu_id,), name=f"DetectionWorker-{worker_id}", daemon=True)
+        self.thread = threading.Thread(target=self.preprocess, args=(worker_id,), name=f"DetectionWorker-{worker_id}", daemon=True)
         self.running = threading.Event()
         self.running.set()
         self.thread.start()

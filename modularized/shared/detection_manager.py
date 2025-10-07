@@ -29,7 +29,7 @@ class DetectionManager:
     self.lock = threading.Lock() 
 
     for i in range(num_workers):
-      worker = DetectionWorker(i, i)
+      worker = DetectionWorker(i)
       self.workers.append(worker)
 
   
