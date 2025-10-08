@@ -6,24 +6,38 @@ class Camera:
   """
   Represents a camera device and manages its detection pipelines.
 
-  This class holds camera configuration, queues for inter-thread communication,
-  and shared state such as event flags and locks used across multiple threads.
+  This class holds camera configuration, queues, shared state such as event flags, and locks used across multiple threads.
 
   Attributes:
     camera_id (int): Unique identifier for the camera.
     ip_address (str): IP address of the camera.
-    channel (str): Camera channel number, e.g., "101".
-    use_ip_camera (bool): Indicates if the camera is an IP camera. Use False only for testing purposes, otherwise it should always be True.
-    manager (CameraManager): Reference to the parent camera manager instance.
-    frame_queue (Queue): Queue for raw frames, used by YOLO object and pose detection.
-    process_queue (Queue): Queue for frames for human to food/ drink association.
-    save_queue (Queue): Queue for frames of incompliances to be saved.
-    display_queue (Queue): Queue for frames to be displayed on the video feed in dashboard.
-    running (threading.Event): Event flag to control the camera's processing threads.
-    flagged_foodbev (list): Track IDs flagged for food/beverage policy violations.
+    channel (str): Channel identifier (e.g., "101").
+    use_ip_camera (bool): Indicates if the camera is an IP camera. Set to False only for testing with webcam.
+    manager (CameraManager): Reference to the parent CameraManager instance.
+    detection_manager: Inference manager retrieved from the camera manager.
+
+    frame_queue (queue.Queue): Queue for raw frames to use in object and pose detection.
+    process_queue (queue.Queue): Queue for frames used in association logic (human-to-food/beverage).
+    save_queue (queue.Queue): Queue for frames of incompliances to be saved to disk.
+    display_queue (queue.Queue): Queue for frames to be displayed in the dashboard UI.
+
+    running (threading.Event): Flag to control camera's detection loop.
+
+    flagged_foodbev (list): List of track IDs flagged for food or beverage policy violations.
     pose_points (list): List of detected pose keypoints per frame.
-    detected_incompliance (dict): Tracks detected compliance violations by track ID.
-    wrist_proximity_history (dict): Historical wrist proximity timestamps by track ID.
+    detected_incompliance (dict): Maps track IDs to non-compliant detection data.
+      Format: {
+        track_id: [coords (list of 4), center (tuple), confidence (float), class_id (int)]
+      }
+
+    wrist_proximity_history (dict): Historical record of wrist proximity timestamps by track ID.
+      Format: {
+        track_id: [timestamp1, timestamp2, ...]
+      }
+
+    detected_incompliance_lock (threading.Lock): Lock for accessing/modifying 'detected_incompliance'.
+    pose_points_lock (threading.Lock): Lock for accessing/modifying 'pose_points'.
+    flagged_foodbev_lock (threading.Lock): Lock for accessing/modifying 'flagged_foodbev'.
   """
 
   def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager: CameraManager):
