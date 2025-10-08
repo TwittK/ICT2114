@@ -1,6 +1,8 @@
 # shared/mqtt_client.py
 from datetime import datetime
 import paho.mqtt.publish as publish
+import pytz
+from datetime import datetime
 
 from shared.config import MQTT_PORT, MQTT_BROKER, MQTT_TOPIC_VIOLATIONS
 
@@ -15,7 +17,9 @@ class MQTTClient:
 
     def publish_violation(self, user, event, details=""):
         """Publish a violation message to the MQTT broker."""
-        timestamp = datetime.now().strftime("%d %b %Y %I:%M %p")
+
+        sgt = pytz.timezone("Asia/Singapore")
+        timestamp = datetime.now(sgt).strftime("%d %b %Y %I:%M %p")
         payload = f"[{timestamp}]\nUser: {user}\nEvent: {event}\nDetails: {details}"
 
         try:
