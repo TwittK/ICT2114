@@ -1,3 +1,20 @@
+import logging
+import queue
+import xml.etree.ElementTree as ET
+from datetime import datetime
+from functools import wraps
+
+import cv2
+import os
+import psycopg2
+import requests
+from data_source.camera_dao import CameraDAO
+from data_source.class_labels import ClassLabelRepository
+from data_source.lab_dao import LabDAO
+from data_source.role_dao import RoleDAO
+from data_source.user_dao import UserDAO
+from database import verify_user, update_last_login, get_all_users
+from dotenv import load_dotenv
 from flask import (
     Flask,
     request,
@@ -9,30 +26,14 @@ from flask import (
     Response,
     jsonify,
 )
-from functools import wraps
-from data_source.camera_dao import CameraDAO
-from data_source.role_dao import RoleDAO
-from data_source.lab_dao import LabDAO
-from datetime import datetime
-import psycopg2, os
 from psycopg2.extras import RealDictCursor
-import requests
 from requests.auth import HTTPDigestAuth
-import xml.etree.ElementTree as ET
-from dotenv import load_dotenv
-
-import cv2
-from database import verify_user, update_last_login, get_all_users
-from shared.camera_manager import CameraManager
 from shared.camera_discovery import CameraDiscovery
-import queue
+from shared.camera_manager import CameraManager
 from web.utils import check_permission, validate_and_sanitize_text
 from werkzeug.security import generate_password_hash
-from data_source.class_labels import ClassLabelRepository
 
-import logging
-
-from data_source.user_dao import UserDAO
+from shared.mqtt_client import MQTTClient
 
 # Silence Watchdog debug spam.
 logging.getLogger("watchdog").setLevel(logging.WARNING)
@@ -53,6 +54,7 @@ NO_PRIVILEGES = "Not enough privileges to complete action"
 app = Flask(__name__)
 
 label_repo = ClassLabelRepository()
+mqtt_client = MQTTClient()
 
 
 # def dict_factory(cursor, row):
@@ -1582,7 +1584,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_") :]
+                    rp = key[len("role_perm_"):]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1880,3 +1882,19 @@ def profile(section):
     # Fetch user data for rendering (from session or DB if you want fresh values)
     session_data = dao.get_user_by_id(session["user_id"])
     return render_template("profile.html", user=session_data)
+
+
+@app.route("/mqtt-test", methods=["GET"])
+def mqtt_test():
+    """
+    Test route to publish a message to MQTT broker.
+    """
+    try:
+        mqtt_client.publish_violation(
+            user="TestUser",
+            event="test_message",
+            details="This is a test message from Flask."
+        )
+        return jsonify({"status": "success", "message": "MQTT message sent!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})

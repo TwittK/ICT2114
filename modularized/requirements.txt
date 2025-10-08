@@ -7,3 +7,4 @@ bleach
 python-dotenv
 psycopg2-binary
 watchdog==6.0.0
+paho-mqtt==2.1.0

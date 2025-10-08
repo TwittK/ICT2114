@@ -3,14 +3,14 @@ version: "3.8"
 services:
   lab-monitoring:
     build: .
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+    #    deploy:
+    #      resources:
+    #        reservations:
+    #          devices:
+    #            - driver: nvidia
+    #              count: all
+    #              capabilities: [gpu]
+    #    runtime: nvidia
     container_name: lab-monitoring-app
     ports:
       - "5001:5000"
@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+        [ "CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}" ]
       interval: 10s
       retries: 5
       timeout: 5s
@@ -72,6 +72,16 @@ services:
       - postgres # your PostgreSQL container name
     volumes:
       - ./pgadmin_config/servers/servers.json:/pgadmin4/servers.json
+
+  # User: admin
+  # Password: hivemq
+  hivemq:
+    image: hivemq/hivemq4:4.45.0
+    container_name: hivemq
+    ports:
+      - "1883:1883" # MQTT
+      - "8081:8080" # HiveMQ Control Center web UI.
+    restart: unless-stopped
 
 volumes:
   postgres_data:
