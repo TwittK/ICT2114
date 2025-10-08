@@ -7,7 +7,20 @@ from io import BytesIO
 import os
 
 class NVR:
+  """
+  A class to interact with a Network Video Recorder (NVR) for face detection and management
+  via ISAPI endpoints, for face comparison, and face database insertion.
+  """
   def __init__(self, nvr_ip, fdid, username, password):
+    """
+    Initializes the NVR instance with connection credentials.
+
+    Parameters:
+      nvr_ip (str): IP address of the NVR.
+      fdid (str): Face database ID for face-related queries.
+      username (str): Username for NVR authentication.
+      password (str): Password for NVR authentication.
+    """
     self.fdid = fdid
     self.username = username
     self.password = password
@@ -46,6 +59,19 @@ class NVR:
     return mode_data
   
   def get_face_comparison(self, mode_data):
+    """
+    Uses modeData to search for matching faces in the NVR's face database.
+
+    Parameters:
+      mode_data (str): Mode data string obtained from get_mode_data.
+
+    Returns:
+      tuple: (matches_found, person_id)
+        matches_found (int or str): Number of matches found (0 if none).
+        person_id (str or None): The matched person's ID if found, otherwise None.
+
+      Returns (None, None) if mode_data is None.
+    """
     if mode_data is not None:
 
       iv = os.urandom(16).hex()
@@ -103,7 +129,16 @@ class NVR:
     return matches_found, person_id.text
   
   def insert_into_face_db(self, face, name):
+    """
+    Inserts a new face entry into the NVR's face database along with metadata.
 
+    Parameters:
+      face (np.ndarray): Image of the face to insert.
+      name (str): Name of the person associated with the face.
+
+    Returns:
+      str or None: The new face's ID (PID) if insertion is successful, None otherwise.
+    """
     random_uuid = uuid.uuid4()
 
     # Prepare face image payload

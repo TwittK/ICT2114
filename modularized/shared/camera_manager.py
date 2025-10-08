@@ -1,5 +1,6 @@
 # shared/camera_manager.py
 import threading, psycopg2
+from shared.model import ObjectDetectionModel
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
@@ -8,7 +9,7 @@ class CameraManager:
   _instance = None
 
   # Singleton
-  def __new__(cls, db_params):
+  def __new__(cls, db_params, detection_manager):
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
@@ -20,8 +21,18 @@ class CameraManager:
       raise RuntimeError("CameraManager has not been initialized yet.")
     return cls._instance
 
-  def __init__(self, db_params):
+  def __init__(self, db_params, detection_manager):
+    """
+    Initializes a Camera Manager and prepares all cameras for detection.
 
+    Gets all cameras from the database, starts detection threads on each of them.
+    Stores references of all cameras in its camera pool for management.
+
+    Parameters:
+      db_params (dict): A dictionary containing parameters required to connect to the PostgreSQL database.
+      detection_manager (DetectionManager): An instance of DetectionManager responsible for submitting frames to worker threads.
+    """
+    
     if self._initialized: # Singleton
       return 
     
@@ -33,6 +44,8 @@ class CameraManager:
     cursor.execute("SELECT CameraId, ip_address FROM Camera;")
     rows = cursor.fetchall()
     cursor.close()
+    
+    self.detection_manager = detection_manager
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
@@ -116,7 +129,6 @@ class CameraManager:
       bool: True if the camera was added successfully, False otherwise.
     """
     from threads.reader import read_frames
-    from threads.preprocessor import preprocess
     from threads.detector import detection
     from threads.saver import image_saver
     from shared.camera import Camera
@@ -126,13 +138,11 @@ class CameraManager:
 
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))
-      preprocess_thread = threading.Thread(target=preprocess, args=(camera, target_class_list, 0.3))
       detection_thread = threading.Thread(target=detection, args=(camera,))
       save_thread = threading.Thread(target=image_saver, args=(camera,))
 
 
       read_thread.start()
-      preprocess_thread.start()
       detection_thread.start()
       save_thread.start()
 
@@ -141,8 +151,7 @@ class CameraManager:
         "threads": {
           "read": read_thread,
           "detection": detection_thread,
-          "save": save_thread,
-          "preprocess": preprocess_thread
+          "save": save_thread
         },
       }
 
