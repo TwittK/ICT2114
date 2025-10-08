@@ -1582,7 +1582,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_"):]
+                    rp = key[len("role_perm_") :]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1766,12 +1766,21 @@ def create_account():
 
         # Insert into DB
         try:
+            # Get the ID of the role we want the new user to have
+            print(f"[DEBUG] role_to_add: {role_form}")
+            cursor.execute("SELECT id FROM Roles WHERE name = %s", (role_form,))
+            role_to_add = cursor.fetchone()
+            if not role_to_add:
+                raise ValueError(f"Role '{role_form}' not found.")
+            print(f"[DEBUG] role_to_add: {role_to_add}")
+            role_to_add = role_to_add[0]
+
             cursor.execute(
                 """
                 INSERT INTO users (username, email, password_hash, role)
                 VALUES (%s, %s, %s, %s)
                 """,
-                (username_form, email_form, password_hash, role_form),
+                (username_form, email_form, password_hash, role_to_add),
             )
             conn.commit()
             flash("✅ Account created successfully!", "success")
@@ -1791,14 +1800,14 @@ def create_account():
     )
 
 
-@app.route("/profile", methods=['GET'])
+@app.route("/profile", methods=["GET"])
 @login_required
 def profile_redirect():
     # If user just visits /profile, redirect to /profile/basic
     return redirect("/profile/basic")
 
 
-@app.route("/profile/<section>", methods=['GET', 'POST'])
+@app.route("/profile/<section>", methods=["GET", "POST"])
 @login_required
 def profile(section):
     # logging.debug(f"📝 WORKING!!!!")
@@ -1810,7 +1819,7 @@ def profile(section):
     user = dao.get_user_by_id(session["user_id"])
 
     if section == "basic":
-        if request.method == 'POST':
+        if request.method == "POST":
             # Get data from the form
             email_form = request.form.get("email", "")
             username_form = request.form.get("username", "")
@@ -1829,18 +1838,18 @@ def profile(section):
             try:
                 # Use DAO to update the user
                 rows_affected = dao.update_user(
-                    session['user_id'],
+                    session["user_id"],
                     username_form,
                     email_form,
-                    password_form if password_form else None
+                    password_form if password_form else None,
                 )
 
                 logging.debug(f"📝 Rows affected: {rows_affected}")
 
                 if rows_affected > 0:
                     # Update session values if DB update succeeded
-                    session['username'] = username_form
-                    session['email'] = email_form
+                    session["username"] = username_form
+                    session["email"] = email_form
                     flash("Profile updated successfully!", "success")
                 else:
                     flash("❌ No changes were made.", "warning")
@@ -1851,23 +1860,23 @@ def profile(section):
         return render_template("profile.html", section="basic", user=user)
 
     elif section == "role":
-        role_name = dao.get_user_role(session['user_id'])
+        role_name = dao.get_user_role(session["user_id"])
         return render_template("profile.html", section="role", user_role=role_name)
 
     elif section == "permission":
-        user_permissions = dao.get_user_permissions(session['user_id'])
+        user_permissions = dao.get_user_permissions(session["user_id"])
         all_permissions = dao.get_all_permissions()
         return render_template(
             "profile.html",
             section="permission",
             user=user,
             permissions=user_permissions,
-            all_permissions=all_permissions
+            all_permissions=all_permissions,
         )
 
     else:
         # If an invalid section is given → fallback to basic
         return redirect(url_for("profile", section="basic"))
     # Fetch user data for rendering (from session or DB if you want fresh values)
-    session_data = dao.get_user_by_id(session['user_id'])
+    session_data = dao.get_user_by_id(session["user_id"])
     return render_template("profile.html", user=session_data)

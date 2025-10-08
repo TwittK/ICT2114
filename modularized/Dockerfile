@@ -41,4 +41,5 @@ EXPOSE 5000
 
 # Run the application
 ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 CMD ["watchmedo", "auto-restart", "--patterns=*.py", "--recursive", "--", "python", "app.py"]

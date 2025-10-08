@@ -47,23 +47,27 @@ class RoleDAO:
                 # Get the ID of the 'user' role (default role)
                 cursor.execute("SELECT id FROM Roles WHERE name = %s", ("user",))
                 user_role_id = cursor.fetchone()
+                # print(f"[DEBUG] user_role_row: {user_role_id}")  # <-- Add this
                 if not user_role_id:
                     raise ValueError("Default 'user' role does not exist.")
+                user_role_id = user_role_id["id"]
 
                 # Get the ID of the role we want to delete
                 cursor.execute("SELECT id FROM Roles WHERE name = %s", (role_name,))
                 role_to_delete = cursor.fetchone()
+                # print(f"[DEBUG] role_to_delete: {role_to_delete}")
                 if not role_to_delete:
                     raise ValueError(f"Role '{role_name}' not found.")
+                role_to_delete = role_to_delete["id"]
 
                 # Update users with the role being deleted
                 cursor.execute(
                     "UPDATE users SET role = %s WHERE role = %s",
-                    (user_role_id[0], role_to_delete[0]),
+                    (user_role_id, role_to_delete),
                 )
 
                 # Delete the role
-                cursor.execute("DELETE FROM Roles WHERE id = %s", (role_to_delete[0],))
+                cursor.execute("DELETE FROM Roles WHERE id = %s", (role_to_delete,))
                 conn.commit()
                 return True
         except psycopg2.IntegrityError:
