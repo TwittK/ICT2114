@@ -1,12 +1,10 @@
-import queue, os
+import queue
 from datetime import datetime, timedelta
 import cv2 as cv
-from ultralytics import YOLO
-from shared.camera import Camera
+from shared.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
 from threads.detector import safe_crop
 import threading
 import queue
-import torch
 
 
 class DetectionWorker:
@@ -19,11 +17,11 @@ class DetectionWorker:
         self.worker_id = worker_id
 
     # Display annotated frames on dashboard
-    def preprocess(self, gpu_id): #context: Camera
+    def preprocess(self, gpu_id):
         
-        drink_model = YOLO(os.path.join("yolo_models", "yolo11n.pt"))
-        pose_model = YOLO(os.path.join("yolo_models", "yolov8n-pose.pt"))
-        classif_model = YOLO(os.path.join("yolo_models", "yolov8n-cls.pt"))
+        object_detection_model = ObjectDetectionModel("yolo11m.pt", gpu_device=gpu_id)
+        pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.8, 0.7)
+        classif_model = ImageClassificationModel("yolov8n-cls.pt")
         last_cleared = datetime.min
 
         while self.running.is_set():
@@ -42,17 +40,8 @@ class DetectionWorker:
                 frame.copy()
             )  # copy frame for drawing bounding boxes, ids and conf scores.
 
-            # Drink detection
-            device_str = f"cuda:{gpu_id}" if gpu_id is not None else "cpu"
-            result = drink_model.track(
-                frame,
-                persist=True,
-                classes=[39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55],
-                conf=0.3,
-                verbose=False,
-                device=torch.device(device_str)
-            )
-            drink_boxes = result[0].boxes
+            # Food/Drink detection
+            drink_boxes = object_detection_model.detect(frame)
 
             with context.detected_incompliance_lock:
                 context.detected_incompliance.clear()
@@ -88,12 +77,10 @@ class DetectionWorker:
 
                             # Check if it's a water bottle or not
                             object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
-                            results = classif_model(object_crop, verbose=False)
-                            pred = results[0]
-                            label = pred.names[pred.probs.top1]
+                            predicted_label = classif_model.classify(object_crop)
 
                             # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
-                            if label == "water_bottle" or label == "milk_can":
+                            if predicted_label == "water_bottle" or predicted_label == "milk_can":
                                 print("🚫 Water bottle, skipping")
                                 continue
 
@@ -107,35 +94,15 @@ class DetectionWorker:
                                 cls_id, # Class Id of detected object (refer to COCO dataset)
                             ]
 
-
-
-                pose_results = pose_model.predict(frame, conf=0.80, iou=0.4, verbose=False)[
-                    0
-                ]
-                keypoints = pose_results.keypoints.xy if pose_results.keypoints else []
+                keypoints = pose_model.predict(frame)
                 with context.pose_points_lock:
                     context.pose_points.clear()
 
                 with context.detected_incompliance_lock and context.pose_points_lock:
                     # only process if theres both faces and food/beverages in frame
                     if context.detected_incompliance and (keypoints is not None):
-                        # save landmarks for each person
-                        for person in keypoints:
-                            try:
-                                person_lm = person.cpu().numpy()
-                                context.pose_points.append(
-                                    {
-                                        "nose": person_lm[0],
-                                        "left_wrist": person_lm[9],
-                                        "right_wrist": person_lm[10],
-                                        "left_ear": person_lm[3],
-                                        "right_ear": person_lm[4],
-                                        "left_eye": person_lm[1],
-                                        "right_eye": person_lm[2],
-                                    }
-                                )
-                            except Exception:
-                                continue
+
+                        context.pose_points = pose_model.parse_keypoints(keypoints)
 
                 # Put into process queue for the next step (mapping food/ drinks to faces)
                 with context.detected_incompliance_lock and context.pose_points_lock:
