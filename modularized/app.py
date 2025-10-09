@@ -55,4 +55,5 @@ if __name__ == "__main__":
         print("[INFO] Shutting down.")
 
     finally:
+        camera_manager.shutdown_all_cameras()
         print("[END] Exited cleanly.")
