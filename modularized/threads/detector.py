@@ -2,7 +2,6 @@ import queue, time, os
 import numpy as np
 from dotenv import load_dotenv
 from datetime import datetime
-from threads.saver import save_img
 
 import time
 from threads.emailservice import EmailService
@@ -276,7 +275,7 @@ def detection(context: Camera):
                         if person_id is not None:
 
                             # Save frame locally
-                            save_img(context, frame, str(person_id), today)
+                            context.manager.saver.save_img(frame, str(person_id), today)
 
                             # Send Email for Second Incompliance Detected
                             lab_email = get_lab_safety_email_by_camera_id(
@@ -331,7 +330,7 @@ def detection(context: Camera):
                             ),
                             exist_ok=True,
                         )
-                        save_img(context, frame, str(person_id), today)
+                        context.manager.saver.save_img(frame, str(person_id), today)
 
                         print(
                             "[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅"

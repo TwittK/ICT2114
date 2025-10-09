@@ -9,7 +9,7 @@ class CameraManager:
   _instance = None
 
   # Singleton
-  def __new__(cls, db_params, detection_manager):
+  def __new__(cls, db_params, detection_manager, saver):
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
@@ -21,7 +21,7 @@ class CameraManager:
       raise RuntimeError("CameraManager has not been initialized yet.")
     return cls._instance
 
-  def __init__(self, db_params, detection_manager):
+  def __init__(self, db_params, detection_manager, saver):
     """
     Initializes a Camera Manager and prepares all cameras for detection.
 
@@ -31,6 +31,7 @@ class CameraManager:
     Parameters:
       db_params (dict): A dictionary containing parameters required to connect to the PostgreSQL database.
       detection_manager (DetectionManager): An instance of DetectionManager responsible for submitting frames to worker threads.
+      saver (Saver): An instance of Saver responsible for saving images to disk.
     """
     
     if self._initialized: # Singleton
@@ -46,6 +47,7 @@ class CameraManager:
     cursor.close()
     
     self.detection_manager = detection_manager
+    self.saver = saver
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
@@ -57,6 +59,7 @@ class CameraManager:
     """
     Gracefully shuts down all active cameras in the camera pool.
     Ensures that all camera threads are properly terminated.
+    Also stops all Detection Worker threads and Saver thread.
 
     For each camera, this method:
     - Clears the 'running' event to stop detection.
@@ -74,6 +77,9 @@ class CameraManager:
       for thread_name, thread in threads.items():
         thread.join(timeout=2)
         print(f"[INFO] Thread '{thread_name}' for camera {camera_id} joined.")
+
+    self.detection_manager.stop_all()
+    self.saver.stop()
 
   def remove_camera(self, camera_id):
     """
@@ -130,7 +136,6 @@ class CameraManager:
     """
     from threads.reader import read_frames
     from threads.detector import detection
-    from threads.saver import image_saver
     from shared.camera import Camera
 
     try:
@@ -139,19 +144,15 @@ class CameraManager:
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))
       detection_thread = threading.Thread(target=detection, args=(camera,))
-      save_thread = threading.Thread(target=image_saver, args=(camera,))
-
 
       read_thread.start()
       detection_thread.start()
-      save_thread.start()
 
       self.camera_pool[camera_id] = {
         "camera": camera,
         "threads": {
           "read": read_thread,
-          "detection": detection_thread,
-          "save": save_thread
+          "detection": detection_thread
         },
       }
 

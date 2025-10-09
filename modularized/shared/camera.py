@@ -18,7 +18,6 @@ class Camera:
 
     frame_queue (queue.Queue): Queue for raw frames to use in object and pose detection.
     process_queue (queue.Queue): Queue for frames used in association logic (human-to-food/beverage).
-    save_queue (queue.Queue): Queue for frames of incompliances to be saved to disk.
     display_queue (queue.Queue): Queue for frames to be displayed in the dashboard UI.
 
     running (threading.Event): Flag to control camera's detection loop.
@@ -52,7 +51,6 @@ class Camera:
     self.detection_manager = manager.detection_manager
 
     self.frame_queue = queue.Queue(maxsize=10)
-    self.save_queue = queue.Queue(maxsize=10)
     self.process_queue = queue.Queue(maxsize=10)
     self.display_queue = queue.Queue(maxsize=10)
 

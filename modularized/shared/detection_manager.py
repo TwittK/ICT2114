@@ -40,6 +40,7 @@ class DetectionManager:
     self.next_worker_index = 0 # For round-robin selection
     self.lock = threading.Lock() 
 
+    print(f"[INFO] Starting {int(num_workers)} DetectionWorkers.")
     for i in range(int(num_workers)):
       worker = DetectionWorker(i)
       self.workers.append(worker)
