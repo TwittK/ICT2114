@@ -11,6 +11,8 @@ from threads.process_incompliance import ProcessIncompliance
 from shared.camera import Camera
 from database import get_lab_safety_email_by_camera_id
 
+from shared.mqtt_client import MQTTClient
+
 # Constants
 REQUIRED_DURATION = 2.0  # seconds
 REQUIRED_COUNT = 3  # Number of detections in that duration
@@ -23,6 +25,8 @@ db_params = {
     "host": os.getenv("POSTGRES_HOST", "localhost"),
     "port": os.getenv("POSTGRES_PORT", "5432"),
 }
+
+mqtt_client = MQTTClient()
 
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
@@ -127,7 +131,6 @@ def flag_track_id(context, track_id):
 
 # Mapping detected food/ drinks to person
 def detection(context: Camera):
-
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance(db_params, context.camera_id)
@@ -177,12 +180,12 @@ def detection(context: Camera):
                 area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
                 area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
                 area_check = (
-                    area_food_drinks >= area_head * 4
-                    or area_food_drinks < area_head * 0.1
+                        area_food_drinks >= area_head * 4
+                        or area_food_drinks < area_head * 0.1
                 )
                 height_check = (
-                    abs(y1 - y2) >= abs(fy1 - fy2) * 2.85
-                    or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
+                        abs(y1 - y2) >= abs(fy1 - fy2) * 2.85
+                        or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
                 )
                 if area_check or height_check:
                     print("🔶Food/ drink not at the same depth as person, ignoring.")
@@ -282,6 +285,14 @@ def detection(context: Camera):
                             if lab_email:
                                 email_service.send_incompliance_email(
                                     lab_email, f"Person {person_id}"
+                                )
+
+                            # Publish MQTT message                            
+                            if mqtt_client:
+                                mqtt_client.publish_violation(
+                                    user=str(person_id),
+                                    event="lab_safety_violation",
+                                    details=f"Incompliance detected at camera {context.camera_id} on {current_date}"
                                 )
 
                             print(
