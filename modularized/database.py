@@ -202,7 +202,7 @@ def create_default_labs_and_cameras():
     conn.close()
 
     if lab_count == 0:
-        create_lab_and_email("E2-L6-016", "labsafety@gmail.com")
+        create_lab("E2-L6-016", "labsafety@gmail.com")
         # create_lab("E2-L6-017", "labsafety@Fgmail.com")
 
     if camera_count == 0:
@@ -210,7 +210,7 @@ def create_default_labs_and_cameras():
         # create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
 
 
-def create_lab_and_email(lab_name, lab_safety_email):
+def create_lab(lab_name, lab_safety_email):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
 
@@ -219,21 +219,10 @@ def create_lab_and_email(lab_name, lab_safety_email):
     try:
         cursor.execute(
             """
-                       INSERT INTO Lab (lab_name)
-                       VALUES (%s)
-                       RETURNING LabId
+                       INSERT INTO Lab (lab_name, lab_safety_email)
+                       VALUES (%s, %s)
                        """,
-            (lab_name,),
-        )
-
-        lab_id = cursor.fetchone()[0]
-
-        cursor.execute(
-            """
-            INSERT INTO LabSafetyStaff (lab_safety_email, lab_id)
-            VALUES (%s, %s)
-            """,
-            (lab_safety_email, lab_id)
+            (lab_name, lab_safety_email),
         )
 
         conn.commit()

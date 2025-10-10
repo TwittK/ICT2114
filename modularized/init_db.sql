@@ -30,14 +30,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS Lab (
     LabId SERIAL PRIMARY KEY,
-    lab_name TEXT UNIQUE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS LabSafetyStaff (
-    LabSafetyId SERIAL PRIMARY KEY,
-    lab_safety_email TEXT NOT NULL,
-    lab_id INTEGER,
-    FOREIGN KEY (lab_id) REFERENCES Lab(LabId) ON DELETE CASCADE
+    lab_name TEXT UNIQUE NOT NULL,
+    lab_safety_email TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Camera (
