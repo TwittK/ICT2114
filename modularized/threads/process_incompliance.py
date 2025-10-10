@@ -121,7 +121,7 @@ class ProcessIncompliance:
                     str(local_detected_food_drinks[track_id][3]),  # detected object class id
                     f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
                     person_id,
-                    self.camera_id,  # temp camera id
+                    self.camera_id,
                 ),
             )
             self.db.commit()

@@ -19,6 +19,11 @@ class Saver:
         return cls._instance
 
     def __init__(self):
+        """
+        Initialize the Saver instance.
+
+        Sets up the save queue and starts the thread for saving images.
+        """
         if self._initialized: # Singleton
             return 
         
@@ -72,6 +77,9 @@ class Saver:
             self.save_queue.task_done()
     
     def stop(self):
+        """
+        Gracefully shuts down saver thread.
+        """
         self.save_queue.put(None)
         self.running.clear()
         self.thread.join(timeout=2)

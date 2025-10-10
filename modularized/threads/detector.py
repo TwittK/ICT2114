@@ -2,6 +2,7 @@ import queue, time, os
 import numpy as np
 from dotenv import load_dotenv
 from datetime import datetime
+import cv2
 
 import time
 from threads.emailservice import EmailService
@@ -121,7 +122,6 @@ def get_dist_nose_to_box(pose_points, food_drinks_bbox):
     # Compute distance from nose to closest point on the bbox (euclidean distance formula)
     return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
 
-
 # Helper function to keep track of track id
 def flag_track_id(context, track_id):
     with context.flagged_foodbev_lock:
@@ -150,16 +150,23 @@ def detection(context: Camera):
             local_pose_points = list(context.pose_points)
             local_detected_food_drinks = dict(context.detected_incompliance)
 
-        for p in local_pose_points:
-            for track_id in local_detected_food_drinks:
+        best_matches = {}
+        for track_id in local_detected_food_drinks:
+            
+            with context.flagged_foodbev_lock:
+                if track_id in context.flagged_foodbev:
+                    continue
 
-                with context.flagged_foodbev_lock:
-                    if track_id in context.flagged_foodbev:
-                        continue
+            food_drinks_bbox = local_detected_food_drinks[track_id][0]
+            food_drinks_center = local_detected_food_drinks[track_id][1]
+            x1, y1, x2, y2 = map(int, food_drinks_bbox)
 
-                food_drinks_bbox = local_detected_food_drinks[track_id][0]
-                food_drinks_center = local_detected_food_drinks[track_id][1]
-                x1, y1, x2, y2 = food_drinks_bbox
+            drink = frame.copy()
+            cv2.rectangle(drink, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            best_score = float("inf")
+            best_matches[track_id] = {"person": None, "best_score": best_score}
+
+            for p in local_pose_points:
 
                 try:
                     face_bbox = extract_face_from_nose(p, frame)
@@ -209,6 +216,15 @@ def detection(context: Camera):
                         # Not holding, skip
                         continue
 
+                # Find best matched person
+                score = dist_nose_to_box + dist
+                if score < best_matches[track_id]["best_score"]:
+                    best_matches[track_id]["best_score"] = score
+                    best_matches[track_id]["person"] = p
+
+
+            if best_matches[track_id]["person"] is not None:
+                p = best_matches[track_id]["person"]
                 now = time.time()
 
                 # Track wrist proximity times
@@ -237,6 +253,13 @@ def detection(context: Camera):
                     continue
 
                 face_crop = None
+                try:
+                    face_bbox = extract_face_from_nose(p, frame)
+                    fx1, fy1, fx2, fy2 = map(int, face_bbox)
+
+                except ValueError:
+                    print("can't extract the face")
+                    continue
                 face_crop = safe_crop(frame, fx1, fy1, fx2, fy2, padding=30)
 
                 # Face crop failed
@@ -330,7 +353,11 @@ def detection(context: Camera):
                             ),
                             exist_ok=True,
                         )
-                        context.manager.saver.save_img(frame, str(person_id), today)
+                        
+                        clone = frame.copy()
+                        cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 2)
+                        cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        context.manager.saver.save_img(clone, str(person_id), today)
 
                         print(
                             "[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅"
