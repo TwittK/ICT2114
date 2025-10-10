@@ -301,13 +301,16 @@ def detection(context: Camera):
                             context.manager.saver.save_img(frame, str(person_id), today)
 
                             # Send Email for Second Incompliance Detected
-                            lab_email = get_lab_safety_email_by_camera_id(
+                            lab_emails = get_lab_safety_email_by_camera_id(
                                 context.camera_id
                             )
-                            if lab_email:
-                                email_service.send_incompliance_email(
-                                    lab_email, f"Person {person_id}"
-                                )
+                            if lab_emails:
+                                # Split lab emails saved with commas as delimiter and send to all emails
+                                lab_emails_list = lab_emails.replace(" ", "").split(",")
+                                for email in lab_emails_list:
+                                    email_service.send_incompliance_email(
+                                        email, f"Person {person_id}"
+                                    )
 
                             # Publish MQTT message                            
                             if mqtt_client:
