@@ -6,8 +6,8 @@
       "Host": "postgres",
       "Port": 5432,
       "MaintenanceDB": "postgres",
-      "Username": "edwin",
-      "Password": "password",
+      "Username": "postgres",
+      "Password": "Sit12345",
       "SSLMode": "prefer"
     }
   }
