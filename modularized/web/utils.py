@@ -12,6 +12,19 @@ DB_PARAMS = {
 }
 
 def check_permission(role_name, action):
+  """
+  Checks whether a specific role has permission to perform a given action.
+
+  This function queries the database to determine if the provided role is granted
+  access to the specified permission/action.
+
+  Parameters:
+    role_name (str): The name of the role (e.g., 'admin', 'user').
+    action (str): The name of the permission or action to check (e.g., 'delete_user').
+
+  Returns:
+    bool: True if the role has the permission, False otherwise.
+  """
   conn = psycopg2.connect(**DB_PARAMS)
   cur = conn.cursor()
   cur.execute("""
@@ -21,7 +34,7 @@ def check_permission(role_name, action):
     JOIN Permission p ON rp.permission_id = p.id
     WHERE r.name = %s AND p.name = %s
     LIMIT 1;
-  """, (str(role_name), action))
+  """, (str(role_name), str(action)))
 
   granted = cur.fetchone() is not None
   conn.close()
@@ -29,7 +42,19 @@ def check_permission(role_name, action):
   return granted
 
 def validate_and_sanitize_text(text):
+  """
+  Validates and sanitizes a text input by removing HTML tags, trimming whitespace,
+  and enforcing length constraints.
 
+  Parameters:
+    text (str): The input text to be validated and cleaned.
+
+  Returns:
+    str: The sanitized text string.
+
+  Raises:
+    ValueError: If input is not a string or its length is not between 1 and 100 characters.
+  """
   # Check if input is a string
   if not isinstance(text, str):
     raise ValueError("Input must be a string")

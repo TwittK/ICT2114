@@ -3,19 +3,54 @@ from data_source.snapshot_dao import SnapshotDAO
 from data_source.person_dao import PersonDAO
 
 class ProcessIncompliance:
+    """
+    Handles processing of food/ drink incompliance detections.
+    
+    Interacts with DAOs to store new snapshots, and update person records.
+    Also manages face data in the NVR face database.
+    """
+
     def __init__(self, db_params, camera_id):
+        """
+        Initialize the ProcessIncompliance handler.
+
+        Parameters:
+            db_params (dict): Database connection parameters.
+            camera_id (int): Identifier for the camera used for detection.
+        """
         self.db_params = db_params
         self.camera_id = camera_id
         self.snapshot_dao = SnapshotDAO(db_params)
         self.person_dao = PersonDAO(db_params)
 
-    def get_date(self, current_date):
+    def _get_date(self, current_date):
+        """
+        Extract date (YYYY-MM-DD) from the last 10 characters in a timestamp string.
+
+        Parameters:
+            current_date (str): The timestamp.
+
+        Returns:
+            str: Date in 'YYYY-MM-DD' format.
+        """
         return str(current_date)[:10]
 
-    # When face match is found in exisiting incompliance
-    def match_found_new_incompliance(self, matches_found, nvr, local_detected_food_drinks, track_id, face_crop,
-                                     current_date):
+    def match_found_new_incompliance(self, matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
+        """
+        Handle a case where a face match is found in the existing incompliance records.
 
+        Parameters:
+            matches_found (tuple): Tuple containing match status and snapshot ID.
+            nvr (NVR): NVR object for NVR face database operations.
+            local_detected_food_drinks (dict): Detection results containing confidence and class ID.
+            track_id (int): Identifier for the tracked food/ drink.
+            face_crop (numpy.ndarray): Cropped face image.
+            current_date (str): Timestamp of the detection.
+
+        Returns:
+            int or None: Person ID if a previous snapshot is found and the last incompliance is on a different date.
+        """
+        # Find previous record of the incompliance
         result = self.snapshot_dao.get_snapshot_by_id(matches_found[1])
 
         if result:
@@ -23,7 +58,7 @@ class ProcessIncompliance:
             last_date = (str(last_incompliance)[:10] if last_incompliance else None)
 
             # Current incompliance must happen on a different date
-            today = self.get_date(current_date)
+            today = self._get_date(current_date)
             if last_date != today and last_date is not None:
 
                 face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
@@ -31,6 +66,8 @@ class ProcessIncompliance:
 
                 if snapshot_id:
                     print("[INFO] 🔴 Inserted face into NVR Face Database")
+
+                    # Update the incompliance details and save snapshot under the same person id
                     self.person_dao.update_last_incompliance(person_id, current_date)
                     self.snapshot_dao.insert_snapshot(
                         str(snapshot_id),
@@ -53,17 +90,28 @@ class ProcessIncompliance:
 
         return None
 
-    # When NO face match is found in exisiting incompliance (a new person does incompliance)
     def no_match_new_incompliance(self, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
+        """
+        Handle a case where no face match is found. (A new person committing incompliance)
 
-        today = self.get_date(current_date)
+        Parameters:
+            nvr (NVR): NVR object for NVR face database operations.
+            local_detected_food_drinks (dict): Detection results containing confidence and class ID.
+            track_id (int): Identifier for the tracked food/ drink.
+            face_crop (numpy.ndarray): Cropped face image.
+            current_date (str): Timestamp of the detection.
+
+        Returns:
+            int: The new person's ID after insertion.
+        """
+        today = self._get_date(current_date)
         person_id = self.person_dao.insert_new_person(current_date)
 
         # Save face into NVR face library
         face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
         snapshot_id = nvr.insert_into_face_db(face_crop, person_id)
 
-        # Save incompliance snapshot and record details in database
+        # Save incompliance snapshot and record details under a new person in database
         if snapshot_id:
             print("[INFO] 🔴 Inserted face into NVR Face Database")
             self.snapshot_dao.insert_snapshot(
@@ -77,5 +125,3 @@ class ProcessIncompliance:
             )
         return person_id
 
-    def close_connection(self):
-        self.db.close()

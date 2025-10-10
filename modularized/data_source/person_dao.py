@@ -9,6 +9,7 @@ class PersonDAO:
     return psycopg2.connect(**self.db_params)
   
   def update_last_incompliance(self, id, last_incompliance):
+    """Update a person's last incompliance date."""
     update_query = """
                     UPDATE Person
                     SET last_incompliance  = %s,
@@ -21,6 +22,7 @@ class PersonDAO:
         conn.commit()
 
   def get_incompliance_count(self, person_id):
+    """Get the current incompliance count of a person."""
     with self._get_conn() as conn:
       with conn.cursor() as cursor:
         cursor.execute("""

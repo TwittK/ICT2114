@@ -24,6 +24,7 @@ class SnapshotDAO:
         return result
       
   def insert_snapshot(self, snapshot_id, confidence, current_date, object_detected, image_url, person_id, camera_id):
+    """Insert a new snapshot of an incompliance."""
     snapshot_query = """
                       INSERT INTO Snapshot (snapshotId, confidence, time_generated, object_detected,
                                             imageURL, person_id, camera_id)

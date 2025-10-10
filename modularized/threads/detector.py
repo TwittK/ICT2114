@@ -374,5 +374,3 @@ def detection(context: Camera):
                 except Exception as e:
                     print(e)
                     continue
-
-    process_incompliance.close_connection()
