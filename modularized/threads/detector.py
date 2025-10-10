@@ -268,7 +268,7 @@ def detection(context: Camera):
 
                 try:
                     # Mock next day
-                    # mocked_date = datetime(2025,7,23)
+                    # mocked_date = datetime(2025,2,28)
                     # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -298,7 +298,10 @@ def detection(context: Camera):
                         if person_id is not None:
 
                             # Save frame locally
-                            context.manager.saver.save_img(frame, str(person_id), today)
+                            clone = frame.copy()
+                            cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 1)
+                            cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
+                            context.manager.saver.save_img(clone, str(person_id), today)
 
                             # Send Email for Second Incompliance Detected
                             lab_emails = get_lab_safety_email_by_camera_id(
@@ -329,7 +332,6 @@ def detection(context: Camera):
                             print(
                                 "[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring."
                             )
-                            # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
 
                         flag_track_id(context, track_id)
 
@@ -358,8 +360,8 @@ def detection(context: Camera):
                         )
                         
                         clone = frame.copy()
-                        cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 2)
-                        cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 1)
+                        cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
                         context.manager.saver.save_img(clone, str(person_id), today)
 
                         print(
@@ -368,7 +370,6 @@ def detection(context: Camera):
                         time.sleep(
                             3
                         )  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
-                        # email_service.send_incompliance_email("koitristan123@gmail.com", f"Person {person_id}")
 
                 except Exception as e:
                     print(e)

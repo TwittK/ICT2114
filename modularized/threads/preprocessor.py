@@ -70,8 +70,8 @@ class DetectionWorker:
 
                         x1, y1, x2, y2 = map(int, coords)
 
-                        cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                        cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 1)
+                        cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 1)
 
                         if (track_id not in context.flagged_foodbev):
 
