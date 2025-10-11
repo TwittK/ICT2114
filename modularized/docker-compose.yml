@@ -73,15 +73,5 @@ services:
     volumes:
       - ./pgadmin_config/servers/servers.json:/pgadmin4/servers.json
 
-  # User: admin
-  # Password: hivemq
-  hivemq:
-    image: hivemq/hivemq4:4.45.0
-    container_name: hivemq
-    ports:
-      - "1883:1883" # MQTT
-      - "8081:8080" # HiveMQ Control Center web UI.
-    restart: unless-stopped
-
 volumes:
   postgres_data:
