@@ -7,6 +7,24 @@ target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
 
 class CameraManager:
+  """
+  Singleton class for managing all active cameras in the system.
+
+  The CameraManager is responsible for:
+  - Initializing and maintaining a pool of camera objects.
+  - Starting and stopping all camera-related processing threads (e.g., reading, detection).
+  - Managing resources such as detection workers and saver threads.
+
+  This class follows the Singleton design pattern to ensure only one instance exists
+  throughout the application lifecycle. Use `CameraManager.get_instance()` to retrieve 
+  the active instance after initialization.
+
+  Attributes:
+    camera_pool (dict): A mapping of camera_id to camera instance and its associated threads.
+    db (psycopg2.extensions.connection): Active PostgreSQL database connection.
+    detection_manager (DetectionManager): Manager for coordinating GPU detection workers.
+    saver (Saver): Thread responsible for saving detection results.
+  """
   _instance = None
 
   # Singleton
@@ -31,8 +49,6 @@ class CameraManager:
 
     Parameters:
       db_params (dict): A dictionary containing parameters required to connect to the PostgreSQL database.
-      detection_manager (DetectionManager): An instance of DetectionManager responsible for submitting frames to worker threads.
-      saver (Saver): An instance of Saver responsible for saving images to disk.
     """
     
     if self._initialized: # Singleton
@@ -124,7 +140,7 @@ class CameraManager:
 
     This method:
     - Instantiates a Camera object.
-    - Starts threads for reading, preprocessing, detection, and saving frames.
+    - Starts threads for reading, processing, and saving frames.
     - Stores the camera and its threads in the camera pool.
 
     Parameters:
@@ -137,24 +153,24 @@ class CameraManager:
       bool: True if the camera was added successfully, False otherwise.
     """
     from threads.reader import read_frames
-    from threads.detector import detection
+    from threads.association import association
     from shared.camera import Camera
 
     try:
       camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
 
-      # Start all threads for detection
+      # Start all threads
       read_thread = threading.Thread(target=read_frames, args=(camera,))
-      detection_thread = threading.Thread(target=detection, args=(camera,))
+      association_thread = threading.Thread(target=association, args=(camera,))
 
       read_thread.start()
-      detection_thread.start()
+      association_thread.start()
 
       self.camera_pool[camera_id] = {
         "camera": camera,
         "threads": {
           "read": read_thread,
-          "detection": detection_thread
+          "association": association_thread
         },
       }
 

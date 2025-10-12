@@ -1,6 +1,6 @@
 # shared/detection_manager.py
 import threading
-from threads.preprocessor import DetectionWorker
+from threads.detection_worker import DetectionWorker
 
 
 class DetectionManager:

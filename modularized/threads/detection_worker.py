@@ -2,7 +2,7 @@ import queue
 from datetime import datetime, timedelta
 import cv2 as cv
 from shared.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
-from threads.detector import safe_crop
+from threads.association import safe_crop
 import threading
 import queue
 

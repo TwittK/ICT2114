@@ -129,7 +129,7 @@ def flag_track_id(context, track_id):
 
 
 # Mapping detected food/ drinks to person
-def detection(context: Camera):
+def association(context: Camera):
     email_service = EmailService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance(db_params, context.camera_id)
@@ -275,8 +275,8 @@ def detection(context: Camera):
                     today = current_date[:10]
 
                     # Facial Recognition
-                    mode_data = nvr.get_mode_data(frame)
-                    matches_found = nvr.get_face_comparison(mode_data)
+                    #mode_data = nvr.get_mode_data(frame)
+                    matches_found = (-1,1) #nvr.get_face_comparison(mode_data)
 
                     if matches_found[0] == None:
                         continue
