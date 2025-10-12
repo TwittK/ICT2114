@@ -1,5 +1,12 @@
 import bleach, psycopg2, os
 from dotenv import load_dotenv
+from flask import (
+    session,
+    redirect,
+    url_for,
+    flash,
+)
+from functools import wraps
 
 # Load environment variables from .env
 load_dotenv()
@@ -67,3 +74,38 @@ def validate_and_sanitize_text(text):
     raise ValueError("Text length must be between 1 and 100 characters")
   
   return text
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "logged_in" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def require_permission(permission_name):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if "logged_in" not in session:
+                flash("You must be logged in to access this page.", "danger")
+                return redirect(url_for("index"))
+
+            role_name = session.get("role")
+            if not role_name:
+                flash("No role assigned to user.", "danger")
+                return redirect(url_for("index"))
+
+            has_permission = check_permission(role_name, permission_name)
+
+            if not has_permission:
+                flash(f"Permission '{permission_name}' required.", "danger")
+                return redirect(url_for("index"))
+
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator

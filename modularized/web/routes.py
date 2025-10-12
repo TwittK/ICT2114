@@ -30,7 +30,7 @@ from psycopg2.extras import RealDictCursor
 from requests.auth import HTTPDigestAuth
 from shared.camera_discovery import CameraDiscovery
 from shared.camera_manager import CameraManager
-from web.utils import check_permission, validate_and_sanitize_text
+from web.utils import check_permission, validate_and_sanitize_text, require_permission, login_required
 from werkzeug.security import generate_password_hash
 
 from shared.mqtt_client import MQTTClient
@@ -63,43 +63,6 @@ mqtt_client = MQTTClient()
 #     for idx, col in enumerate(cursor.description):
 #         d[col[0]] = row[idx]
 #     return d
-
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if "logged_in" not in session:
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
-def require_permission(permission_name):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if "logged_in" not in session:
-                flash("You must be logged in to access this page.", "danger")
-                return redirect(url_for("index"))
-
-            role_name = session.get("role")
-            if not role_name:
-                flash("No role assigned to user.", "danger")
-                return redirect(url_for("index"))
-
-            has_permission = check_permission(role_name, permission_name)
-
-            if not has_permission:
-                flash(f"Permission '{permission_name}' required.", "danger")
-                return redirect(url_for("index"))
-
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    return decorator
-
 
 @app.context_processor
 def inject_labs_with_cameras():
@@ -351,12 +314,12 @@ def index():
 
         if object_filter:
             if object_filter == "food":
-                food_ids = label_repo.get_food_class_ids()
+                food_ids = list(map(str, label_repo.get_food_class_ids()))
                 placeholders = ",".join("%s" for _ in food_ids)
                 query += f" AND s.object_detected IN ({placeholders})"
                 params.extend(food_ids)
             elif object_filter == "drink":
-                drinks_ids = label_repo.get_drink_class_ids()
+                drinks_ids = list(map(str, label_repo.get_drink_class_ids()))
                 placeholders = ",".join("%s" for _ in drinks_ids)
                 query += f" AND s.object_detected IN ({placeholders})"
                 params.extend(drinks_ids)
