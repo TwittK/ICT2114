@@ -275,8 +275,8 @@ def association(context: Camera):
                     today = current_date[:10]
 
                     # Facial Recognition
-                    #mode_data = nvr.get_mode_data(frame)
-                    matches_found = (-1,1) #nvr.get_face_comparison(mode_data)
+                    mode_data = nvr.get_mode_data(frame)
+                    matches_found = nvr.get_face_comparison(mode_data)
 
                     if matches_found[0] == None:
                         continue
