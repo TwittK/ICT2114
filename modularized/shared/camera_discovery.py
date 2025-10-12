@@ -29,7 +29,19 @@ class CameraDiscovery:
         self.nvr_ip = nvr_ip
 
     def discover_camera(self, camera_ip, discovered_channels):
-        """Discover camera capabilities and return configuration"""
+        """
+        Fetches configuration details from a camera using its IP address.
+
+        Queries the camera for device info, network settings, stream capabilities, time configuration,
+        and NTP server settings. Returns a dictionary of these values if the camera is responsive.
+
+        Parameters:
+            camera_ip (str): The IP address of the camera to discover.
+            discovered_channels (dict): Mapping of IP addresses to channel IDs from the NVR. See get_connected_channels().
+
+        Returns:
+            dict or None: A dictionary with camera configuration data, or None if discovery fails.
+        """
         try:
             device_info = self._get_device_info(camera_ip)
             network_info = self._get_network_info(camera_ip)
@@ -60,11 +72,20 @@ class CameraDiscovery:
             return None
         
     def get_connected_channels(self):
-        """Get channel of camera in the NVR."""
+        """
+        Retrieves a dictionary mapping currently connected camera IPs to their corresponding channel IDs in the NVR.
+
+        Sends a GET request to the NVR's ISAPI endpoint and parses the response to identify which cameras are currently online. 
+        Extracts the corresponding camera IP addresses and channel IDs.
+
+        Returns:
+            dict: A mapping of IP addresses to channel IDs. Example: { "192.168.1.100": "1501", "192.168.1.101": "1601" }
+        """
         iv = os.urandom(16).hex()
-        url = f"http://192.168.1.63/ISAPI/ContentMgmt/InputProxy/channels/status?security=1&iv={iv}"
+        url = f"http://{self.nvr_ip}/ISAPI/ContentMgmt/InputProxy/channels/status?security=1&iv={iv}"
         response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
-        
+
+        # Parses the response and gets only the cameras that the NVR is able to connect to.
         ns = {'ns': 'http://www.isapi.org/ver20/XMLSchema'}
         root = ET.fromstring(response.text)
         connected_ips = {}
@@ -81,7 +102,16 @@ class CameraDiscovery:
         return connected_ips
 
     def _get_device_info(self, camera_ip):
-        """Get basic device information"""
+        """
+        Sends a GET request to the Camera's ISAPI endpoint and
+        parses the response to retrieve basic device information such as device name and model.
+
+        Parameters:
+            camera_ip (str): IP address of the camera.
+
+        Returns:
+            dict or None: Dictionary with 'device_name' and 'model' keys, or None on failure.
+        """
         url = f"http://{camera_ip}/ISAPI/System/deviceInfo"
         response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
         
@@ -100,7 +130,15 @@ class CameraDiscovery:
         return None
 
     def _get_network_info(self, camera_ip):
-        """Get network configuration"""
+        """
+        Retrieves the network configuration of a camera using a GET request to the Camera's ISAPI endpoint.
+
+        Parameters:
+            camera_ip (str): IP address of the camera.
+
+        Returns:
+            dict or None: Dictionary with keys: 'ip_address', 'subnet_mask', 'gateway', 'ip_type', or None if parsing fails.
+        """
         url = f"http://{camera_ip}/ISAPI/System/Network/interfaces"
         response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
         
@@ -151,7 +189,16 @@ class CameraDiscovery:
         return None
 
     def _get_stream_info(self, camera_ip, channel="101"):
-        """Get streaming configuration"""
+        """
+        Retrieves streaming configuration from the camera using a GET request to the Camera's ISAPI endpoint.
+
+        Parameters:
+            camera_ip (str): IP address of the camera.
+            channel (str): Channel ID to query (default: "101" for direct camera connection, and not through NVR).
+
+        Returns:
+            dict or None: Dictionary with keys: 'resolution', 'frame_rate', 'encoding', or None if stream info is unavailable.
+        """
         url = f"http://{camera_ip}/ISAPI/Streaming/channels/{channel}"
         response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
         
@@ -256,7 +303,15 @@ class CameraDiscovery:
         return None
 
     def _get_time_info(self, camera_ip):
-        """Get time configuration"""
+        """
+        Retrieves time configuration from the camera using a GET request to the Camera's ISAPI endpoint.
+
+        Parameters:
+            camera_ip (str): IP address of the camera.
+
+        Returns:
+            dict or None: Dictionary with keys: 'timezone', 'sync_with_ntp', 'local_time', or None on failure.
+        """
         url = f"http://{camera_ip}/ISAPI/System/time"
         response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
         
@@ -309,6 +364,15 @@ class CameraDiscovery:
         return None
 
     def _get_ntp_info(self, camera_ip):
+        """
+        Retrieves the configured NTP server from the camera using a GET request to the Camera's ISAPI endpoint.
+
+        Parameter:
+            camera_ip (str): IP address of the camera.
+
+        Returns:
+            dict or None: Dictionary with key: 'ntp_server', or None if not available.
+        """
         url = f"http://{camera_ip}/ISAPI/System/time/ntpServers"
         response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
         
@@ -351,7 +415,16 @@ class CameraDiscovery:
         return None
 
     def scan_network_for_cameras(self, network_range="192.168.1."):
-        """Scan network range for Hikvision cameras"""
+        """
+        Scans a given subnet range for active cameras and retrieves their configurations.
+        Iterates over IPs from x.x.x.1 to x.x.x.254 and performs discovery if the camera responds.
+
+        Parameters:
+            network_range (str): The base IP range to scan (default: "192.168.1.").
+
+        Returns:
+            list: A list of dictionaries containing configurations of successfully discovered cameras.
+        """
         discovered_cameras = []
         discovered_channels = self.get_connected_channels()
         
@@ -367,7 +440,15 @@ class CameraDiscovery:
         return discovered_cameras
 
     def auto_populate_database(self, lab_name="E2-L6-016", user_id=1):
-        """Auto-populate database with discovered cameras"""
+        """
+        Automatically discovers all connected cameras and adds them to the database.
+        Links all cameras to the first lab record in the database.
+
+        Parameters:
+            lab_name (str): The name of the lab to associate the cameras with.
+            user_id (int): The user ID to associate with the camera records.
+
+        """
         conn = psycopg2.connect(**DB_PARAMS)
         cursor = conn.cursor()
         

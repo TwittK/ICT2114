@@ -10,7 +10,7 @@ class Camera:
   Attributes:
     camera_id (int): Unique identifier for the camera.
     ip_address (str): IP address of the camera.
-    channel (str): Channel identifier (e.g., "101").
+    channel (str): Channel identifier (e.g., "1501, 101, 1601, 201").
     use_ip_camera (bool): Indicates if the camera is an IP camera. Set to False only for testing with webcam.
     manager (CameraManager): Reference to the parent CameraManager instance.
     detection_manager: Inference manager retrieved from the camera manager.
@@ -51,7 +51,7 @@ class Camera:
 
     self.frame_queue = queue.Queue(maxsize=10)
     self.process_queue = queue.Queue(maxsize=10)
-    self.display_queue = queue.Queue(maxsize=10)
+    self.display_queue = queue.Queue(maxsize=3)
 
     self.cap = None
 

@@ -8,3 +8,4 @@ python-dotenv
 psycopg2-binary
 watchdog==6.0.0
 paho-mqtt==2.1.0
+mkdocs==1.6.1
