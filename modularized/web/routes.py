@@ -1399,14 +1399,23 @@ def add_camera():
         # Get current user ID from session
         user_id = session.get("user_id", 1)
 
+        # Find channel ID of camera in the NVR
+        from shared.camera_discovery import CameraDiscovery
+        discovery = CameraDiscovery()
+        all_channels = discovery.get_connected_channels()
+        try:
+            channel = all_channels[camera_ip]
+        except Exception as e:
+            return jsonify({"success": False, "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR."})
+
         # Add to database with correct column names and all required fields
         cursor.execute(
             """
             INSERT INTO Camera (name, ip_address, camera_lab_id, camera_user_id, resolution, frame_rate,
                                 encoding,
                                 subnet_mask, gateway, camera_ip_type, timezone, sync_with_ntp,
-                                ntp_server_address, time)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cameraid
+                                ntp_server_address, time, channel)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cameraid
             """,
             (
                 device_info.get("device_name", f"Camera_{camera_ip}"),
@@ -1426,7 +1435,8 @@ def add_camera():
                 ),  # Fixed: use correct key
                 device_info.get(
                     "time", "2025-01-01T00:00:00"
-                ),  # Added: time is required (NOT NULL)
+                ),
+                channel
             ),
         )
 
