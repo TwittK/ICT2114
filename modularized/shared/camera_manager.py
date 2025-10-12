@@ -1,6 +1,7 @@
 # shared/camera_manager.py
-import threading, psycopg2
-from shared.model import ObjectDetectionModel
+import threading, psycopg2, os
+from shared.detection_manager import DetectionManager
+from threads.saver import Saver
 
 target_class_list = [39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
@@ -9,7 +10,7 @@ class CameraManager:
   _instance = None
 
   # Singleton
-  def __new__(cls, db_params, detection_manager, saver):
+  def __new__(cls, db_params):
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
@@ -21,7 +22,7 @@ class CameraManager:
       raise RuntimeError("CameraManager has not been initialized yet.")
     return cls._instance
 
-  def __init__(self, db_params, detection_manager, saver):
+  def __init__(self, db_params):
     """
     Initializes a Camera Manager and prepares all cameras for detection.
 
@@ -45,9 +46,10 @@ class CameraManager:
     cursor.execute("SELECT CameraId, ip_address FROM Camera;")
     rows = cursor.fetchall()
     cursor.close()
-    
-    self.detection_manager = detection_manager
-    self.saver = saver
+
+    gpu_count = os.getenv("GPU_COUNT")
+    self.detection_manager = DetectionManager(gpu_count)
+    self.saver = Saver()
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:

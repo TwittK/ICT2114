@@ -1,6 +1,5 @@
 import threading
 import queue
-from shared.camera_manager import CameraManager
 
 class Camera:
   """
@@ -39,8 +38,8 @@ class Camera:
     flagged_foodbev_lock (threading.Lock): Lock for accessing/modifying 'flagged_foodbev'.
   """
 
-  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager: CameraManager):
-
+  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager):
+    
     # Store Camera details
     self.camera_id = camera_id
     self.ip_address = ip_address
