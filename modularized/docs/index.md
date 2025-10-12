@@ -4,11 +4,17 @@
 Before getting started, ensure the following:
 
 - **NVIDIA GPU with CUDA support**
-    - To check if your GPU is ready:<br>
-      ```bash nvidia-smi ```
-    - If not configured, install:
-        - [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive)
-        - [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
+    - To check if your GPU is ready run the following commands:<br>
+```bash
+nvidia-smi
+```
+```bash
+cd modularized
+python gpu_check.py
+```
+  - If not configured, install:
+      - [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive)
+      - [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
 - **Python 3.12+**
 - **(Optional) Docker and Docker Compose**
 

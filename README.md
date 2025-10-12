@@ -23,6 +23,8 @@ pip install -r ./modularized/requirements.txt
 
 ------------------------------------------------------------------
 
+## Windows
+
 
 Create an environment
 
@@ -59,3 +61,10 @@ Install Dependencies from requirements.txt
 ```bat
 pip install -r requirements.txt
 ```
+------------------------------------------------------------------
+
+## Read Docs
+```bash
+mkdocs serve
+```
+Go to http://localhost:8000
