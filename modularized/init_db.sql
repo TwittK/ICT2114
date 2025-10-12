@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS Camera (
     time TIMESTAMP NOT NULL,
     camera_user_id INTEGER NOT NULL,
     camera_lab_id INTEGER NOT NULL,
+    channel INTEGER NOT NULL,
     FOREIGN KEY (camera_user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (camera_lab_id) REFERENCES Lab(LabId) ON DELETE CASCADE
 );

@@ -37,13 +37,13 @@ class ObjectDetectionModel(BaseModel):
       Boxes: Detected bounding boxes of target classes.
     """
     device_str = f"cuda:{self.gpu_device}" if self.gpu_device is not None else "cpu"
+    self.model.to(torch.device(device_str))
     result = self.model.track(
       frame,
       persist=True,
       classes=[39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55],
       conf=0.3,
-      verbose=False,
-      device=torch.device(device_str)
+      verbose=False
     )
     drink_boxes = result[0].boxes
     return drink_boxes

@@ -177,7 +177,7 @@ def create_user(username, email, password, role_name="user"):
         conn.close()
 
 
-def create_default_labs_and_cameras():
+def create_default_labs():
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
 
@@ -190,24 +190,11 @@ def create_default_labs_and_cameras():
                    """
     )
     lab_count = cursor.fetchone()[0]
-
-    cursor.execute(
-        """
-                   SELECT COUNT(*)
-                   FROM Camera
-                   """
-    )
-    camera_count = cursor.fetchone()[0]
-
     conn.close()
 
     if lab_count == 0:
         create_lab("E2-L6-016", "labsafety@gmail.com")
         # create_lab("E2-L6-017", "labsafety@Fgmail.com")
-
-    if camera_count == 0:
-        create_camera("Camera 1", 1, 1, ip_address="192.168.1.64")
-        # create_camera("Camera 2", 1, 1, ip_address="192.168.1.65")
 
 
 def create_lab(lab_name, lab_safety_email):
@@ -237,6 +224,7 @@ def create_camera(
     name,
     camera_user_id,
     camera_lab_id,
+    channel,
     resolution=1080,
     frame_rate=30,
     encoding="H.265",
@@ -247,7 +235,7 @@ def create_camera(
     timezone="Asia/Singapore",
     sync_with_ntp=False,
     ntp_server_address="pool.ntp.org",
-    time="2025-01-01T00:00:00",
+    time="2025-01-01T00:00:00"
 ):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -260,9 +248,9 @@ def create_camera(
                        INSERT INTO Camera (name, resolution, frame_rate,
                                            encoding, camera_ip_type, ip_address,
                                            subnet_mask, gateway, timezone,
-                                           sync_with_ntp, ntp_server_address, time,
+                                           sync_with_ntp, ntp_server_address, time, channel,
                                            camera_user_id, camera_lab_id)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        """,
             (
                 name,
@@ -277,6 +265,7 @@ def create_camera(
                 sync_with_ntp,
                 ntp_server_address,
                 time,
+                channel,
                 camera_user_id,
                 camera_lab_id,
             ),
@@ -327,6 +316,7 @@ def create_new_camera(
     sync_with_ntp,
     ntp_server_address,
     time,
+    channel
 ):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -339,9 +329,9 @@ def create_new_camera(
                        INSERT INTO Camera (name, resolution, frame_rate,
                                            encoding, camera_ip_type, ip_address,
                                            subnet_mask, gateway, timezone,
-                                           sync_with_ntp, ntp_server_address, time,
+                                           sync_with_ntp, ntp_server_address, time, channel,
                                            camera_user_id, camera_lab_id)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        RETURNING camera_id;
                        """,
             (
@@ -357,6 +347,7 @@ def create_new_camera(
                 sync_with_ntp,
                 ntp_server_address,
                 time,
+                channel,
                 camera_user_id,
                 camera_lab_id,
             ),

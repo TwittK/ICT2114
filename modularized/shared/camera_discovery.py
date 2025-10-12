@@ -18,7 +18,7 @@ DEFAULT_TIMEZONE = 'Asia/Singapore'
 DATETIME_FORMAT =  '%Y-%m-%dT%H:%M:%S'
 
 class CameraDiscovery:
-    def __init__(self, username="admin", password="Sit12345"):
+    def __init__(self, username="admin", password="Sit12345", nvr_ip="192.168.1.63"):
         self.username = username
         self.password = password
         # Support both namespace variations
@@ -26,8 +26,9 @@ class CameraDiscovery:
             "hik": "http://www.hikvision.com/ver20/XMLSchema",
             "isapi": "http://www.isapi.org/ver20/XMLSchema"
         }
+        self.nvr_ip = nvr_ip
 
-    def discover_camera(self, camera_ip):
+    def discover_camera(self, camera_ip, discovered_channels):
         """Discover camera capabilities and return configuration"""
         try:
             device_info = self._get_device_info(camera_ip)
@@ -35,6 +36,7 @@ class CameraDiscovery:
             stream_info = self._get_stream_info(camera_ip)
             time_info = self._get_time_info(camera_ip)
             ntp_info = self._get_ntp_info(camera_ip)
+            channel_info = discovered_channels[camera_ip]+"01"
             
             if device_info and network_info and stream_info and time_info:
                 return {
@@ -48,13 +50,35 @@ class CameraDiscovery:
                     'gateway': network_info.get('gateway', '192.168.1.1'),
                     'camera_ip_type': network_info.get('ip_type', 'static'),
                     'timezone': time_info.get('timezone', DEFAULT_TIMEZONE),
-                    'sync_with_ntp': time_info.get('sync_with_ntp', 0),
+                    'sync_with_ntp': time_info.get('sync_with_ntp', False),
                     'ntp_server_address': ntp_info.get('ntp_server', 'pool.ntp.org'),
-                    'time': time_info.get('local_time', datetime.now().strftime(DATETIME_FORMAT))
+                    'time': time_info.get('local_time', datetime.now().strftime(DATETIME_FORMAT)),
+                    'channel': channel_info
                 }
         except Exception as e:
             print(f"❌ Failed to discover camera {camera_ip}: {e}")
             return None
+        
+    def get_connected_channels(self):
+        """Get channel of camera in the NVR."""
+        iv = os.urandom(16).hex()
+        url = f"http://192.168.1.63/ISAPI/ContentMgmt/InputProxy/channels/status?security=1&iv={iv}"
+        response = requests.get(url, auth=HTTPDigestAuth(self.username, self.password), timeout=10)
+        
+        ns = {'ns': 'http://www.isapi.org/ver20/XMLSchema'}
+        root = ET.fromstring(response.text)
+        connected_ips = {}
+        for channel in root.findall('ns:InputProxyChannelStatus', ns):
+            result = channel.find('ns:chanDetectResult', ns)
+            if result is not None and result.text == "connect":
+                chan_id = channel.find('ns:id', ns)
+                ip = channel.find('ns:sourceInputPortDescriptor/ns:ipAddress', ns)
+
+                if chan_id is not None and ip is not None:
+
+                    connected_ips[ip.text] = chan_id.text
+                                         
+        return connected_ips
 
     def _get_device_info(self, camera_ip):
         """Get basic device information"""
@@ -249,9 +273,9 @@ class CameraDiscovery:
                                root.find(".//isapi:timeZone", namespaces=self.ns))
                 
                 # Determine if NTP is enabled (manual = 0, NTP = 1)
-                sync_with_ntp = 0
+                sync_with_ntp = False
                 if time_mode_elem is not None and time_mode_elem.text:
-                    sync_with_ntp = 1 if time_mode_elem.text.lower() == 'ntp' else 0
+                    sync_with_ntp = True if time_mode_elem.text.lower() == 'ntp' else False
                 
                 # Parse timezone (CST-8:00:00 -> Asia/Singapore)
                 timezone = DEFAULT_TIMEZONE  # default
@@ -329,19 +353,20 @@ class CameraDiscovery:
     def scan_network_for_cameras(self, network_range="192.168.1."):
         """Scan network range for Hikvision cameras"""
         discovered_cameras = []
+        discovered_channels = self.get_connected_channels()
         
         for i in range(1, 255):
             camera_ip = f"{network_range}{i}"
             print(f"🔍 Scanning {camera_ip}...")
             
-            config = self.discover_camera(camera_ip)
+            config = self.discover_camera(camera_ip, discovered_channels)
             if config:
                 print(f"✅ Found camera: {config['device_name']} at {camera_ip}")
                 discovered_cameras.append(config)
         
         return discovered_cameras
 
-    def auto_populate_database(self, camera_ips, lab_name="E2-L6-016", user_id=1):
+    def auto_populate_database(self, lab_name="E2-L6-016", user_id=1):
         """Auto-populate database with discovered cameras"""
         conn = psycopg2.connect(**DB_PARAMS)
         cursor = conn.cursor()
@@ -355,10 +380,14 @@ class CameraDiscovery:
             return
         
         lab_id = lab_result[0]
-        
+
+        # Get all connected cameras IP and channel ID in the NVR 
+        discovered_cameras = self.get_connected_channels()
+        camera_ips = list(discovered_cameras.keys())
+
         for camera_ip in camera_ips:
             print(f"🔍 Discovering camera at {camera_ip}...")
-            config = self.discover_camera(camera_ip)
+            config = self.discover_camera(camera_ip, discovered_cameras)
             
             if config:
                 # Check if camera already exists
@@ -372,6 +401,7 @@ class CameraDiscovery:
                     name=config['device_name'],
                     camera_user_id=user_id,
                     camera_lab_id=lab_id,
+                    channel=config['channel'],
                     resolution=config['resolution'],
                     frame_rate=config['frame_rate'],
                     encoding=config['encoding'],

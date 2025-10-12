@@ -1325,12 +1325,12 @@ def video_feed(camera_id):
         return f"Camera {camera_id} not found.", 404
 
     camera = cam_manager.camera_pool[camera_id]["camera"]
-    print(f"[STREAM] Client connected to /video_feed/{camera_id}")
+    print(f"[STREAM] Client connected to /video_feed/{camera_id}.")
 
     def generate_stream():
         while camera.running:
             try:
-                frame = (camera.display_queue).get(timeout=1)
+                frame = (camera.display_queue).get()
             except queue.Empty:
                 continue
 
