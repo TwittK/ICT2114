@@ -177,7 +177,7 @@ def create_user(username, email, password, role_name="user"):
         conn.close()
 
 
-def create_default_labs():
+def create_test_lab_and_camera():
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
 
@@ -194,8 +194,7 @@ def create_default_labs():
 
     if lab_count == 0:
         create_lab("E2-L6-016", "labsafety@gmail.com")
-        # create_lab("E2-L6-017", "labsafety@Fgmail.com")
-
+        create_camera("test", 1, 1, "101")
 
 def create_lab(lab_name, lab_safety_email):
     # Connect to PostgreSQL

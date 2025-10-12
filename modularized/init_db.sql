@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS Camera (
     timezone VARCHAR(100) NOT NULL,
     sync_with_ntp BOOLEAN NOT NULL DEFAULT FALSE,
     ntp_server_address VARCHAR(100) DEFAULT NULL,
-    time TIMESTAMP NOT NULL,
+    time TIMESTAMP,
     camera_user_id INTEGER NOT NULL,
     camera_lab_id INTEGER NOT NULL,
     channel INTEGER NOT NULL,
