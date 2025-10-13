@@ -1,6 +1,8 @@
 site_name: AI-Powered-Lab-Compliance-Monitoring
 nav:
   - Home: index.md
+  - 'User Guide': user-guide.md
+  - 'Overview': overview.md
   - 'Camera':
     - 'CameraDiscovery': camera/camera_discovery.md
     - 'CameraManagery': camera/camera_manager.md
@@ -15,7 +17,6 @@ nav:
     - 'NVR': incompliance/nvr.md
     - 'EmailService': incompliance/emailservice.md
     - 'Saver': incompliance/saver.md
-
 plugins:
   - mkdocstrings:
       handlers:

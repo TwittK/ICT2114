@@ -23,3 +23,5 @@ coverage.xml
 .vscode/
 test.bat
 scripts/
+docs/
+mkdocs.yml
