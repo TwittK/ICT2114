@@ -10,10 +10,10 @@ class CameraManager:
   """
   Singleton class for managing all active cameras in the system.
 
-  The CameraManager is responsible for:
-  - Initializing and maintaining a pool of camera objects.
-  - Starting and stopping all camera-related processing threads (e.g., reading, detection).
-  - Managing resources such as detection workers and saver threads.
+  The CameraManager is responsible for:  
+  - Initializing and maintaining a pool of camera objects.  
+  - Starting and stopping all camera-related processing threads (e.g., reading, detection).  
+  - Managing resources such as detection workers and saver threads.  
 
   This class follows the Singleton design pattern to ensure only one instance exists
   throughout the application lifecycle. Use `CameraManager.get_instance()` to retrieve 
@@ -22,7 +22,7 @@ class CameraManager:
   Attributes:
     camera_pool (dict): A mapping of camera_id to camera instance and its associated threads.
     db (psycopg2.extensions.connection): Active PostgreSQL database connection.
-    detection_manager (DetectionManager): Manager for coordinating GPU detection workers.
+    detection_manager (DetectionManager): Manager for coordinating YOLO detection workers.
     saver (Saver): Thread responsible for saving detection results.
   """
   _instance = None
@@ -77,11 +77,11 @@ class CameraManager:
     """
     Gracefully shuts down all active cameras in the camera pool.
     Ensures that all camera threads are properly terminated.
-    Also stops all Detection Worker threads and Saver thread.
+    Also stops all other threads (Detection Worker and Saver) for a clean exit.
 
-    For each camera, this method:
-    - Clears the 'running' event to stop detection.
-    - Join all associated threads.
+    For each camera, this method:  
+    - Clears the 'running' event to stop detection.  
+    - Join all associated threads.  
     """
 
     for camera_id, camera_info in self.camera_pool.items():
@@ -103,11 +103,11 @@ class CameraManager:
     """
     Removes a camera from the camera pool and gracefully shuts it down.
 
-    This method performs the following steps:
-    - Checks if the camera exists in the pool.
-    - Signals the detection to stop by clearing the 'running' event.
-    - Joins each thread.
-    - Deletes the camera entry from the camera pool.
+    This method performs the following steps:  
+    - Checks if the camera exists in the pool.  
+    - Signals the detection to stop by clearing the 'running' event.  
+    - Joins each thread.  
+    - Deletes the camera entry from the camera pool.  
 
     Parameters:
       camera_id (int): The unique identifier of the camera to remove.
@@ -138,10 +138,10 @@ class CameraManager:
     """
     Adds a new camera and starts its associated processing/ detection threads.
 
-    This method:
-    - Instantiates a Camera object.
-    - Starts threads for reading, processing, and saving frames.
-    - Stores the camera and its threads in the camera pool.
+    This method:  
+    - Instantiates a Camera object.  
+    - Starts threads for reading, processing, and saving frames.  
+    - Stores the camera and its threads in the camera pool.  
 
     Parameters:
       camera_id (int): Unique identifier for the camera.

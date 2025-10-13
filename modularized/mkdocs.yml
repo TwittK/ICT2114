@@ -7,7 +7,9 @@ nav:
     - 'Camera': camera/camera.md
   - 'Detection':
     - 'DetectionManager': detection/detection_manager.md
+    - 'DetectionWorker': detection/detection_worker.md
     - 'Model': detection/model.md
+    - 'read_frames': detection/reader.md
   - 'Incompliance':
     - 'ProcessIncompliance': incompliance/process_incompliance.md
     - 'NVR': incompliance/nvr.md

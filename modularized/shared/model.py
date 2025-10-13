@@ -28,7 +28,9 @@ class ObjectDetectionModel(BaseModel):
 
   def detect(self, frame):
     """
-    Runs object detection on a given frame.
+    Runs object detection on a given frame to find any food or drinks only.  
+    Any other detected objects of other classes will not be returned.  
+    Refer to `https://docs.ultralytics.com/datasets/detect/coco/#dataset-yaml` for class IDs.
 
     Parameters:
       frame (numpy.ndarray): Input frame for detection.
@@ -39,7 +41,7 @@ class ObjectDetectionModel(BaseModel):
     device_str = f"cuda:{self.gpu_device}" if self.gpu_device is not None else "cpu"
     result = self.model.track(
       frame,
-      persist=True,
+      persist=True, # Enable to track objects across frames.
       classes=[39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55],
       conf=0.3,
       verbose=False,

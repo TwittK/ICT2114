@@ -18,6 +18,22 @@ DEFAULT_TIMEZONE = 'Asia/Singapore'
 DATETIME_FORMAT =  '%Y-%m-%dT%H:%M:%S'
 
 class CameraDiscovery:
+    """
+    This class for discovering and retrieving information of connected cameras.
+    
+    Provides functionalities to:  
+    - Auto discover cameras connected to the NVR and link them to a lab in the database.  
+    - Retrieve device information (model, name, etc.), network settings (subnet mask, gateway, IP type), 
+      stream capabilities (resolution, frame rate, encoding), time configuration, and NTP server settings.  
+    - Map camera IPs to their corresponding channel IDs in the NVR.  
+    
+    Attributes:
+        username (str): The username for authentication when sending a request to the camera.
+        password (str): The password for authentication when sending a request to the camera.
+        ns (dict): A dictionary containing the XML namespaces used for parsing camera responses.
+        nvr_ip (str): The IP address of the NVR, 192.168.1.63 by default.
+    """
+    
     def __init__(self, username="admin", password="Sit12345", nvr_ip="192.168.1.63"):
         self.username = username
         self.password = password
@@ -73,10 +89,14 @@ class CameraDiscovery:
         
     def get_connected_channels(self):
         """
-        Retrieves a dictionary mapping currently connected camera IPs to their corresponding channel IDs in the NVR.
+        Cameras connected to the NVR have a channel number associated to it. It is used as an identifier for a camera in the NVR. 
+        This function retrieves a dictionary mapping currently connected camera IPs to their corresponding channel IDs in the NVR.
 
-        Sends a GET request to the NVR's ISAPI endpoint and parses the response to identify which cameras are currently online. 
-        Extracts the corresponding camera IP addresses and channel IDs.
+        Sends a GET request to the following NVR's ISAPI endpoint:  
+        `/ISAPI/ContentMgmt/InputProxy/channels/`  
+          
+        Parses the response to identify which cameras are currently online. 
+        Extracts the corresponding camera IP addresses and channel IDs.  
 
         Returns:
             dict: A mapping of IP addresses to channel IDs. Example: { "192.168.1.100": "1501", "192.168.1.101": "1601" }
@@ -442,7 +462,7 @@ class CameraDiscovery:
     def auto_populate_database(self, lab_name="E2-L6-016", user_id=1):
         """
         Automatically discovers all connected cameras and adds them to the database.
-        Links all cameras to the first lab record in the database.
+        Links all cameras to the lab name specified in the database.
 
         Parameters:
             lab_name (str): The name of the lab to associate the cameras with.

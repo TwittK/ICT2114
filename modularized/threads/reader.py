@@ -3,45 +3,26 @@ import cv2
 import time
 from shared.camera import Camera
 
-
-# def read_frames(context: Camera):
-
-#     if context.use_ip_camera:
-#         # Camera config
-#         username = "admin"
-#         password = "Sit12345"
-#         # last digit of channel: Use 1 for main stream (better qual, but more bandwidth), 2 for sub stream
-#         # rtsp_url = f"rtsp://{username}:{password}@{context.camera_ip}/Streaming/Channels/{context.channel}"
-#         rtsp_url = f"rtsp://{username}:{password}@{context.ip_address}/Streaming/Channels/{context.channel}"
-
-#         # Initialize IP camera instead of webcam
-#         context.cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-
-#         # Check if camera connection is successful
-#         if not (context.cap).isOpened():
-#             print("Failed to connect to the RTSP stream.")
-#             print(f"Attempted URL: {rtsp_url}")
-#             return
-
-#         print(f"✅ Successfully connected to IP camera: {context.ip_address}")
-#     else:
-#         context.cap = cv2.VideoCapture(0)  # to test with webcam
-
-#     while context.running:
-#         ret, frame = (context.cap).read()
-#         if not ret:
-#             print("Failed to read frame from IP camera")
-#             time.sleep(0.1)  # Wait a bit before retrying
-#             continue
-
-#         if not (context.frame_queue).full():
-#             (context.frame_queue).put(frame)
-#         time.sleep(0.01)
-
-#     (context.cap).release()
-#     print("IP camera connection closed")
-
 def read_frames(context: Camera):
+    """
+    Reads frames from an IP camera or webcam and handles reconnections in case of failure.  
+
+    This function runs in a thread that continuously reads frames from the camera and handles connection issues by 
+    attempting to reconnect if frames cannot be retrieved. If the camera is an IP camera, it uses 
+    RTSP to stream frames, and it supports retries up to a maximum number of attempts with exponential backoff if consecutive failures occur.   
+    For non-IP cameras such as a local webcam, it directly captures frames (Use webcam only for testing on personal machines).
+    
+    Parameters:
+        context (Camera): The camera context, containing configuration and state information about 
+                           the camera, such as whether it is an IP camera, its IP address, channel, 
+                           and the frame queue for processing.  
+
+    Notes:
+        - For IP cameras, the function uses RTSP for video streaming with basic authentication.
+        - The function uses exponential backoff for retrying failed connections, gradually increasing the 
+          delay between each reconnection attempt.
+        - The function supports a maximum retry limit to prevent endless retries and control the backoff behavior.
+    """
     max_retries = 30  # Maximum reconnection attempts
     retry_delay = 1.0  # Initial delay between retries
     max_delay = 10.0   # Maximum delay between retries

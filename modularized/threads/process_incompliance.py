@@ -4,7 +4,7 @@ from data_source.person_dao import PersonDAO
 
 class ProcessIncompliance:
     """
-    Handles processing of food/ drink incompliance detections.
+    Handles processing of food/ drink incompliance detections.  
     
     Interacts with DAOs to store new snapshots, and update person records.
     Also manages face data in the NVR face database.
@@ -28,7 +28,7 @@ class ProcessIncompliance:
         Extract date (YYYY-MM-DD) from the last 10 characters in a timestamp string.
 
         Parameters:
-            current_date (str): The timestamp.
+            current_date (str): The timestamp (time and date).
 
         Returns:
             str: Date in 'YYYY-MM-DD' format.
@@ -37,7 +37,9 @@ class ProcessIncompliance:
 
     def match_found_new_incompliance(self, matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
         """
-        Handle a case where a face match is found in the existing incompliance records.
+        Handle a case where a face match is found in the existing incompliance records.  
+        This method checks if the matched person already has a previous incompliance record.  
+        If the last incompliance occurred on a different date, it updates the person's record, inserts the new face into the NVR database, and logs the incompliance.  
 
         Parameters:
             matches_found (tuple): Tuple containing match status and snapshot ID.
@@ -55,6 +57,8 @@ class ProcessIncompliance:
 
         if result:
             person_id, last_incompliance = result
+
+            # Extract the date part only from the timestamp
             last_date = (str(last_incompliance)[:10] if last_incompliance else None)
 
             # Current incompliance must happen on a different date
@@ -92,8 +96,10 @@ class ProcessIncompliance:
 
     def no_match_new_incompliance(self, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
         """
-        Handle a case where no face match is found. (A new person committing incompliance)
-
+        Handle a case where no face match is found. (A new person committing incompliance)  
+        This method inserts a new person into the database, saves their face in the NVR face database, and logs the incompliance.  
+        It returns the new person ID after the operation.  
+        
         Parameters:
             nvr (NVR): NVR object for NVR face database operations.
             local_detected_food_drinks (dict): Detection results containing confidence and class ID.

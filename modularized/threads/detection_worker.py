@@ -8,7 +8,27 @@ import queue
 
 
 class DetectionWorker:
+    """
+    A worker class responsible for detecting food, drinks, and pose points in video frames. 
+
+    This class runs in a separate thread and continuously processes frames from a queue. It applies 
+    object detection to identify food and beverage items. Filters out objects that could be Water Bottles and performs pose detection 
+    to identify keypoints/ humans. Detected frames are then sent to the next processing 
+    stage and also sent to a queue that stores the frames for display on the dashboard.
+
+    Attributes:
+        worker_id (int): The unique identifier for this worker.
+        queue (queue.Queue): A queue for frames to be processed.
+        thread (threading.Thread): The thread that runs the `preprocess` method.
+        running (threading.Event): A flag to signal when the worker is running.
+    """
     def __init__(self, worker_id):
+        """
+        Initializes the detection worker with a unique worker ID and starts the worker thread.
+
+        Parameters:
+            worker_id (int): The unique identifier for this worker.
+        """
         self.queue = queue.Queue()
         self.thread = threading.Thread(target=self.preprocess, args=(worker_id,), name=f"DetectionWorker-{worker_id}", daemon=True)
         self.running = threading.Event()
@@ -18,7 +38,18 @@ class DetectionWorker:
 
     # Display annotated frames on dashboard
     def preprocess(self, gpu_id):
-        
+        """
+        Processes frames by detecting food, drinks, and pose keypoints. 
+        This method continuously retrieves frames from the queue, performs object detection, 
+        classifies detected objects, and detects human poses.
+
+        Detected food and drink items are checked for compliance (water bottles are ignored). 
+        Pose keypoints are extracted if both food and poses are detected in the same frame. 
+        Processed frames are sent to the next processing stage or displayed.
+
+        Parameters:
+            gpu_id (int): The ID of the GPU device used for inference.
+        """
         object_detection_model = ObjectDetectionModel("yolo11m.pt", gpu_device=gpu_id)
         pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.8, 0.7)
         classif_model = ImageClassificationModel("yolov8n-cls.pt")
@@ -132,9 +163,22 @@ class DetectionWorker:
                 context.display_queue.put(frame_copy)
 
     def stop(self):
+        """
+        Stops the worker thread and ensures that the processing thread is properly terminated.
+
+        Waits for up to 2 seconds for the thread to stop gracefully. 
+        If the thread is still running, it is forcibly stopped.
+        """
         self.running.clear()
         self.thread.join(timeout=2)
         print(f"[INFO] Detection worker {self.worker_id} stopped.")
 
     def submit(self, frame, camera):
+        """
+        Submits a new frame to the worker for processing.
+
+        Parameters:
+            frame (numpy.ndarray): The frame to be processed.
+            camera (Camera): The camera context that provides necessary details for processing.
+        """
         self.queue.put((frame, camera))
