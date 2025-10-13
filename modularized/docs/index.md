@@ -18,7 +18,7 @@ python gpu_check.py
       - [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive)
       - [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
 - **Python 3.12+**
-- **PostgresQL**
+- **PostgreSQL**
 - **(Optional) Docker and Docker Compose**
 
 ## **Getting Started (Linux Ubuntu)**
@@ -60,6 +60,6 @@ Refer to .env.example to create a .env file
 cd modularized
 docker compose -f docker-compose.yml up -d
 ```
-The app should be accesible at [**http://localhost:5000**](http://localhost:5000)
+The app should be accesible at [**http://localhost:5001**](http://localhost:5001)
 
 

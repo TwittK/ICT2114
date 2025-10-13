@@ -20,27 +20,66 @@ This diagram represents the logical components of the dashboard and detection co
 ![Logical Architecture Diagram](logical-diag.drawio.png)
 
 ## **Detection Pipeline: Step-by-Step**
-### 1. Camera Stream Access
-Each camera stream is continuosly pulled and read via RTSP protocol, then the frames are submitted to the [Detection Manager](./detection/detection_manager.md).
+### 1. Reading Frames from Camera Stream
+Each camera’s video stream is continuosly read via RTSP protocol, then the frames are submitted to the [Detection Manager](./detection/detection_manager.md).
 
 ### 2. YOLO Detction
-Detection Manager dispatch the frames to [Detection Workers](./detection/detection_worker.md) using round robin scheduling. The Detection Workers run the YOLO object detection model inference to detect food or drinks. <br><br>
-If at least 1 food/ drink is detected, it saves a track ID (a unique number per entity given by the model to track objects across frames) as well as bounding box information of the detected food/ drink. <br><br>
-Another YOLO model is then utilized for pose detection to find any human figures in the frame and saves landmark (wrists, eyes, nose, ears) information of each person.<br><br>
-If there's at least 1 food/ drink and 1 human figure, it puts the frame into the [Camera's](./camera/camera.md) process_queue.  
-Regardless of whether there's a food/ drink or human detection, the frames are also submitted to the display queue of each camera for video feed display on the dashboard.
+Detection Manager dispatch the frames to [Detection Workers](./detection/detection_worker.md) using a _round robin scheduling_ approach. The Detection Workers run the YOLO object detection model inference to detect food or drinks. <br><br>
+Each Detection Worker runs a YOLO object detection model to check for any visible food or drinks.
 
-### 3. Human to Food/ Drink Association
-Given the track ID, bounding box info, and landmark info of human figures in the frame, the association() function continuously attempts to associate the most likely owner of each food/ drink present in the frame based on the Euclidean distance between:  
-- the nose and wrist landmarks  
-- the bounding box of the food/ drink  
+- If food or drinks are detected, the system stores:  
+    - A unique track ID for each detected item (used to track objects across frames)    
 
-The result of this process produces a dictionary of all food/ drinks mapped to the landmarks of the most likely owner.
+    - Its bounding box information (location in the frame, class ID, confidence)  
 
-A person must maintain close wrist proximity to the object for at least 2 seconds before counting as an incompliance. This helps prevent incorrect associations in scenarios where a person briefly passes near a detected item, for example if they are walking past a food/ drink, by ensuring that it does not trigger a detected incompliance.
+
+- Next, a separate YOLO pose detection model looks for human figures in the same frame.  
+    - If people are detected, it saves their landmarks (eyes, nose, ears, and wrists).    
+
+
+- If at least one food/drink and one person are detected:  
+    - The frame is added to the [Camera's](./camera/camera.md) processing queue.  
+
+
+Regardless of detections, all frames are also sent to the dashboard display queue so they can be viewed in the live video feed.
+
+### 3. Matching People to Food/Drinks
+The `association()` function continuously attempts to associate the most likely owner of each food/ drink present in the frame by calculating how close each person’s nose and wrists are to the food/drink bounding box using the Euclidean distance between:  
+
+  - the nose and wrist landmarks  
+  
+  - the bounding box of the food/ drink  
+
+The closest person is assumed to be the owner.  
+
+To avoid false alarms like someone walking by, the system waits until the person has maintained close wrist proximity for at least 2 seconds before counting it as an incompliance.  
 
 ### 4. Saving Incompliance Snapshots
-Once an incompliance is triggered, the face area is cropped and sent to the [NVR](./incompliance/nvr.md) for facial recognition.  
-If a match is found on a different date (meaning that the person has at least 1 previous incompliance), the incompliance is logged and the face crop is also saved in the NVR's face database (under the name "Incompliance") for future use.  
-If a match is found on the same date, the system will disregard it. This is to prevent the same individual from being detected repeatedly within consecutive frames on the same day, ensuring that only new or distinct incompliances are logged.  
-If no match is found, the system will treat the individual as a new person committing the incompliance.
+When an incompliance is confirmed:  
+The face area is cropped and sent to the [NVR](./incompliance/nvr.md) for facial recognition.  
+
+- If a **match is found** on a **different date**:
+    - This means that the person has at least 1 previous incompliance
+
+    - The incompliance is logged, incompliance details for person updated in datasbase
+
+    - The face crop is saved in the NVR's face database (under the name "Incompliance") for future use
+
+    - Frame pushed to queue in [Saver](./incompliance/saver.md) and saved in web/static/incompliances/
+
+- If a **match is found** on the **same date**:
+    - The system will disregard it
+
+    - This is to prevent the same individual from being detected repeatedly within consecutive frames on the same day, ensuring that only new or distinct incompliances are logged  
+
+- If **no match** is found:
+    - The system will treat the individual as a new person committing the incompliance 
+
+    - The incompliance is logged, new person created in the database
+
+    - The face crop is saved in the NVR's face database (under the name "Incompliance") for future use
+
+    - Frame pushed to queue in Saver and saved in web/static/incompliances/ 
+
+## **Detection Pipeline Flowchart**
+![Detection Flowchart](detection-flowchart.drawio.png)
