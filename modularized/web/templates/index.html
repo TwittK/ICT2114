@@ -39,36 +39,74 @@
         </div>
     </form>
 
-    {% if results %}
-        <h4 class="mb-3">Results:</h4>
+    <div class="mt-5">
+        <h1>Live Feed</h1>
+        {% if results %}
+            <h4 class="mb-3">Results:</h4>
+            <div class="row">
+                {% for row in results %}
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm">
+                            <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}"
+                                 class="card-img-top snapshot-img"
+                                 alt="Snapshot"
+                                 style="cursor: pointer;"
+                                 data-label="{{ row[1] }}"
+                                 data-confidence="{{ row[2] }}"
+                                 data-date="{{ row[0] }}"
+                            >
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    {{ row[1] }}
+                                    <small class="text-muted">
+                                        (Confidence: {{ row[2] }})
+                                    </small>
+                                </h6>
+                                <p class="card-text text-muted">
+                                    {{ row[0] }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Live Feed Camera #}
         <div class="row">
-            {% for row in results %}
+            {% for cam in cameras %}
                 <div class="col-md-4 mb-4">
                     <div class="card shadow-sm">
-                        <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}"
-                             class="card-img-top snapshot-img"
-                             alt="Snapshot"
-                             style="cursor: pointer;"
-                             data-label="{{ row[1] }}"
-                             data-confidence="{{ row[2] }}"
-                             data-date="{{ row[0] }}"
-                        >
+                        <img src="" class="card-img-top" alt="Live feed {{ cam.name }}">
                         <div class="card-body">
-                            <h6 class="card-title">
-                                {{ row[1] }}
-                                <small class="text-muted">
-                                    (Confidence: {{ row[2] }})
-                                </small>
-                            </h6>
-                            <p class="card-text text-muted">
-                                {{ row[0] }}
-                            </p>
+                            <h6 class="card-title">{{ cam.name }}</h6>
                         </div>
                     </div>
                 </div>
             {% endfor %}
         </div>
-    {% endif %}
+
+        {# Pagination UI #}
+        <nav aria-label="Camera pagination">
+            <ul class="pagination justify-content-end">
+                <li class="page-item {% if current_page == 1 %} disabled{% endif %}">
+                    <a class="page-link" href="?lab={{ selected_lab }}&page={{ current_page - 1 }}">Previous</a>
+                </li>
+
+                {% for p in range(1, total_pages + 1) %}
+                    <li class="page-item {% if p == current_page %}active{% endif %}">
+                        <a class="page-link" href="?lab{{ selected_lab }}&page={{ p }}">{{ p }}</a>
+                    </li>
+                {% endfor %}
+
+                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?lab={{ selected_lab }}&page={{ current_page + 1 }}">Next</a>
+                </li>
+            </ul>
+        </nav>
+
+
+    </div>
 
     {# Image Modal #}
     {# Used for enlarging the image #}
@@ -86,43 +124,4 @@
             </div>
         </div>
     </div>
-{% endblock %}
-
-{% block scripts %}
-    {# JavaScript #}
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const images = document.querySelectorAll('.snapshot-img');
-
-            images.forEach(img => {
-                img.addEventListener('click', function () {
-                    // Populate the image source
-                    const modalImg = document.getElementById("modalImage");
-                    // Should not be null
-                    console.log(document.getElementById("modalImage"));
-
-                    // Check if element exists before using it.
-                    if (!modalImg) {
-                        console.error("Modal image element not found.")
-                        return;
-                    }
-
-                    modalImg.src = this.src;
-
-                    // Populate the metadata
-                    const label = this.dataset.label;
-                    const confidence = this.dataset.confidence;
-                    const date = this.dataset.date;
-
-                    document.getElementById("modalLabel").textContent = label || "Unknown";
-                    document.getElementById("modalConfidence").textContent = `Confidence: ${confidence || 'N/A'}`;
-                    document.getElementById("modalDate").textContent = `Detected: ${date || 'N/A'}`;
-
-                    // Show the modal.
-                    const modal = new bootstrap.Modal(document.getElementById("imageModal"));
-                    modal.show();
-                })
-            });
-        })
-    </script>
 {% endblock %}

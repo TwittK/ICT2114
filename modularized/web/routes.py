@@ -166,6 +166,16 @@ def index():
 
     selected_camera = camera_name
 
+    # Pagination.
+    per_page = 6
+    current_page = int(request.args.get("page", 1))
+    total_pages = (len(all_cameras) + per_page - 1) // per_page
+    start = (current_page - 1) * per_page
+    end = start + per_page
+    paginated_cameras = all_cameras[start:end]
+
+    app.logger.debug(f"📝 paginated_cameras: {', '.join(paginated_cameras)}")
+
     # ✅ Store selected camera in session
     if camera_name:
         session["selected_camera"] = {
@@ -354,8 +364,6 @@ def index():
 
     all_labels = label_repo.get_all_labels()
 
-    app.logger.debug(f"📝 all_cameras: {', '.join(all_cameras)}")
-
     return render_template(
         "index.html",
         results=results,
@@ -372,6 +380,9 @@ def index():
         selected_object_type=object_filter,
         all_cameras=all_cameras,
         selected_camera=selected_camera,
+        cameras=paginated_cameras,
+        current_page=current_page,
+        total_pages=total_pages,
     )
 
 
