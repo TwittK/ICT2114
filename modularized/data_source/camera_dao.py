@@ -164,3 +164,24 @@ class CameraDAO:
                 (lab_name,),
             )
             return [row["name"] for row in cursor.fetchall()]
+
+    def get_first_cameras_for_lab(self, lab_name):
+        """
+        Returns the name of the first camera for a given lab,
+        or None if no camera exists.
+        """
+        if not lab_name:
+            return None
+
+        with self.get_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.name
+                FROM Camera c
+                         JOIN Lab l ON c.camera_lab_id = l.LabId
+                WHERE l.lab_name = %s
+                ORDER BY c.name LIMIT 1
+                """, (lab_name,),
+            )
+            row = cursor.fetchone()
+            return row["name"] if row else None

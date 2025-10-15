@@ -1,4 +1,5 @@
 import logging
+import math
 import queue
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -389,48 +390,28 @@ def index():
 @app.route("/second-incompliance", methods=["GET", "POST"])
 @login_required
 def second_incompliance():
+    lab_dao = LabDAO(DB_PARAMS)
+    camera_dao = CameraDAO(DB_PARAMS)
     # Get lab and camera from URL query parameters - mandatory for filtering
     lab_name = request.args.get("lab")
     camera_name = request.args.get("camera")
 
+    # Current page number from query params, default to 1
+    current_page = request.args.get("page", default=1, type=int)
+    # Number of results per page.
+    page_size = 9
+
     # Redirect if either lab or camera not specified.
     if not lab_name or not camera_name:
         try:
-            conn = psycopg2.connect(**DB_PARAMS)
-            cursor = conn.cursor()
-
-            # Get first lab name (e.g., E2-L6-016)
-            cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name LIMIT 1")
-            first_lab = cursor.fetchone()
-            if first_lab:
-                lab_name = first_lab[0]
+            all_labs = lab_dao.get_all_labs() or []
+            if all_labs:
+                # First lab
+                lab_name = all_labs[0]["lab_name"]
             else:
                 lab_name = None
 
-            # Get first camera for the lab.
-            if lab_name:
-                cursor.execute(
-                    """
-                    SELECT c.name
-                    FROM Camera c
-                             JOIN Lab l ON c.camera_lab_id = l.LabId
-                    WHERE l.lab_name = %s
-                    ORDER BY c.name LIMIT 1
-                    """,
-                    (lab_name,),
-                )
-
-                first_camera = cursor.fetchone()
-
-                if first_camera:
-                    camera_name = first_camera[0]
-                else:
-                    camera_name = None
-            else:
-                camera_name = None
-
-            conn.close()
-
+            camera_name = camera_dao.get_first_cameras_for_lab(lab_name)
         except Exception:
             flash("Error retrieving default lab and camera.", "danger")
             return redirect(url_for("index"))
@@ -560,9 +541,19 @@ def second_incompliance():
         print(f"Exception: {e}")
         return redirect(url_for("index"))
 
+    # Total results
+    total_results = len(results)
+    # Compute total pages based on page size.
+    total_pages = max(1, math.ceil(total_results / page_size))
+
+    # Slice results for the current page.
+    start_index = (current_page - 1) * page_size
+    end_index = start_index + page_size
+    results_page = results[start_index:end_index]
+
     return render_template(
         "second_incompliance.html",
-        results=results,
+        results=results_page,
         lab_name=lab_name,
         camera_name=camera_name,
         cam_management=cam_management,
@@ -572,6 +563,8 @@ def second_incompliance():
         all_labels=all_labels,
         selected_date=selected_date,
         selected_object_type=selected_object_type,
+        current_page=current_page,
+        total_pages=total_pages,
     )
 
 
