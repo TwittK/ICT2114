@@ -52,6 +52,7 @@ SNAPSHOT_FOLDER = "snapshots"
 NO_PRIVILEGES = "Not enough privileges to complete action"
 
 app = Flask(__name__)
+app.logger.setLevel(logging.DEBUG)
 
 label_repo = ClassLabelRepository()
 mqtt_client = MQTTClient()
@@ -134,15 +135,19 @@ def login():
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def index():
-    # Open DB connection to fetch valid labs and cameras
-    conn = psycopg2.connect(**DB_PARAMS)
-    # conn.row_factory = sqlite3.Row
+    lab_dao = LabDAO(DB_PARAMS)
+
+    # Fetch all labs from the database.
+    all_lab_details = lab_dao.get_all_labs() or []
+    all_labs = [lab["lab_name"] for lab in all_lab_details]
+
     conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
     cursor = conn.cursor()
 
-    # Get all lab names
-    cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
-    all_labs = [row["lab_name"] for row in cursor.fetchall()]
+    # # Get all lab names
+    # cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
+    # all_labs = [row["lab_name"] for row in cursor.fetchall()]
+
     default_lab = (
         "E2-L6-016" if "E2-L6-016" in all_labs else (all_labs[0] if all_labs else None)
     )
@@ -152,7 +157,10 @@ def index():
     if lab_name not in all_labs:
         lab_name = default_lab
 
-    # Get all cameras in this lab
+    # Set selected lab for dropdown.
+    selected_lab = lab_name
+
+    # Fetch cameras for this lab/
     cursor.execute(
         """
         SELECT c.name
@@ -161,7 +169,7 @@ def index():
         WHERE l.lab_name = %s
         ORDER BY c.name
         """,
-        (lab_name,),
+        (selected_lab,),
     )
     all_cameras = [row["name"] for row in cursor.fetchall()]
     default_camera = all_cameras[0] if all_cameras else None
@@ -170,6 +178,8 @@ def index():
     camera_name = request.args.get("camera")
     if camera_name not in all_cameras:
         camera_name = default_camera
+
+    selected_camera = camera_name
 
     # ✅ Store selected camera in session
     if camera_name:
@@ -361,11 +371,15 @@ def index():
 
     all_labels = label_repo.get_all_labels()
 
+    app.logger.debug(f"📝 all_cameras: {', '.join(all_cameras)}")
+
     return render_template(
         "index.html",
         results=results,
         snapshot_folder=SNAPSHOT_FOLDER,
         lab_name=lab_name,
+        all_labs=all_labs,
+        selected_lab=selected_lab,
         camera_name=camera_name,
         cam_management=cam_management,
         user_role_management=user_role_management,
@@ -373,6 +387,8 @@ def index():
         all_labels=all_labels,
         selected_date=selected_date,
         selected_object_type=object_filter,
+        all_cameras=all_cameras,
+        selected_camera=selected_camera,
     )
 
 
@@ -1369,7 +1385,8 @@ def add_camera():
         try:
             channel = all_channels[camera_ip]
         except Exception as e:
-            return jsonify({"success": False, "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR."})
+            return jsonify({"success": False,
+                            "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR."})
 
         # Add to database with correct column names and all required fields
         cursor.execute(
@@ -1787,7 +1804,7 @@ def profile_redirect():
 def profile(section):
     # logging.debug(f"📝 WORKING!!!!")
     # logging.debug(f"📝 Session user_id: {session.get('user_id')}")
-    logging.debug(f"📝 Profile section: {section}")
+    app.logger.debug(f"📝 Profile section: {section}")
     dao = UserDAO(DB_PARAMS)
 
     # Get the current user from DB

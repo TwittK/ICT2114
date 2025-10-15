@@ -3,43 +3,38 @@
 {% block content %}
 
     <h2 class="mb-2">Overview</h2>
-    {% if lab_name and camera_name %}
+    {% if lab_name %}
         <div class="alert alert-info">
             Lab: <strong>{{ lab_name }}</strong><br>
-            Viewing camera: <strong>{{ camera_name }}</strong>
-        </div>
-    {% elif lab_name %}
-        <div class="alert alert-warning">
-            Selected Lab: <strong>{{ lab_name }}</strong>
         </div>
     {% endif %}
 
-
-    <form method="post" class="row g-3 align-items-end mb-4">
+    <form method="get" class="row g-3 align-items-end mb-4">
         <div class="col-md-6">
-            <label for="date" class="form-label">Date Time:</label>
-            <input type="date"
-                   class="form-control rounded-pill"
-                   name="date"
-                   id="date"
-                   value="{{ selected_date }}"
-            >
+            <label for="lab" class="form-label">Lab:</label>
+            <select name="lab" id="lab" class="form-select rounded-pill" onchange="this.form.submit()">
+                {% for lab in all_labs %}
+                    <option value="{{ lab }}" {% if lab == selected_lab %}selected{% endif %}>
+                        {{ lab }}
+                    </option>
+                {% endfor %}
+            </select>
         </div>
 
         <div class="col-md-6">
-            <label for="object_type" class="form-label">In-Compliance Type:</label>
-            <select name="object_type" class="form-select rounded-pill">
-                <option value="">ALL</option>
-                <option value="food" {% if selected_object_type == 'food' %}selected{% endif %}>Food</option>
-                <option value="drink" {% if selected_object_type == 'drink' %}selected{% endif %}>Drink</option>
+            <label for="camera" class="form-label">Camera:</label>
+            <select name="camera" class="form-select rounded-pill">
+                {% for cam in all_cameras %}
+                    <option value="{{ cam }}" {% if cam == selected_camera %}selected{% endif %}>{{ cam }}</option>
+                {% endfor %}
             </select>
         </div>
 
         <div class="col-md-2">
-            <button type="submit" class="btn btn-dark rounded-pill px-4">Search</button>
+            <button type="submit" class="btn btn-dark rounded-pill px-4">Filter</button>
         </div>
     </form>
-
+    
     {% if results %}
         <h4 class="mb-3">Results:</h4>
         <div class="row">
