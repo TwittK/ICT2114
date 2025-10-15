@@ -2,12 +2,26 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from database import create_camera, create_new_camera
 
+from contextlib import contextmanager
+
 LAB_NOT_FOUND = "Lab not found"
 
 
 class CameraDAO:
     def __init__(self, db_params):
         self.db_params = db_params
+
+    @contextmanager
+    def get_cursor(self):
+        """Yield a cursor with an automatically closed connection."""
+        conn = psycopg2.connect(**self.db_params, cursor_factory=RealDictCursor)
+        try:
+            cursor = conn.cursor()
+            yield cursor
+            conn.commit()
+        finally:
+            cursor.close()
+            conn.close()
 
     def _get_conn(self):
         """Helper to open a new connection with dict-style rows."""
@@ -61,11 +75,12 @@ class CameraDAO:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    DELETE FROM Camera
+                    DELETE
+                    FROM Camera
                     WHERE name = %s
                       AND camera_lab_id = %s
                       AND camera_user_id = %s
-                """,
+                    """,
                     (camera_name, lab_id, user_id),
                 )
                 affected_rows = cursor.rowcount
@@ -91,7 +106,7 @@ class CameraDAO:
                     WHERE name = %s
                       AND camera_lab_id = %s
                       AND camera_user_id = %s
-                """,
+                    """,
                     (camera_name, lab_id, user_id),
                 )
 
@@ -134,3 +149,18 @@ class CameraDAO:
             )
         else:
             return None, "Failed to add camera"
+
+    def get_cameras_by_lab(self, lab_name):
+        """Return all camera names in a given lab."""
+        with self.get_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.name
+                FROM Camera c
+                         JOIN Lab l ON c.camera_lab_id = l.LabId
+                WHERE l.lab_name = %s
+                ORDER BY c.name
+                """,
+                (lab_name,),
+            )
+            return [row["name"] for row in cursor.fetchall()]
