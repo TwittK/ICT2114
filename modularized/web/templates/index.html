@@ -24,6 +24,10 @@
         <div class="col-md-6">
             <label for="camera" class="form-label">Camera:</label>
             <select name="camera" class="form-select rounded-pill">
+                <!-- "All cameras" option -->
+                <option value="" {% if selected_camera == "" or not selected_camera %}selected{% endif %}>ALL</option>
+
+                <!-- Individual cameras -->
                 {% for cam in all_cameras %}
                     <option value="{{ cam }}" {% if cam == selected_camera %}selected{% endif %}>{{ cam }}</option>
                 {% endfor %}
@@ -34,7 +38,7 @@
             <button type="submit" class="btn btn-dark rounded-pill px-4">Filter</button>
         </div>
     </form>
-    
+
     {% if results %}
         <h4 class="mb-3">Results:</h4>
         <div class="row">

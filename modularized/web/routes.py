@@ -136,18 +136,11 @@ def login():
 @login_required
 def index():
     lab_dao = LabDAO(DB_PARAMS)
+    camera_dao = CameraDAO(DB_PARAMS)
 
     # Fetch all labs from the database.
     all_lab_details = lab_dao.get_all_labs() or []
     all_labs = [lab["lab_name"] for lab in all_lab_details]
-
-    conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
-    cursor = conn.cursor()
-
-    # # Get all lab names
-    # cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
-    # all_labs = [row["lab_name"] for row in cursor.fetchall()]
-
     default_lab = (
         "E2-L6-016" if "E2-L6-016" in all_labs else (all_labs[0] if all_labs else None)
     )
@@ -160,23 +153,15 @@ def index():
     # Set selected lab for dropdown.
     selected_lab = lab_name
 
-    # Fetch cameras for this lab/
-    cursor.execute(
-        """
-        SELECT c.name
-        FROM Camera c
-                 JOIN Lab l ON c.camera_lab_id = l.LabId
-        WHERE l.lab_name = %s
-        ORDER BY c.name
-        """,
-        (selected_lab,),
-    )
-    all_cameras = [row["name"] for row in cursor.fetchall()]
+    # Fetch cameras for this lab.
+    all_cameras = camera_dao.get_cameras_by_lab(selected_lab)
     default_camera = all_cameras[0] if all_cameras else None
 
     # Get camera from query or fallback.
     camera_name = request.args.get("camera")
-    if camera_name not in all_cameras:
+
+    # Only fallback to default if a specific camera is selected but not found.
+    if camera_name and camera_name not in all_cameras:
         camera_name = default_camera
 
     selected_camera = camera_name
@@ -188,8 +173,6 @@ def index():
             "lab": lab_name,
         }
         print("✅ Selected camera stored in session:", session["selected_camera"])
-
-    conn.close()
 
     is_deleting_camera = request.args.get("delete", "0") == "1"
     is_adding_camera = request.args.get("add", "0") == "1"
