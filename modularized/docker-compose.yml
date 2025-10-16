@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        [ "CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}" ]
+        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
       interval: 10s
       retries: 5
       timeout: 5s
@@ -67,7 +67,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@labcomply.com
       PGADMIN_DEFAULT_PASSWORD: admin123
     ports:
-      - "8080:80"
+      - "8082:80"
     depends_on:
       - postgres # your PostgreSQL container name
     volumes:

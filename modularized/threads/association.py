@@ -122,6 +122,7 @@ def get_dist_nose_to_box(pose_points, food_drinks_bbox):
     # Compute distance from nose to closest point on the bbox (euclidean distance formula)
     return np.linalg.norm(nose - np.array([clamped_x, clamped_y]))
 
+
 # Helper function to keep track of track id
 def flag_track_id(context, track_id):
     with context.flagged_foodbev_lock:
@@ -152,7 +153,7 @@ def association(context: Camera):
 
         best_matches = {}
         for track_id in local_detected_food_drinks:
-            
+
             with context.flagged_foodbev_lock:
                 if track_id in context.flagged_foodbev:
                     continue
@@ -186,12 +187,12 @@ def association(context: Camera):
                 area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
                 area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
                 area_check = (
-                        area_food_drinks >= area_head * 4
-                        or area_food_drinks < area_head * 0.1
+                    area_food_drinks >= area_head * 4
+                    or area_food_drinks < area_head * 0.1
                 )
                 height_check = (
-                        abs(y1 - y2) >= abs(fy1 - fy2) * 2.85
-                        or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
+                    abs(y1 - y2) >= abs(fy1 - fy2) * 2.85
+                    or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
                 )
                 if area_check or height_check:
                     print("🔶Food/ drink not at the same depth as person, ignoring.")
@@ -221,7 +222,6 @@ def association(context: Camera):
                 if score < best_matches[track_id]["best_score"]:
                     best_matches[track_id]["best_score"] = score
                     best_matches[track_id]["person"] = p
-
 
             if best_matches[track_id]["person"] is not None:
                 p = best_matches[track_id]["person"]
@@ -268,7 +268,7 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    # mocked_date = datetime(2025,2,28)
+                    # mocked_date = datetime(2025, 2, 28)
                     # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -315,12 +315,12 @@ def association(context: Camera):
                                         email, f"Person {person_id}"
                                     )
 
-                            # Publish MQTT message                            
+                            # Publish MQTT message
                             if mqtt_client:
                                 mqtt_client.publish_violation(
                                     user=str(person_id),
                                     event="lab_safety_violation",
-                                    details=f"Incompliance detected at camera {context.camera_id} on {current_date}"
+                                    details=f"Incompliance detected at camera {context.camera_id} on {current_date}",
                                 )
 
                             print(
@@ -358,7 +358,7 @@ def association(context: Camera):
                             ),
                             exist_ok=True,
                         )
-                        
+
                         clone = frame.copy()
                         cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 1)
                         cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
