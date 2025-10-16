@@ -1,8 +1,9 @@
 import logging
 import queue
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
+import pytz
 
 import cv2
 import os
@@ -13,7 +14,12 @@ from data_source.class_labels import ClassLabelRepository
 from data_source.lab_dao import LabDAO
 from data_source.role_dao import RoleDAO
 from data_source.user_dao import UserDAO
-from database import verify_user, update_last_login, get_all_users
+from database import (
+    verify_user,
+    update_last_login,
+    get_all_users,
+    get_incompliance_details_for_video,
+)
 from dotenv import load_dotenv
 from flask import (
     Flask,
@@ -30,7 +36,13 @@ from psycopg2.extras import RealDictCursor
 from requests.auth import HTTPDigestAuth
 from shared.camera_discovery import CameraDiscovery
 from shared.camera_manager import CameraManager
-from web.utils import check_permission, validate_and_sanitize_text, require_permission, login_required
+from threads.nvr import NVR
+from web.utils import (
+    check_permission,
+    validate_and_sanitize_text,
+    require_permission,
+    login_required,
+)
 from werkzeug.security import generate_password_hash
 
 from shared.mqtt_client import MQTTClient
@@ -63,6 +75,7 @@ mqtt_client = MQTTClient()
 #     for idx, col in enumerate(cursor.description):
 #         d[col[0]] = row[idx]
 #     return d
+
 
 @app.context_processor
 def inject_labs_with_cameras():
@@ -295,7 +308,7 @@ def index():
 
         # Updated query to join Camera table and filter by camera name
         query = """
-                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
+                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL, s.DetectionId
                 FROM Snapshot s
                          LEFT JOIN Camera c ON s.camera_id = c.CameraId
                 WHERE 1 = 1 \
@@ -347,6 +360,7 @@ def index():
             object_detected = row["object_detected"]
             confidence = row["confidence"]
             image_url = row["imageurl"]
+            detection_id = row["detectionid"]
 
             # Try to interpret as int (e.g., if stored as string class ID)
             try:
@@ -355,7 +369,7 @@ def index():
                 # If object_detected is already a string label.
                 label = object_detected
 
-            results.append((time_generated, label, confidence, image_url))
+            results.append((time_generated, label, confidence, image_url, detection_id))
 
         conn.close()
 
@@ -483,7 +497,7 @@ def second_incompliance():
         if request.method == "POST":
             # SQL query to find repeated incompliances for specific lab and camera
             query = """
-                    SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
+                    SELECT s.DetectionId, s.time_generated, s.object_detected, s.confidence, s.imageURL
                     FROM Snapshot s
                              JOIN (SELECT person_id, MIN(time_generated) AS first_time
                                    FROM Snapshot
@@ -531,17 +545,20 @@ def second_incompliance():
 
             # Process results: replace class ID with label.
             for row in raw_results:
+                detection_id = row["detectionid"]
                 time_generated = row["time_generated"]
                 object_detected = row["object_detected"]
                 confidence = row["confidence"]
-                image_url = row["imageURL"]
+                image_url = row["imageurl"]
 
                 try:
                     label = label_repo.get_label(int(object_detected))
                 except (ValueError, TypeError):
                     label = object_detected
 
-                results.append((time_generated, label, confidence, image_url))
+                results.append(
+                    (detection_id, time_generated, label, confidence, image_url)
+                )
 
         conn.close()
 
@@ -579,6 +596,78 @@ def get_db():
     return conn
 
 
+def generate_video_stream(detection_id):
+    """
+    Orchestrates streaming a video clip by fetching details and calling the NVR class.
+    """
+    # 1. Get incompliance details from the database
+    details = get_incompliance_details_for_video(detection_id)
+
+    if not details:
+        print(f"No incompliance details found for ID {detection_id}")
+        return
+
+    # 2. Get NVR IP from environment and initialize the NVR object
+    nvr_ip = os.getenv("NVR_IP_ADDRESS")
+    if not nvr_ip:
+        print("❌ NVR_IP_ADDRESS not set in .env file.")
+        return
+
+    nvr = NVR(
+        nvr_ip=nvr_ip,
+        fdid=None,
+        username=os.getenv("NVR_USERNAME", "admin"),
+        password=os.getenv("NVR_PASSWORD", "Sit12345"),
+    )
+
+    # 3. Get the naive local time directly from the database
+    naive_detection_time = details["time_generated"]
+
+    # 4. Calculate the time window using the naive local time
+    start_time_local = naive_detection_time - timedelta(seconds=5)
+    end_time_local = naive_detection_time + timedelta(seconds=5)
+
+    # 5. Determine the correct MAIN stream track ID.
+    channel_num = details["channel"]
+    track_id = 1602
+    # if channel_num < 100:
+    #     track_id = (channel_num * 100) + 1
+    # else:
+    #     track_id = channel_num
+
+    # 6. Stream using the NVR's HTTP download API.
+    stream_generator = nvr.download_clip_by_time(
+        start_time_local, end_time_local, track_id
+    )
+
+    frame_yielded = False
+    for frame_bytes in stream_generator:
+        if not frame_yielded:
+            frame_yielded = True
+        yield (
+            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+        )
+
+    if frame_yielded:
+        print(f"✅ Successfully streamed using main stream track ID: {track_id}")
+    else:
+        print(
+            f"❌ Streaming failed for track ID: {track_id}. Please check NVR settings."
+        )
+
+
+@app.route("/video_clip/<int:detection_id>")
+@login_required
+def video_clip(detection_id):
+    """
+    Route to stream a recorded video clip for a given incompliance.
+    """
+    return Response(
+        generate_video_stream(detection_id),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
 @app.route("/edit_camera/<int:camera_id>", methods=["GET", "POST"])
 @login_required
 @require_permission("camera_management")
@@ -609,6 +698,7 @@ def edit_camera(camera_id):
             subnet_mask = request.form.get("subnet_mask")
             gateway = request.form.get("gateway")
             timezone = request.form.get("timezone", "Asia/Singapore")
+            channel = request.form.get("channel")
             # sync_with_ntp = 1 if request.form.get("sync_with_ntp") else 0
             sync_with_ntp = True if request.form.get("sync_with_ntp") else False
             ntp_server_address = request.form.get("ntp_server_address", "pool.ntp.org")
@@ -632,7 +722,8 @@ def edit_camera(camera_id):
                     timezone           = %s,
                     sync_with_ntp      = %s,
                     ntp_server_address = %s,
-                    time               = %s
+                    time               = %s,
+                    channel            = %s
                 WHERE CameraId = %s
                 """,
                 (
@@ -648,6 +739,7 @@ def edit_camera(camera_id):
                     sync_with_ntp,
                     ntp_server_address,
                     time_value,
+                    channel,
                     camera_id,
                 ),
             )
@@ -703,6 +795,7 @@ def edit_camera(camera_id):
                c.sync_with_ntp,
                c.ntp_server_address,
                c.time,
+               c.channel,
                l.lab_name
         FROM Camera c
                  JOIN Lab l ON c.camera_lab_id = l.LabId
@@ -736,6 +829,7 @@ def edit_camera(camera_id):
         "ntp_server_address": camera["ntp_server_address"] or "pool.ntp.org",
         "time": camera["time"] or "",
         "lab_name": camera["lab_name"] or "Unknown Lab",
+        "channel": camera["channel"] or "",
     }
 
     conn.close()
@@ -1314,7 +1408,10 @@ def check_ip():
     ip_address = request.json.get("ip")
 
     cd = CameraDiscovery()
-    discover_results = cd.discover_camera(ip_address)
+    # Get all connected channels from the NVR
+    discovered_channels = cd.get_connected_channels()
+    # Pass the discovered channels to the discover_camera method
+    discover_results = cd.discover_camera(ip_address, discovered_channels)
     if discover_results is None:
         return jsonify({"valid": False, "device_info": discover_results})
 
@@ -1364,12 +1461,18 @@ def add_camera():
 
         # Find channel ID of camera in the NVR
         from shared.camera_discovery import CameraDiscovery
+
         discovery = CameraDiscovery()
         all_channels = discovery.get_connected_channels()
         try:
             channel = all_channels[camera_ip]
         except Exception as e:
-            return jsonify({"success": False, "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR."})
+            return jsonify(
+                {
+                    "success": False,
+                    "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR.",
+                }
+            )
 
         # Add to database with correct column names and all required fields
         cursor.execute(
@@ -1396,10 +1499,8 @@ def add_camera():
                 device_info.get(
                     "ntp_server_address", "pool.ntp.org"
                 ),  # Fixed: use correct key
-                device_info.get(
-                    "time", "2025-01-01T00:00:00"
-                ),
-                channel
+                device_info.get("time", "2025-01-01T00:00:00"),
+                channel,
             ),
         )
 
@@ -1557,7 +1658,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_"):]
+                    rp = key[len("role_perm_") :]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1866,7 +1967,7 @@ def mqtt_test():
         mqtt_client.publish_violation(
             user="TestUser",
             event="test_message",
-            details="This is a test message from Flask."
+            details="This is a test message from Flask.",
         )
         return jsonify({"status": "success", "message": "MQTT message sent!"})
     except Exception as e:

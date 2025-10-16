@@ -2,128 +2,134 @@
 {% block title %}Detection Search - LabComply+{% endblock %}
 {% block content %}
 
-    <h2 class="mb-2">Detection Search</h2>
-    {% if lab_name and camera_name %}
-        <div class="alert alert-info">
-            Lab: <strong>{{ lab_name }}</strong><br>
-            Viewing camera: <strong>{{ camera_name }}</strong>
-        </div>
-    {% elif lab_name %}
-        <div class="alert alert-warning">
-            Selected Lab: <strong>{{ lab_name }}</strong>
-        </div>
-    {% endif %}
+<h2 class="mb-2">Detection Search</h2>
+{% if lab_name and camera_name %}
+<div class="alert alert-info">
+    Lab: <strong>{{ lab_name }}</strong><br>
+    Viewing camera: <strong>{{ camera_name }}</strong>
+</div>
+{% elif lab_name %}
+<div class="alert alert-warning">
+    Selected Lab: <strong>{{ lab_name }}</strong>
+</div>
+{% endif %}
 
 
-    <form method="post" class="row g-3 align-items-end mb-4">
-        <div class="col-md-6">
-            <label for="date" class="form-label">Date Time:</label>
-            <input type="date"
-                   class="form-control rounded-pill"
-                   name="date"
-                   id="date"
-                   value="{{ selected_date }}"
-            >
-        </div>
+<form method="post" class="row g-3 align-items-end mb-4">
+    <div class="col-md-6">
+        <label for="date" class="form-label">Date Time:</label>
+        <input type="date" class="form-control rounded-pill" name="date" id="date" value="{{ selected_date }}">
+    </div>
 
-        <div class="col-md-6">
-            <label for="object_type" class="form-label">In-Compliance Type:</label>
-            <select name="object_type" class="form-select rounded-pill">
-                <option value="">ALL</option>
-                <option value="food" {% if selected_object_type == 'food' %}selected{% endif %}>Food</option>
-                <option value="drink" {% if selected_object_type == 'drink' %}selected{% endif %}>Drink</option>
-            </select>
-        </div>
+    <div class="col-md-6">
+        <label for="object_type" class="form-label">In-Compliance Type:</label>
+        <select name="object_type" class="form-select rounded-pill">
+            <option value="">ALL</option>
+            <option value="food" {% if selected_object_type=='food' %}selected{% endif %}>Food</option>
+            <option value="drink" {% if selected_object_type=='drink' %}selected{% endif %}>Drink</option>
+        </select>
+    </div>
 
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-dark rounded-pill px-4">Search</button>
-        </div>
-    </form>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-dark rounded-pill px-4">Search</button>
+    </div>
+</form>
 
-    {% if results %}
-        <h4 class="mb-3">Results:</h4>
-        <div class="row">
-            {% for row in results %}
-                <div class="col-md-4 mb-4">
-                    <div class="card shadow-sm">
-                        <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}"
-                             class="card-img-top snapshot-img"
-                             alt="Snapshot"
-                             style="cursor: pointer;"
-                             data-label="{{ row[1] }}"
-                             data-confidence="{{ row[2] }}"
-                             data-date="{{ row[0] }}"
-                        >
-                        <div class="card-body">
-                            <h6 class="card-title">
-                                {{ row[1] }}
-                                <small class="text-muted">
-                                    (Confidence: {{ row[2] }})
-                                </small>
-                            </h6>
-                            <p class="card-text text-muted">
-                                {{ row[0] }}
-                            </p>
-                        </div>
+{% if results %}
+<h4 class="mb-3">Results:</h4>
+<div class="row">
+    {% for row in results %}
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm">
+            <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}" class="card-img-top snapshot-img"
+                alt="Snapshot" style="cursor: pointer;" data-label="{{ row[1] }}" data-confidence="{{ row[2] }}"
+                data-date="{{ row[0] }}" data-incompliance-id="{{ row[4] }}">
+            <div class="card-body">
+                <h6 class="card-title">
+                    {{ row[1] }}
+                    <small class="text-muted">
+                        (Confidence: {{ row[2]|round(2) }})
+                    </small>
+                </h6>
+                <p class="card-text text-muted">
+                    {{ row[0] }}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# Image Modal #}
+{# Used for enlarging the image and showing the video clip #}
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <div class="row g-0">
+                    <div class="col-md-6">
+                        <h5 class="p-3">Snapshot</h5>
+                        <img src="" id="modalImage" class="img-fluid w-100" alt="Enlarged Snapshot">
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="p-3">Video Clip</h5>
+                        <img id="modalVideo" class="img-fluid w-100" alt="Loading video clip...">
                     </div>
                 </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    {# Image Modal #}
-    {# Used for enlarging the image #}
-    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-body p-0">
-                    <img src="" id="modalImage" class="img-fluid w-100 mb-2" alt="Enlarged Snapshot">
-                    <div class="p-3">
-                        <h5 id="modalLabel"></h5>
-                        <p class="mb-1 text-muted" id="modalConfidence"></p>
-                        <p class="mb-0 text-muted" id="modalDate"></p>
-                    </div>
+                <div class="p-3 border-top">
+                    <h5 id="modalLabel"></h5>
+                    <p class="mb-1 text-muted" id="modalConfidence"></p>
+                    <p class="mb-0 text-muted" id="modalDate"></p>
                 </div>
             </div>
         </div>
     </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-    {# JavaScript #}
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const images = document.querySelectorAll('.snapshot-img');
+{# JavaScript #}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const imageModal = new bootstrap.Modal(document.getElementById("imageModal"));
+        const modalImage = document.getElementById("modalImage");
+        const modalVideo = document.getElementById("modalVideo");
+        const modalLabel = document.getElementById("modalLabel");
+        const modalConfidence = document.getElementById("modalConfidence");
+        const modalDate = document.getElementById("modalDate");
 
-            images.forEach(img => {
-                img.addEventListener('click', function () {
-                    // Populate the image source
-                    const modalImg = document.getElementById("modalImage");
-                    // Should not be null
-                    console.log(document.getElementById("modalImage"));
+        document.querySelectorAll('.snapshot-img').forEach(img => {
+            img.addEventListener('click', function () {
+                // Get data from the clicked image's data attributes
+                const incomplianceId = this.dataset.incomplianceId;
+                const label = this.dataset.label;
+                const confidence = this.dataset.confidence;
+                const date = this.dataset.date;
 
-                    // Check if element exists before using it.
-                    if (!modalImg) {
-                        console.error("Modal image element not found.")
-                        return;
-                    }
+                // Populate the modal with the snapshot and metadata
+                modalImage.src = this.src;
+                modalLabel.textContent = label || "Unknown";
+                modalConfidence.textContent = `Confidence: ${confidence || 'N/A'}`;
+                modalDate.textContent = `Detected: ${date || 'N/A'}`;
 
-                    modalImg.src = this.src;
+                // Set the video source URL using the incompliance ID
+                if (incomplianceId) {
+                    modalVideo.src = `/video_clip/${incomplianceId}`;
+                    modalVideo.style.display = 'block';
+                } else {
+                    modalVideo.style.display = 'none'; // Hide video if no ID
+                }
 
-                    // Populate the metadata
-                    const label = this.dataset.label;
-                    const confidence = this.dataset.confidence;
-                    const date = this.dataset.date;
-
-                    document.getElementById("modalLabel").textContent = label || "Unknown";
-                    document.getElementById("modalConfidence").textContent = `Confidence: ${confidence || 'N/A'}`;
-                    document.getElementById("modalDate").textContent = `Detected: ${date || 'N/A'}`;
-
-                    // Show the modal.
-                    const modal = new bootstrap.Modal(document.getElementById("imageModal"));
-                    modal.show();
-                })
+                // Show the modal
+                imageModal.show();
             });
-        })
-    </script>
+        });
+
+        // Stop video playback when the modal is hidden
+        document.getElementById('imageModal').addEventListener('hidden.bs.modal', function () {
+            modalVideo.src = ""; // Detach the source to stop the stream
+        });
+    });
+</script>
 {% endblock %}

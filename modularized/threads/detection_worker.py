@@ -1,7 +1,11 @@
 import queue
 from datetime import datetime, timedelta
 import cv2 as cv
-from shared.model import ObjectDetectionModel, PoseDetectionModel, ImageClassificationModel
+from shared.model import (
+    ObjectDetectionModel,
+    PoseDetectionModel,
+    ImageClassificationModel,
+)
 from threads.association import safe_crop
 import threading
 import queue
@@ -10,7 +14,12 @@ import queue
 class DetectionWorker:
     def __init__(self, worker_id):
         self.queue = queue.Queue()
-        self.thread = threading.Thread(target=self.preprocess, args=(worker_id,), name=f"DetectionWorker-{worker_id}", daemon=True)
+        self.thread = threading.Thread(
+            target=self.preprocess,
+            args=(worker_id,),
+            name=f"DetectionWorker-{worker_id}",
+            daemon=True,
+        )
         self.running = threading.Event()
         self.running.set()
         self.thread.start()
@@ -18,14 +27,14 @@ class DetectionWorker:
 
     # Display annotated frames on dashboard
     def preprocess(self, gpu_id):
-        
+
         object_detection_model = ObjectDetectionModel("yolo11m.pt", gpu_device=gpu_id)
         pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.8, 0.7)
         classif_model = ImageClassificationModel("yolov8n-cls.pt")
         last_cleared = datetime.min
 
         while self.running.is_set():
-            
+
             try:
                 frame, context = self.queue.get(timeout=1)
 
@@ -49,7 +58,9 @@ class DetectionWorker:
             if drink_boxes and len(drink_boxes) >= 1:
                 # or (food_boxes and len(food_boxes) >= 1)):
 
-                if datetime.now() - last_cleared >= timedelta(hours=2): # Clear flagged ids every 2 hours
+                if datetime.now() - last_cleared >= timedelta(
+                    hours=2
+                ):  # Clear flagged ids every 2 hours
                     with context.flagged_foodbev_lock:
                         context.flagged_foodbev.clear()
                     last_cleared = datetime.now()
@@ -59,7 +70,7 @@ class DetectionWorker:
                     # Process drinks
                     for box in drink_boxes:
                         track_id = int(box.id) if box.id is not None else None
-                        if (track_id is None):
+                        if track_id is None:
                             continue
 
                         cls_id = int(box.cls.cpu())
@@ -71,27 +82,35 @@ class DetectionWorker:
                         x1, y1, x2, y2 = map(int, coords)
 
                         cv.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 0, 255), 1)
-                        cv.putText(frame_copy, f"id: {track_id}, conf: {confidence:.2f}", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 1)
+                        cv.putText(
+                            frame_copy,
+                            f"id: {track_id}, conf: {confidence:.2f}",
+                            (x1, y1 - 10),
+                            cv.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (0, 0, 255),
+                            1,
+                        )
 
-                        if (track_id not in context.flagged_foodbev):
+                        if track_id not in context.flagged_foodbev:
 
                             # Check if it's a water bottle or not
                             object_crop = safe_crop(frame, x1, y1, x2, y2, padding=10)
                             predicted_label = classif_model.classify(object_crop)
 
                             # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
-                            if predicted_label == "water_bottle" or predicted_label == "milk_can":
-                                print("🚫 Water bottle, skipping")
-                                continue
+                            # if predicted_label == "water_bottle" or predicted_label == "milk_can":
+                            #     print("🚫 Water bottle, skipping")
+                            #     continue
 
                             context.detected_incompliance[track_id] = [
-                                coords, # Coordinates of bbox
+                                coords,  # Coordinates of bbox
                                 (
-                                    (coords[0] + coords[2]) // 2, # Center of bbox
+                                    (coords[0] + coords[2]) // 2,  # Center of bbox
                                     (coords[1] + coords[3]) // 2,
                                 ),
-                                confidence, # Confidence score
-                                cls_id, # Class Id of detected object (refer to COCO dataset)
+                                confidence,  # Confidence score
+                                cls_id,  # Class Id of detected object (refer to COCO dataset)
                             ]
 
                 keypoints = pose_model.predict(frame)
