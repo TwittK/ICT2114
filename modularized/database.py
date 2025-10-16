@@ -289,9 +289,9 @@ def get_lab_safety_email_by_camera_id(camera_id):
     cursor.execute(
         """
         SELECT Lab.lab_safety_email
-        FROM Camera
-        JOIN Lab ON Camera.camera_lab_id = Lab.LabId
-        WHERE Camera.ROWID = %s
+        FROM camera
+        JOIN Lab ON camera.camera_lab_id = lab.labId
+        WHERE camera.cameraid = %s
     """,
         (camera_id,),
     )

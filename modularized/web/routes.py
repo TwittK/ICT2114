@@ -624,19 +624,19 @@ def generate_video_stream(detection_id):
     naive_detection_time = details["time_generated"]
 
     # 4. Calculate the time window using the naive local time
-    start_time_local = naive_detection_time - timedelta(seconds=5)
+    start_time_local = naive_detection_time - timedelta(seconds=15)
     end_time_local = naive_detection_time + timedelta(seconds=5)
 
     # 5. Determine the correct MAIN stream track ID.
     channel_num = details["channel"]
-    track_id = 1602
-    # if channel_num < 100:
-    #     track_id = (channel_num * 100) + 1
-    # else:
-    #     track_id = channel_num
+    if channel_num < 100:
+        track_id = (channel_num * 100) + 1
+    else:
+        track_id = channel_num
 
-    # 6. Stream using the NVR's HTTP download API.
-    stream_generator = nvr.download_clip_by_time(
+    # 6. Stream using the main stream track ID and LOCAL times.
+    # This passes the time to the NVR without UTC conversion.
+    stream_generator = nvr.stream_clip_by_time(
         start_time_local, end_time_local, track_id
     )
 
