@@ -9,14 +9,14 @@ from database import (
 from shared.camera_discovery import CameraDiscovery
 import os
 
+
 def setup_app():
     """Initialise database and defaults without starting Flask."""
     init_database()
     insert_default_roles()
     create_default_admin()
-    create_test_lab_and_camera()
-    
+    # create_test_lab_and_camera()
+
     # Auto discover cameras and add to database using NVR
     # cd = CameraDiscovery()
     # cd.auto_populate_database()
-    

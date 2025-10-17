@@ -1,6 +1,7 @@
 import os, time
 from dotenv import load_dotenv
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Load environment variables from .env
@@ -196,6 +197,7 @@ def create_test_lab_and_camera():
         create_lab("E2-L6-016", "labsafety@gmail.com")
         create_camera("test", 1, 1, "101")
 
+
 def create_lab(lab_name, lab_safety_email):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -234,7 +236,7 @@ def create_camera(
     timezone="Asia/Singapore",
     sync_with_ntp=False,
     ntp_server_address="pool.ntp.org",
-    time="2025-01-01T00:00:00"
+    time="2025-01-01T00:00:00",
 ):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -287,9 +289,9 @@ def get_lab_safety_email_by_camera_id(camera_id):
     cursor.execute(
         """
         SELECT Lab.lab_safety_email
-        FROM Camera
-        JOIN Lab ON Camera.camera_lab_id = Lab.LabId
-        WHERE Camera.ROWID = %s
+        FROM camera
+        JOIN Lab ON camera.camera_lab_id = lab.labId
+        WHERE camera.cameraid = %s
     """,
         (camera_id,),
     )
@@ -315,7 +317,7 @@ def create_new_camera(
     sync_with_ntp,
     ntp_server_address,
     time,
-    channel
+    channel,
 ):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -431,9 +433,35 @@ def get_all_users():
     return [dict(zip(columns, row)) for row in users]
 
 
+def get_incompliance_details_for_video(detection_id):
+    """Fetches timestamp and camera channel for a given snapshot DetectionId."""
+    conn = None
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            """
+            SELECT s.time_generated, c.channel
+            FROM Snapshot s
+            JOIN Camera c ON s.camera_id = c.CameraId
+            WHERE s.DetectionId = %s
+        """,
+            (detection_id,),
+        )
+        details = cur.fetchone()
+        cur.close()
+        return details
+    except Exception as e:
+        print(f"Database error in get_incompliance_details_for_video: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
 if __name__ == "__main__":
     init_database()
     insert_default_roles()
     create_default_admin()
     # Mock lab and cameras
-    create_default_labs_and_cameras()
+    # create_default_labs_and_cameras()

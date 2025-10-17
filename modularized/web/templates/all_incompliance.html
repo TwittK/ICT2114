@@ -1,9 +1,8 @@
-{# web/templates/second_incompliance.html #}
 {% extends 'base.html' %}
-{% block title %}Second Incompliance - LabComply+{% endblock %}
+{% block title %}Detection Search - LabComply+{% endblock %}
 {% block content %}
 
-<h2 class="mb-2">Second Incompliance Detection</h2>
+<h2 class="mb-2">Detection Search</h2>
 {% if lab_name and camera_name %}
 <div class="alert alert-info">
     Lab: <strong>{{ lab_name }}</strong><br>
@@ -14,6 +13,7 @@
     Selected Lab: <strong>{{ lab_name }}</strong>
 </div>
 {% endif %}
+
 
 <form method="post" class="row g-3 align-items-end mb-4">
     <div class="col-md-6">
@@ -41,20 +41,19 @@
     {% for row in results %}
     <div class="col-md-4 mb-4">
         <div class="card shadow-sm">
-            <img src="{{ url_for('static', filename=row[4].replace('static/', '')) }}" class="card-img-top snapshot-img"
-                alt="Snapshot" style="cursor: pointer;" data-label="{{ row[2] }}" data-confidence="{{ row[3] }}"
-                data-date="{{ row[1] }}" data-incompliance-id="{{ row[0] }}">
+            <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}" class="card-img-top snapshot-img"
+                alt="Snapshot" style="cursor: pointer;" data-label="{{ row[1] }}" data-confidence="{{ row[2] }}"
+                data-date="{{ row[0] }}" data-incompliance-id="{{ row[4] }}">
             <div class="card-body">
                 <h6 class="card-title">
-                    {{ row[2] }}
+                    {{ row[1] }}
                     <small class="text-muted">
-                        (Confidence: {{ row[3]|round(2) }})
+                        (Confidence: {{ row[2]|round(2) }})
                     </small>
                 </h6>
                 <p class="card-text text-muted">
-                    {{ row[1] }}
+                    {{ row[0] }}
                 </p>
-                <span class="badge bg-warning text-dark">Second Offense</span>
             </div>
         </div>
     </div>
@@ -62,7 +61,7 @@
 </div>
 
 {# Pagination UI #}
-<nav aria-label="Second incompliance pagination">
+<nav aria-label="Incompliance pagination">
     <ul class="pagination justify-content-end">
         <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
             <a class="page-link"
@@ -83,7 +82,7 @@
 </nav>
 {% else %}
 <div class="alert alert-secondary mt-3">
-    No second incompliances found. Try adjusting your search criteria.
+    No incompliances found. Try adjusting your search criteria.
 </div>
 {% endif %}
 

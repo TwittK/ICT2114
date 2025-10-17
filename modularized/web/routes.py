@@ -2,8 +2,9 @@ import logging
 import math
 import queue
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
+import pytz
 
 import cv2
 import os
@@ -14,7 +15,12 @@ from data_source.class_labels import ClassLabelRepository
 from data_source.lab_dao import LabDAO
 from data_source.role_dao import RoleDAO
 from data_source.user_dao import UserDAO
-from database import verify_user, update_last_login, get_all_users
+from database import (
+    verify_user,
+    update_last_login,
+    get_all_users,
+    get_incompliance_details_for_video,
+)
 from dotenv import load_dotenv
 from flask import (
     Flask,
@@ -31,7 +37,13 @@ from psycopg2.extras import RealDictCursor
 from requests.auth import HTTPDigestAuth
 from shared.camera_discovery import CameraDiscovery
 from shared.camera_manager import CameraManager
-from web.utils import check_permission, validate_and_sanitize_text, require_permission, login_required
+from threads.nvr import NVR
+from web.utils import (
+    check_permission,
+    validate_and_sanitize_text,
+    require_permission,
+    login_required,
+)
 from werkzeug.security import generate_password_hash
 
 from shared.mqtt_client import MQTTClient
@@ -65,6 +77,7 @@ mqtt_client = MQTTClient()
 #     for idx, col in enumerate(cursor.description):
 #         d[col[0]] = row[idx]
 #     return d
+
 
 @app.context_processor
 def inject_labs_with_cameras():
@@ -136,124 +149,49 @@ def login():
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def index():
-    lab_dao = LabDAO(DB_PARAMS)
-    camera_dao = CameraDAO(DB_PARAMS)
+    # Open DB connection to fetch valid labs and cameras
+    conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
+    cursor = conn.cursor()
 
-    # Fetch all labs from the database.
-    all_lab_details = lab_dao.get_all_labs() or []
-    all_labs = [lab["lab_name"] for lab in all_lab_details]
+    # Get all lab names
+    cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
+    all_labs = [row["lab_name"] for row in cursor.fetchall()]
     default_lab = (
         "E2-L6-016" if "E2-L6-016" in all_labs else (all_labs[0] if all_labs else None)
     )
 
-    # Get lab from query or fallback.
+    # Get lab from query or fallback
     lab_name = request.args.get("lab")
     if lab_name not in all_labs:
         lab_name = default_lab
 
-    # Set selected lab for dropdown.
-    selected_lab = lab_name
+    # Get all cameras in this lab with their IDs for live feed
+    cameras = []
+    if lab_name:
+        cursor.execute(
+            """
+            SELECT c.CameraId as camera_id, c.name
+            FROM Camera c
+            JOIN Lab l ON c.camera_lab_id = l.LabId
+            WHERE l.lab_name = %s
+            ORDER BY c.name
+            """,
+            (lab_name,),
+        )
+        cameras = cursor.fetchall()
 
-    # Fetch cameras for this lab.
-    all_cameras = camera_dao.get_cameras_by_lab(selected_lab)
-    default_camera = all_cameras[0] if all_cameras else None
+    conn.close()
 
-    # Get camera from query or fallback.
-    camera_name = request.args.get("camera")
-
-    # Only fallback to default if a specific camera is selected but not found.
-    if camera_name and camera_name not in all_cameras:
-        camera_name = default_camera
-
-    selected_camera = camera_name
-
-    # Pagination.
-    per_page = 6
-    current_page = int(request.args.get("page", 1))
-    total_pages = (len(all_cameras) + per_page - 1) // per_page
-    start = (current_page - 1) * per_page
-    end = start + per_page
-    paginated_cameras = all_cameras[start:end]
-
-    app.logger.debug(f"📝 paginated_cameras: {', '.join(paginated_cameras)}")
-
-    # ✅ Store selected camera in session
-    if camera_name:
-        session["selected_camera"] = {
-            "name": camera_name,
-            "lab": lab_name,
-        }
-        print("✅ Selected camera stored in session:", session["selected_camera"])
-
+    # Handle camera deletion (admin only)
     is_deleting_camera = request.args.get("delete", "0") == "1"
-    is_adding_camera = request.args.get("add", "0") == "1"
-    today_str = datetime.now().strftime("%Y-%m-%d")
-
-    results = []
-    date_filter = None
-    object_filter = None
-    selected_date = today_str
+    camera_name = request.args.get("camera")
 
     role = session.get("role")
     if role is None:
-        return redirect(url_for("index"))
+        return redirect(url_for("login"))
 
     cam_management = check_permission(role, "camera_management")
     user_role_management = check_permission(role, "user_role_management")
-
-    # Create camera inside the database - ADMIN ONLY
-    if request.method == "POST" and is_adding_camera and lab_name and cam_management:
-        try:
-            if not request.is_json:
-                flash("Invalid request.", "danger")
-                return redirect(url_for("index"))
-
-            data = request.get_json()
-            device_info = data.get("device_info")
-
-            # Device info not found
-            if not device_info:
-                flash("Error retrieving device info.", "danger")
-                return redirect(url_for("index"))
-
-            user_id = session.get("user_id")
-            dao = CameraDAO(DB_PARAMS)
-
-            # Validate and sanitize string
-            try:
-                lab_name = validate_and_sanitize_text(lab_name)
-            except ValueError as e:
-                flash(f"Validation error: {e}", "danger")
-                return redirect(url_for("index"))
-
-            # Insert camera into database
-            camera_id, message = dao.add_new_camera(
-                lab_name=lab_name, user_id=user_id, device_info=device_info
-            )
-            if camera_id is None:
-                flash("Error inserting camera into database.", "danger")
-                return redirect(url_for("index"))
-
-            # Add camera into manager and start detection on newly inserted camera
-
-            # cm = CameraManager(DATABASE)
-            # result = cm.add_new_camera(camera_id, device_info["ip_address"], True)
-            cm = CameraManager(DB_PARAMS)
-            result = cm.add_new_camera(device_info["ip_address"], "101", True)
-            if not result:
-                flash("Error inserting camera into camera manager.", "danger")
-                return redirect(url_for("index"))
-
-            flash(message, "success" if result else "danger")
-            return redirect(url_for("index", lab=lab_name))
-
-        except Exception as e:
-            flash("Error retrieving IP and/or device info.", "danger")
-            return redirect(url_for("index"))
-
-    elif is_adding_camera and not check_permission(role, "add_camera"):
-        flash("Admin access required to add cameras!", "danger")
-        return redirect(url_for("index", lab=lab_name))
 
     # Delete camera - ADMIN ONLY
     if is_deleting_camera and camera_name and lab_name and cam_management:
@@ -266,7 +204,7 @@ def index():
             flash("Camera not found in database.", "danger")
             return redirect(url_for("index", lab=lab_name))
 
-        # Remove camera from manager, stop detection and join threads
+        # Remove camera from manager
         camera_manager = CameraManager(DB_PARAMS)
         remove_success = camera_manager.remove_camera(camera_id)
         if not remove_success:
@@ -275,115 +213,18 @@ def index():
 
         # Delete camera from database
         success, message = dao.delete_camera(lab_name, camera_name, user_id)
-
         flash(message, "success" if success else "danger")
-        return redirect(url_for("index") if success else url_for("index", lab=lab_name))
-    elif is_deleting_camera and not check_permission(role, "delete_camera"):
+        return redirect(url_for("index", lab=lab_name))
+    elif is_deleting_camera and not cam_management:
         flash("Admin access required to delete cameras!", "danger")
         return redirect(url_for("index", lab=lab_name))
 
-    if request.method == "POST" and check_permission(role, "view_incompliances"):
-        action = request.form.get("action")
-
-        date_filter = request.form.get("date")
-        object_filter = request.form.get("object_type")
-
-        conn = psycopg2.connect(**DB_PARAMS)
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        # conn.row_factory = dict_factory
-        # cursor = conn.cursor()
-
-        # Get all cameras for the dropdown
-        cursor.execute("SELECT CameraId, name FROM Camera")
-        cameras = cursor.fetchall()
-
-        # Updated query to join Camera table and filter by camera name
-        query = """
-                SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
-                FROM Snapshot s
-                         LEFT JOIN Camera c ON s.camera_id = c.CameraId
-                WHERE 1 = 1 \
-                """
-        params = []
-
-        # Add camera filter if a camera is selected
-        if camera_name:
-            query += " AND c.name = %s"
-            params.append(camera_name)
-
-        if date_filter:
-            selected_date = date_filter
-            query += " AND DATE(s.time_generated) = %s"
-            params.append(date_filter)
-
-        if object_filter:
-            if object_filter == "food":
-                food_ids = list(map(str, label_repo.get_food_class_ids()))
-                placeholders = ",".join("%s" for _ in food_ids)
-                query += f" AND s.object_detected IN ({placeholders})"
-                params.extend(food_ids)
-            elif object_filter == "drink":
-                drinks_ids = list(map(str, label_repo.get_drink_class_ids()))
-                placeholders = ",".join("%s" for _ in drinks_ids)
-                query += f" AND s.object_detected IN ({placeholders})"
-                params.extend(drinks_ids)
-            else:
-                # Assume it's a specific class ID
-                query += " AND s.object_detected = %s"
-                params.append(object_filter)
-
-        query += " ORDER BY s.time_generated DESC"
-
-        print("Camera filter:", camera_name)
-        print("Query:", query)
-        print("Params:", params)
-
-        cursor.execute(query, params)
-
-        # Fetch all raw results from the database
-        raw_results = cursor.fetchall()
-        print("[DEBUG PHOTOS]: ", raw_results)
-
-        # Replace class ID with label using mapping.
-        results = []
-        for row in raw_results:
-            time_generated = row["time_generated"]
-            object_detected = row["object_detected"]
-            confidence = row["confidence"]
-            image_url = row["imageurl"]
-
-            # Try to interpret as int (e.g., if stored as string class ID)
-            try:
-                label = label_repo.get_label(int(object_detected))
-            except ValueError:
-                # If object_detected is already a string label.
-                label = object_detected
-
-            results.append((time_generated, label, confidence, image_url))
-
-        conn.close()
-
-    all_labels = label_repo.get_all_labels()
-
     return render_template(
         "index.html",
-        results=results,
-        snapshot_folder=SNAPSHOT_FOLDER,
         lab_name=lab_name,
-        all_labs=all_labs,
-        selected_lab=selected_lab,
-        camera_name=camera_name,
+        cameras=cameras,
         cam_management=cam_management,
         user_role_management=user_role_management,
-        today=today_str,
-        all_labels=all_labels,
-        selected_date=selected_date,
-        selected_object_type=object_filter,
-        all_cameras=all_cameras,
-        selected_camera=selected_camera,
-        cameras=paginated_cameras,
-        current_page=current_page,
-        total_pages=total_pages,
     )
 
 
@@ -425,9 +266,14 @@ def second_incompliance():
             flash("No labs or cameras configured.", "danger")
             return redirect(url_for("index"))
 
-    # Default selected date to today or get from POST form.
-    selected_date = request.form.get("date") or datetime.now().strftime("%Y-%m-%d")
-    selected_object_type = request.form.get("object_type") or ""
+    # Get filters from POST form or use defaults
+    if request.method == "POST":
+        selected_date = request.form.get("date", "")
+        selected_object_type = request.form.get("object_type", "")
+    else:
+        # On GET request, use empty filters to show all results
+        selected_date = ""
+        selected_object_type = ""
 
     # Retrieve all labels for dropdown
     all_labels = label_repo.get_all_labels()
@@ -440,7 +286,6 @@ def second_incompliance():
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
-        # conn.row_factory = sqlite3.Row
         conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
         cursor = conn.cursor()
 
@@ -471,68 +316,73 @@ def second_incompliance():
 
         all_cameras = [row["name"] for row in cursor.fetchall()]
 
-        if request.method == "POST":
-            # SQL query to find repeated incompliances for specific lab and camera
-            query = """
-                    SELECT s.time_generated, s.object_detected, s.confidence, s.imageURL
-                    FROM Snapshot s
-                             JOIN (SELECT person_id, MIN(time_generated) AS first_time
-                                   FROM Snapshot
-                                   WHERE person_id IS NOT NULL
-                                   GROUP BY person_id
-                                   HAVING COUNT(*) > 1) repeats
-                                  ON s.person_id = repeats.person_id
-                    WHERE s.time_generated > repeats.first_time
-                      AND EXISTS(SELECT 1
-                                 FROM Camera c
-                                          JOIN Lab l ON c.camera_lab_id = l.LabId
-                                 WHERE c.CameraId = s.camera_id
-                                   AND l.lab_name = %s
-                                   AND c.name = %s) \
-                    """
+        # SQL query to find repeated incompliances for specific lab and camera
+        # MOVED OUTSIDE OF if request.method == "POST" block
+        query = """
+                SELECT s.DetectionId, s.time_generated, s.object_detected, s.confidence, s.imageURL
+                FROM Snapshot s
+                         JOIN (SELECT person_id, MIN(time_generated) AS first_time
+                               FROM Snapshot
+                               WHERE person_id IS NOT NULL
+                               GROUP BY person_id
+                               HAVING COUNT(*) > 1) repeats
+                              ON s.person_id = repeats.person_id
+                WHERE s.time_generated > repeats.first_time
+                  AND EXISTS(SELECT 1
+                             FROM Camera c
+                                      JOIN Lab l ON c.camera_lab_id = l.LabId
+                             WHERE c.CameraId = s.camera_id
+                               AND l.lab_name = %s
+                               AND c.name = %s) \
+                """
 
-            params = [lab_name, camera_name]
+        params = [lab_name, camera_name]
 
-            # Apply date filter if selected.
-            if selected_date:
-                query += " AND DATE(s.time_generated) = %s"
-                params.append(selected_date)
+        # Apply date filter if selected.
+        if selected_date:
+            query += " AND DATE(s.time_generated) = %s"
+            params.append(selected_date)
 
-            # Apply object type filter if selected.
-            if selected_object_type:
-                if selected_object_type == "food":
-                    food_ids = label_repo.get_food_class_ids()
-                    placeholders = ",".join("%s" for _ in food_ids)
-                    query += f" AND s.object_detected IN ({placeholders})"
-                    params.extend(food_ids)
-                elif selected_object_type == "drink":
-                    drinks_ids = label_repo.get_drink_class_ids()
-                    placeholders = ",".join("%s" for _ in drinks_ids)
-                    query += f" AND s.object_detected IN ({placeholders})"
-                    params.extend(drinks_ids)
-                else:
-                    # Assume it's a specific class ID
-                    query += " AND s.object_detected = %s"
-                    params.append(selected_object_type)
+        # Apply object type filter if selected.
+        if selected_object_type:
+            if selected_object_type == "food":
+                food_ids = label_repo.get_food_class_ids()
+                # Convert IDs to strings for the query
+                food_ids_str = [str(fid) for fid in food_ids]
+                placeholders = ",".join("%s" for _ in food_ids_str)
+                query += f" AND s.object_detected IN ({placeholders})"
+                params.extend(food_ids_str)
+            elif selected_object_type == "drink":
+                drinks_ids = label_repo.get_drink_class_ids()
+                # Convert IDs to strings for the query
+                drinks_ids_str = [str(did) for did in drinks_ids]
+                placeholders = ",".join("%s" for _ in drinks_ids_str)
+                query += f" AND s.object_detected IN ({placeholders})"
+                params.extend(drinks_ids_str)
+            else:
+                # Assume it's a specific class ID
+                query += " AND s.object_detected = %s"
+                params.append(selected_object_type)
 
-            query += " ORDER BY s.time_generated DESC"
+        query += " ORDER BY s.time_generated DESC"
 
-            cursor.execute(query, params)
-            raw_results = cursor.fetchall()
+        cursor.execute(query, params)
+        raw_results = cursor.fetchall()
 
-            # Process results: replace class ID with label.
-            for row in raw_results:
-                time_generated = row["time_generated"]
-                object_detected = row["object_detected"]
-                confidence = row["confidence"]
-                image_url = row["imageURL"]
+        # Process results: replace class ID with label.
+        for row in raw_results:
+            detection_id = row["detectionid"]
+            time_generated = row["time_generated"]
+            object_detected = row["object_detected"]
+            confidence = row["confidence"]
+            image_url = row["imageurl"]
 
-                try:
-                    label = label_repo.get_label(int(object_detected))
-                except (ValueError, TypeError):
-                    label = object_detected
+            try:
+                label = label_repo.get_label(int(object_detected))
+            except (ValueError, TypeError):
+                label = object_detected
 
-                results.append((time_generated, label, confidence, image_url))
+            results.append((detection_id, time_generated, label, confidence, image_url))
 
         conn.close()
 
@@ -568,6 +418,191 @@ def second_incompliance():
     )
 
 
+@app.route("/all-incompliance", methods=["GET", "POST"])
+@login_required
+def all_incompliance():
+    lab_dao = LabDAO(DB_PARAMS)
+    camera_dao = CameraDAO(DB_PARAMS)
+
+    # Get lab and camera from URL query parameters
+    lab_name = request.args.get("lab")
+    camera_name = request.args.get("camera")
+
+    # Current page number from query params, default to 1
+    current_page = request.args.get("page", default=1, type=int)
+    # Number of results per page
+    page_size = 9
+
+    # Redirect if either lab or camera not specified
+    if not lab_name or not camera_name:
+        try:
+            all_labs = lab_dao.get_all_labs() or []
+            if all_labs:
+                lab_name = all_labs[0]["lab_name"]
+            else:
+                lab_name = None
+
+            camera_name = camera_dao.get_first_cameras_for_lab(lab_name)
+        except Exception:
+            flash("Error retrieving default lab and camera.", "danger")
+            return redirect(url_for("index"))
+
+        if lab_name and camera_name:
+            return redirect(
+                url_for("all_incompliance", lab=lab_name, camera=camera_name)
+            )
+        else:
+            flash("No labs or cameras configured.", "danger")
+            return redirect(url_for("index"))
+
+    # Get filters from POST form or use defaults
+    if request.method == "POST":
+        selected_date = request.form.get("date", "")
+        selected_object_type = request.form.get("object_type", "")
+    else:
+        # On GET request, use empty filters to show all results
+        selected_date = ""
+        selected_object_type = ""
+
+    # Retrieve all labels for dropdown
+    all_labels = label_repo.get_all_labels()
+
+    # User role and camera management
+    role = session.get("role")
+    if role is None or not check_permission(role, "view_incompliances"):
+        flash("Permission denied to view incompliances.", "danger")
+        return redirect(url_for("index"))
+
+    cam_management = check_permission(role, "camera_management")
+    user_role_management = check_permission(role, "user_role_management")
+
+    results = []
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
+
+        # Fetch list of all labs for dropdown
+        cursor.execute("SELECT lab_name FROM Lab ORDER BY lab_name")
+        all_labs = [row["lab_name"] for row in cursor.fetchall()]
+
+        # Fetch cameras only for the selected lab
+        cursor.execute(
+            """
+            SELECT c.name
+            FROM Camera c
+            JOIN Lab l ON c.camera_lab_id = l.LabId
+            WHERE l.lab_name = %s
+            ORDER BY c.name
+            """,
+            (lab_name,),
+        )
+        all_cameras = [row["name"] for row in cursor.fetchall()]
+
+        # THIS IS THE KEY CHANGE - Query runs on BOTH GET and POST
+        # SQL query to find all incompliances for specific lab and camera
+        query = """
+            SELECT s.DetectionId, s.time_generated, s.object_detected, s.confidence, s.imageURL
+            FROM Snapshot s
+            JOIN Camera c ON s.camera_id = c.CameraId
+            JOIN Lab l ON c.camera_lab_id = l.LabId
+            WHERE l.lab_name = %s AND c.name = %s
+        """
+        params = [lab_name, camera_name]
+
+        # Apply date filter if selected
+        if selected_date:
+            query += " AND DATE(s.time_generated) = %s"
+            params.append(selected_date)
+
+        # Apply object type filter if selected.
+        if selected_object_type:
+            if selected_object_type == "food":
+                food_ids = label_repo.get_food_class_ids()
+                # Convert IDs to strings for the query
+                food_ids_str = [str(fid) for fid in food_ids]
+                placeholders = ",".join("%s" for _ in food_ids_str)
+                query += f" AND s.object_detected IN ({placeholders})"
+                params.extend(food_ids_str)
+            elif selected_object_type == "drink":
+                drinks_ids = label_repo.get_drink_class_ids()
+                # Convert IDs to strings for the query
+                drinks_ids_str = [str(did) for did in drinks_ids]
+                placeholders = ",".join("%s" for _ in drinks_ids_str)
+                query += f" AND s.object_detected IN ({placeholders})"
+                params.extend(drinks_ids_str)
+            else:
+                # Assume it's a specific class ID
+                query += " AND s.object_detected = %s"
+                params.append(selected_object_type)
+
+        query += " ORDER BY s.time_generated DESC"
+
+        print(f"[DEBUG] Executing query with lab={lab_name}, camera={camera_name}")
+        print(f"[DEBUG] Query: {query}")
+        print(f"[DEBUG] Params: {params}")
+
+        cursor.execute(query, params)
+        raw_results = cursor.fetchall()
+
+        print(f"[DEBUG] Found {len(raw_results)} results")
+
+        # Process results: replace class ID with label
+        for row in raw_results:
+            detection_id = row["detectionid"]
+            time_generated = row["time_generated"]
+            object_detected = row["object_detected"]
+            confidence = row["confidence"]
+            image_url = row["imageurl"]
+
+            try:
+                label = label_repo.get_label(int(object_detected))
+            except (ValueError, TypeError):
+                label = object_detected
+
+            results.append((time_generated, label, confidence, image_url, detection_id))
+
+        conn.close()
+
+    except Exception as e:
+        flash("Error loading incompliance data.", "danger")
+        print(f"[ERROR] Exception: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return redirect(url_for("index"))
+
+    # Total results
+    total_results = len(results)
+    # Compute total pages based on page size
+    total_pages = max(1, math.ceil(total_results / page_size))
+
+    # Slice results for the current page
+    start_index = (current_page - 1) * page_size
+    end_index = start_index + page_size
+    results_page = results[start_index:end_index]
+
+    print(
+        f"[DEBUG] Total results: {total_results}, Current page: {current_page}, Total pages: {total_pages}"
+    )
+
+    return render_template(
+        "all_incompliance.html",
+        results=results_page,
+        lab_name=lab_name,
+        camera_name=camera_name,
+        cam_management=cam_management,
+        user_role_management=user_role_management,
+        all_labs=all_labs,
+        all_cameras=all_cameras,
+        all_labels=all_labels,
+        selected_date=selected_date,
+        selected_object_type=selected_object_type,
+        current_page=current_page,
+        total_pages=total_pages,
+    )
+
+
 @app.route("/logout")
 def logout():
     session.clear()
@@ -580,6 +615,78 @@ def get_db():
     # conn.row_factory = sqlite3.Row
     conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
     return conn
+
+
+def generate_video_stream(detection_id):
+    """
+    Orchestrates streaming a video clip by fetching details and calling the NVR class.
+    """
+    # 1. Get incompliance details from the database
+    details = get_incompliance_details_for_video(detection_id)
+
+    if not details:
+        print(f"No incompliance details found for ID {detection_id}")
+        return
+
+    # 2. Get NVR IP from environment and initialize the NVR object
+    nvr_ip = os.getenv("NVR_IP_ADDRESS")
+    if not nvr_ip:
+        print("❌ NVR_IP_ADDRESS not set in .env file.")
+        return
+
+    nvr = NVR(
+        nvr_ip=nvr_ip,
+        fdid=None,
+        username=os.getenv("NVR_USERNAME", "admin"),
+        password=os.getenv("NVR_PASSWORD", "Sit12345"),
+    )
+
+    # 3. Get the naive local time directly from the database
+    naive_detection_time = details["time_generated"]
+
+    # 4. Calculate the time window using the naive local time
+    start_time_local = naive_detection_time - timedelta(seconds=15)
+    end_time_local = naive_detection_time + timedelta(seconds=5)
+
+    # 5. Determine the correct MAIN stream track ID.
+    channel_num = details["channel"]
+    if channel_num < 100:
+        track_id = (channel_num * 100) + 1
+    else:
+        track_id = channel_num
+
+    # 6. Stream using the main stream track ID and LOCAL times.
+    # This passes the time to the NVR without UTC conversion.
+    stream_generator = nvr.stream_clip_by_time(
+        start_time_local, end_time_local, track_id
+    )
+
+    frame_yielded = False
+    for frame_bytes in stream_generator:
+        if not frame_yielded:
+            frame_yielded = True
+        yield (
+            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+        )
+
+    if frame_yielded:
+        print(f"✅ Successfully streamed using main stream track ID: {track_id}")
+    else:
+        print(
+            f"❌ Streaming failed for track ID: {track_id}. Please check NVR settings."
+        )
+
+
+@app.route("/video_clip/<int:detection_id>")
+@login_required
+def video_clip(detection_id):
+    """
+    Route to stream a recorded video clip for a given incompliance.
+    """
+    return Response(
+        generate_video_stream(detection_id),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 @app.route("/edit_camera/<int:camera_id>", methods=["GET", "POST"])
@@ -612,6 +719,7 @@ def edit_camera(camera_id):
             subnet_mask = request.form.get("subnet_mask")
             gateway = request.form.get("gateway")
             timezone = request.form.get("timezone", "Asia/Singapore")
+            channel = request.form.get("channel")
             # sync_with_ntp = 1 if request.form.get("sync_with_ntp") else 0
             sync_with_ntp = True if request.form.get("sync_with_ntp") else False
             ntp_server_address = request.form.get("ntp_server_address", "pool.ntp.org")
@@ -635,7 +743,8 @@ def edit_camera(camera_id):
                     timezone           = %s,
                     sync_with_ntp      = %s,
                     ntp_server_address = %s,
-                    time               = %s
+                    time               = %s,
+                    channel            = %s
                 WHERE CameraId = %s
                 """,
                 (
@@ -651,6 +760,7 @@ def edit_camera(camera_id):
                     sync_with_ntp,
                     ntp_server_address,
                     time_value,
+                    channel,
                     camera_id,
                 ),
             )
@@ -706,6 +816,7 @@ def edit_camera(camera_id):
                c.sync_with_ntp,
                c.ntp_server_address,
                c.time,
+               c.channel,
                l.lab_name
         FROM Camera c
                  JOIN Lab l ON c.camera_lab_id = l.LabId
@@ -739,6 +850,7 @@ def edit_camera(camera_id):
         "ntp_server_address": camera["ntp_server_address"] or "pool.ntp.org",
         "time": camera["time"] or "",
         "lab_name": camera["lab_name"] or "Unknown Lab",
+        "channel": camera["channel"] or "",
     }
 
     conn.close()
@@ -1317,7 +1429,10 @@ def check_ip():
     ip_address = request.json.get("ip")
 
     cd = CameraDiscovery()
-    discover_results = cd.discover_camera(ip_address)
+    # Get all connected channels from the NVR
+    discovered_channels = cd.get_connected_channels()
+    # Pass the discovered channels to the discover_camera method
+    discover_results = cd.discover_camera(ip_address, discovered_channels)
     if discover_results is None:
         return jsonify({"valid": False, "device_info": discover_results})
 
@@ -1367,13 +1482,18 @@ def add_camera():
 
         # Find channel ID of camera in the NVR
         from shared.camera_discovery import CameraDiscovery
+
         discovery = CameraDiscovery()
         all_channels = discovery.get_connected_channels()
         try:
             channel = all_channels[camera_ip]
         except Exception as e:
-            return jsonify({"success": False,
-                            "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR."})
+            return jsonify(
+                {
+                    "success": False,
+                    "message": "No channel ID found in NVR for the camera. Check that camera is connected to NVR.",
+                }
+            )
 
         # Add to database with correct column names and all required fields
         cursor.execute(
@@ -1400,10 +1520,8 @@ def add_camera():
                 device_info.get(
                     "ntp_server_address", "pool.ntp.org"
                 ),  # Fixed: use correct key
-                device_info.get(
-                    "time", "2025-01-01T00:00:00"
-                ),
-                channel
+                device_info.get("time", "2025-01-01T00:00:00"),
+                channel,
             ),
         )
 
@@ -1561,7 +1679,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_"):]
+                    rp = key[len("role_perm_") :]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1870,7 +1988,7 @@ def mqtt_test():
         mqtt_client.publish_violation(
             user="TestUser",
             event="test_message",
-            details="This is a test message from Flask."
+            details="This is a test message from Flask.",
         )
         return jsonify({"status": "success", "message": "MQTT message sent!"})
     except Exception as e:

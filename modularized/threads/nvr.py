@@ -5,81 +5,89 @@ import uuid
 import cv2 as cv
 from io import BytesIO
 import os
+from datetime import datetime, timedelta
+
 
 class NVR:
-  """
-  A class to interact with a Network Video Recorder (NVR) for face detection and management
-  via ISAPI endpoints, for face comparison, and face database insertion.
-  """
-  def __init__(self, nvr_ip, fdid, username, password):
     """
-    Initializes the NVR instance with connection credentials.
-
-    Parameters:
-      nvr_ip (str): IP address of the NVR.
-      fdid (str): Face database ID for face-related queries.
-      username (str): Username for NVR authentication.
-      password (str): Password for NVR authentication.
+    A class to interact with a Network Video Recorder (NVR) for face detection and management
+    via ISAPI endpoints, for face comparison, and face database insertion.
     """
-    self.fdid = fdid
-    self.username = username
-    self.password = password
-    self.nvr_ip = nvr_ip
 
-  def get_mode_data(self, face):
-    url = f"http://{self.nvr_ip}/ISAPI/Intelligent/analysisImage/face"
+    def __init__(self, nvr_ip, fdid, username, password):
+        """
+        Initializes the NVR instance with connection credentials.
 
-    # Send request
-    success, encoded_image = cv.imencode(".jpg", face)
-    if not success:
-      return None
-    
-    # Get modeData of face for face comparison
-    image_data = encoded_image.tobytes()
-    headers = {"Content-Type": "application/octet-stream"}
-    response = requests.post(url, data=image_data, headers=headers, auth=HTTPDigestAuth(self.username, self.password))
+        Parameters:
+          nvr_ip (str): IP address of the NVR.
+          fdid (str): Face database ID for face-related queries.
+          username (str): Username for NVR authentication.
+          password (str): Password for NVR authentication.
+        """
+        self.fdid = fdid
+        self.username = username
+        self.password = password
+        self.nvr_ip = nvr_ip
 
-    # Find modeData in message body
-    if response.ok:
-      try:
-        ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
-        root = ET.fromstring(response.text)
-        mode_data_elem = root.find(".//isapi:modeData", namespaces=ns)
+    def get_mode_data(self, face):
+        url = f"http://{self.nvr_ip}/ISAPI/Intelligent/analysisImage/face"
 
-        if mode_data_elem is not None:
-          mode_data = mode_data_elem.text
+        # Send request
+        success, encoded_image = cv.imencode(".jpg", face)
+        if not success:
+            return None
+
+        # Get modeData of face for face comparison
+        image_data = encoded_image.tobytes()
+        headers = {"Content-Type": "application/octet-stream"}
+        response = requests.post(
+            url,
+            data=image_data,
+            headers=headers,
+            auth=HTTPDigestAuth(self.username, self.password),
+        )
+
+        # Find modeData in message body
+        if response.ok:
+            try:
+                ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
+                root = ET.fromstring(response.text)
+                mode_data_elem = root.find(".//isapi:modeData", namespaces=ns)
+
+                if mode_data_elem is not None:
+                    mode_data = mode_data_elem.text
+                else:
+                    return None
+
+            except ET.ParseError:
+                return None
         else:
-          return None
+            return None
 
-      except ET.ParseError:
-        return None
-    else:
-      return None
+        return mode_data
 
-    return mode_data
-  
-  def get_face_comparison(self, mode_data):
-    """
-    Uses modeData to search for matching faces in the NVR's face database.
+    def get_face_comparison(self, mode_data):
+        """
+        Uses modeData to search for matching faces in the NVR's face database.
 
-    Parameters:
-      mode_data (str): Mode data string obtained from get_mode_data.
+        Parameters:
+          mode_data (str): Mode data string obtained from get_mode_data.
 
-    Returns:
-      tuple: (matches_found, person_id)
-        matches_found (int or str): Number of matches found (0 if none).
-        person_id (str or None): The matched person's ID if found, otherwise None.
+        Returns:
+          tuple: (matches_found, person_id)
+            matches_found (int or str): Number of matches found (0 if none).
+            person_id (str or None): The matched person's ID if found, otherwise None.
 
-      Returns (None, None) if mode_data is None.
-    """
-    if mode_data is not None:
+          Returns (None, None) if mode_data is None.
+        """
+        if mode_data is not None:
 
-      iv = os.urandom(16).hex()
-      url = f"http://{self.nvr_ip}/ISAPI/Intelligent/FDLib/FDSearch?security=1&iv={iv}"
+            iv = os.urandom(16).hex()
+            url = f"http://{self.nvr_ip}/ISAPI/Intelligent/FDLib/FDSearch?security=1&iv={iv}"
 
-      # Build the XML payload
-      random_uuid = uuid.uuid4()
-      xml_payload = f"""<?xml version="1.0" encoding="utf-8"?>
+            # Build the XML payload
+            random_uuid = uuid.uuid4()
+            xml_payload = f"""<?xml version="1.0" encoding="utf-8"?>
       <FDSearchDescription>
           <FDID>{self.fdid}</FDID>
           <OccurrencesInfo>
@@ -101,56 +109,56 @@ class NVR:
       </FDSearchDescription>
       """
 
-      headers = {"Content-Type": "application/xml"}
+            headers = {"Content-Type": "application/xml"}
 
-      # Send request
-      response = requests.post(
-        url,
-        data=xml_payload.encode("utf-8"),
-        headers=headers,
-        auth=HTTPDigestAuth(self.username, self.password),
-      )
+            # Send request
+            response = requests.post(
+                url,
+                data=xml_payload.encode("utf-8"),
+                headers=headers,
+                auth=HTTPDigestAuth(self.username, self.password),
+            )
 
-      root = ET.fromstring(response.text)
-      ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
-      num_of_matches = root.find(".//isapi:numOfMatches", namespaces=ns)
+            root = ET.fromstring(response.text)
+            ns = {"isapi": "http://www.isapi.org/ver20/XMLSchema"}
+            num_of_matches = root.find(".//isapi:numOfMatches", namespaces=ns)
 
-      # Check if there's any match
-      if num_of_matches is not None and int(num_of_matches.text) >= 1:
-        matches_found = num_of_matches.text
-        person_id = root.find(".//isapi:PID", namespaces=ns)
+            # Check if there's any match
+            if num_of_matches is not None and int(num_of_matches.text) >= 1:
+                matches_found = num_of_matches.text
+                person_id = root.find(".//isapi:PID", namespaces=ns)
 
-      else:
-        return (0, None)
-      
-    else:
-      return (None, None)
+            else:
+                return (0, None)
 
-    return matches_found, person_id.text
-  
-  def insert_into_face_db(self, face, name):
-    """
-    Inserts a new face entry into the NVR's face database along with metadata.
+        else:
+            return (None, None)
 
-    Parameters:
-      face (np.ndarray): Image of the face to insert.
-      name (str): Name of the person associated with the face.
+        return matches_found, person_id.text
 
-    Returns:
-      str or None: The new face's ID (PID) if insertion is successful, None otherwise.
-    """
-    random_uuid = uuid.uuid4()
+    def insert_into_face_db(self, face, name):
+        """
+        Inserts a new face entry into the NVR's face database along with metadata.
 
-    # Prepare face image payload
-    success, encoded_image = cv.imencode(".jpg", face)
-    if not success:
-      return None
+        Parameters:
+          face (np.ndarray): Image of the face to insert.
+          name (str): Name of the person associated with the face.
 
-    image_data = encoded_image.tobytes()
-    image_file = BytesIO(image_data)
+        Returns:
+          str or None: The new face's ID (PID) if insertion is successful, None otherwise.
+        """
+        random_uuid = uuid.uuid4()
 
-    # Build the XML payload
-    xml_payload = f"""\
+        # Prepare face image payload
+        success, encoded_image = cv.imencode(".jpg", face)
+        if not success:
+            return None
+
+        image_data = encoded_image.tobytes()
+        image_file = BytesIO(image_data)
+
+        # Build the XML payload
+        xml_payload = f"""\
     <?xml version='1.0' encoding='UTF-8'?>
     <PictureUploadData>
         <FDID>{self.fdid}</FDID>
@@ -163,21 +171,72 @@ class NVR:
     </PictureUploadData>
     """
 
-    files = {
-      "FaceAppendData": ("FaceAppendData.xml", xml_payload, "application/xml"),
-      "importImage": ("image.jpg", image_file, "application/octet-stream"),
-    }
+        files = {
+            "FaceAppendData": ("FaceAppendData.xml", xml_payload, "application/xml"),
+            "importImage": ("image.jpg", image_file, "application/octet-stream"),
+        }
 
-    try:
-      # Send the POST request
-      response = requests.post(
-        f"http://{self.nvr_ip}/ISAPI/Intelligent/FDLib/pictureUpload?type=concurrent",
-        files=files,
-        auth=HTTPDigestAuth(self.username, self.password),
-      )
-      root = ET.fromstring(response.text)
-      pid = root.text
-      return pid
+        try:
+            # Send the POST request
+            response = requests.post(
+                f"http://{self.nvr_ip}/ISAPI/Intelligent/FDLib/pictureUpload?type=concurrent",
+                files=files,
+                auth=HTTPDigestAuth(self.username, self.password),
+            )
+            root = ET.fromstring(response.text)
+            pid = root.text
+            return pid
 
-    except Exception:
-      return None
+        except Exception:
+            return None
+
+    def stream_clip_by_time(self, start_time, end_time, track_id):
+        """
+        A generator function that connects to the NVR and yields JPEG frames for a given time window.
+
+        Parameters:
+          start_time (datetime): The start time of the video clip.
+          end_time (datetime): The end time of the video clip.
+          track_id (int): The camera channel track ID to stream from (e.g., 1601, 1602).
+        """
+        # Format times for the RTSP URL without the 'Z' (UTC) suffix
+        start_str = start_time.strftime("%Y%m%dT%H%M%S")
+        end_str = end_time.strftime("%Y%m%dT%H%M%S")
+
+        # Construct the NVR playback RTSP URL using the now-known correct path
+        # rtsp_url = (
+        #     f"rtsp://{self.username}:{self.password}@{self.nvr_ip}"
+        #     f"/Streaming/Channels/{track_id}?"
+        #     f"starttime={start_str}&endtime={end_str}"
+        # )
+        # rtsp_url = (
+        #     f"rtsp://{self.username}:{self.password}@{self.nvr_ip}"
+        #     f"/Streaming/tracks/1501/?"
+        #     f"starttime=20251016T143043Z&amp;endtime=20251016T154042Z&amp;name=02000004528000000&amp;size=840208268"
+        # )
+        rtsp_url = (
+            f"rtsp://{self.username}:{self.password}@{self.nvr_ip}"
+            f"/Streaming/tracks/{track_id}/?"
+            f"starttime={start_str}&amp;endtime={end_str}&amp;name=02000004528000000&amp;size=840208268"
+        )
+
+        print(f"Streaming from NVR URL: {rtsp_url}")
+        cap = cv.VideoCapture(rtsp_url, cv.CAP_FFMPEG)
+
+        if not cap.isOpened():
+            print("Error: Could not open video stream from NVR.")
+            return
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+
+            ret, buffer = cv.imencode(".jpg", frame)
+            if not ret:
+                continue
+
+            yield buffer.tobytes()
+
+        cap.release()
+        print("Finished streaming clip from NVR.")

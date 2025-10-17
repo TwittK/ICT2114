@@ -1,127 +1,44 @@
 {% extends 'base.html' %}
-{% block title %}Detection Search - LabComply+{% endblock %}
+{% block title %}Live Feed - LabComply{% endblock %}
 {% block content %}
 
-    <h2 class="mb-2">Overview</h2>
-    {% if lab_name %}
-        <div class="alert alert-info">
-            Lab: <strong>{{ lab_name }}</strong><br>
-        </div>
-    {% endif %}
+<h2 class="mb-2">Live Feed Overview</h2>
 
-    <form method="get" class="row g-3 align-items-end mb-4">
-        <div class="col-md-6">
-            <label for="lab" class="form-label">Lab:</label>
-            <select name="lab" id="lab" class="form-select rounded-pill" onchange="this.form.submit()">
-                {% for lab in all_labs %}
-                    <option value="{{ lab }}" {% if lab == selected_lab %}selected{% endif %}>
-                        {{ lab }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
+{% if lab_name %}
+<div class="alert alert-info">
+    Viewing Lab: <strong>{{ lab_name }}</strong>
+</div>
+{% else %}
+<div class="alert alert-warning">
+    No lab selected. Please select a lab from the sidebar.
+</div>
+{% endif %}
 
-        <div class="col-md-6">
-            <label for="camera" class="form-label">Camera:</label>
-            <select name="camera" class="form-select rounded-pill">
-                <!-- "All cameras" option -->
-                <option value="" {% if selected_camera == "" or not selected_camera %}selected{% endif %}>ALL</option>
-
-                <!-- Individual cameras -->
-                {% for cam in all_cameras %}
-                    <option value="{{ cam }}" {% if cam == selected_camera %}selected{% endif %}>{{ cam }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-dark rounded-pill px-4">Filter</button>
-        </div>
-    </form>
-
-    <div class="mt-5">
-        <h1>Live Feed</h1>
-        {% if results %}
-            <h4 class="mb-3">Results:</h4>
-            <div class="row">
-                {% for row in results %}
-                    <div class="col-md-4 mb-4">
-                        <div class="card shadow-sm">
-                            <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}"
-                                 class="card-img-top snapshot-img"
-                                 alt="Snapshot"
-                                 style="cursor: pointer;"
-                                 data-label="{{ row[1] }}"
-                                 data-confidence="{{ row[2] }}"
-                                 data-date="{{ row[0] }}"
-                            >
-                            <div class="card-body">
-                                <h6 class="card-title">
-                                    {{ row[1] }}
-                                    <small class="text-muted">
-                                        (Confidence: {{ row[2] }})
-                                    </small>
-                                </h6>
-                                <p class="card-text text-muted">
-                                    {{ row[0] }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
+{# Display live camera feeds #}
+{% if cameras and cameras|length > 0 %}
+<div class="row">
+    {% for camera in cameras %}
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h6 class="mb-0">{{ camera.name }}</h6>
             </div>
-        {% endif %}
-
-        {# Live Feed Camera #}
-        <div class="row">
-            {% for cam in cameras %}
-                <div class="col-md-4 mb-4">
-                    <div class="card shadow-sm">
-                        <img src="" class="card-img-top" alt="Live feed {{ cam.name }}">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ cam.name }}</h6>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-
-        {# Pagination UI #}
-        <nav aria-label="Camera pagination">
-            <ul class="pagination justify-content-end">
-                <li class="page-item {% if current_page == 1 %} disabled{% endif %}">
-                    <a class="page-link" href="?lab={{ selected_lab }}&page={{ current_page - 1 }}">Previous</a>
-                </li>
-
-                {% for p in range(1, total_pages + 1) %}
-                    <li class="page-item {% if p == current_page %}active{% endif %}">
-                        <a class="page-link" href="?lab{{ selected_lab }}&page={{ p }}">{{ p }}</a>
-                    </li>
-                {% endfor %}
-
-                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
-                    <a class="page-link" href="?lab={{ selected_lab }}&page={{ current_page + 1 }}">Next</a>
-                </li>
-            </ul>
-        </nav>
-
-
-    </div>
-
-    {# Image Modal #}
-    {# Used for enlarging the image #}
-    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-body p-0">
-                    <img src="" id="modalImage" class="img-fluid w-100 mb-2" alt="Enlarged Snapshot">
-                    <div class="p-3">
-                        <h5 id="modalLabel"></h5>
-                        <p class="mb-1 text-muted" id="modalConfidence"></p>
-                        <p class="mb-0 text-muted" id="modalDate"></p>
-                    </div>
-                </div>
+            <img src="{{ url_for('video_feed', camera_id=camera.camera_id) }}" class="card-img-top"
+                alt="Live feed {{ camera.name }}" style="height: 300px; object-fit: fill;">
+            <div class="card-body">
+                <a href="{{ url_for('all_incompliance', lab=lab_name, camera=camera.name) }}"
+                    class="btn btn-primary btn-sm">
+                    View Incompliances
+                </a>
             </div>
         </div>
     </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary">
+    No cameras available for this lab.
+</div>
+{% endif %}
+
 {% endblock %}

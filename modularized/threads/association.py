@@ -3,6 +3,7 @@ import numpy as np
 from dotenv import load_dotenv
 from datetime import datetime
 import cv2
+from zoneinfo import ZoneInfo
 
 import time
 from threads.emailservice import EmailService
@@ -271,7 +272,9 @@ def association(context: Camera):
                     # mocked_date = datetime(2025, 2, 28)
                     # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
-                    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    local_tz = ZoneInfo("Asia/Singapore")
+                    current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    print(current_date)
                     today = current_date[:10]
 
                     # Facial Recognition
