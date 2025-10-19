@@ -48,6 +48,8 @@ from werkzeug.security import generate_password_hash
 
 from shared.mqtt_client import MQTTClient
 
+from shared.config import LF_CAMERA_PER_PAGE
+
 # Silence Watchdog debug spam.
 logging.getLogger("watchdog").setLevel(logging.WARNING)
 logging.basicConfig(level=logging.DEBUG)
@@ -165,19 +167,41 @@ def index():
     if lab_name not in all_labs:
         lab_name = default_lab
 
+    # Pagination parameters
+    try:
+        current_page = int(request.args.get("page", 1))
+        if current_page < 1:
+            current_page = 1
+    except ValueError:
+        current_page = 1
+
+    # Cameras per page
+    per_page = LF_CAMERA_PER_PAGE
+    offset = (current_page - 1) * per_page
+
     # Get all cameras in this lab with their IDs for live feed
     cameras = []
+    total_pages = 0
     if lab_name:
-        cursor.execute(
-            """
+        # Get total number of cameras for pagination.
+        cursor.execute("""
+            SELECT COUNT(*) FROM Camera c
+            JOIN Lab l ON c.camera_lab_id = l.LabId
+            WHERE l.lab_name = %s
+        """, (lab_name,), )
+
+        total_cameras = cursor.fetchone()["count"]
+        total_pages = math.ceil(total_cameras / per_page)
+
+        # Get paginated cameras
+        cursor.execute("""
             SELECT c.CameraId as camera_id, c.name
             FROM Camera c
             JOIN Lab l ON c.camera_lab_id = l.LabId
             WHERE l.lab_name = %s
             ORDER BY c.name
-            """,
-            (lab_name,),
-        )
+            LIMIT %s OFFSET %s
+        """, (lab_name, per_page, offset), )
         cameras = cursor.fetchall()
 
     conn.close()
@@ -225,6 +249,8 @@ def index():
         cameras=cameras,
         cam_management=cam_management,
         user_role_management=user_role_management,
+        current_page=current_page,
+        total_pages=total_pages,
     )
 
 
@@ -666,7 +692,7 @@ def generate_video_stream(detection_id):
         if not frame_yielded:
             frame_yielded = True
         yield (
-            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
         )
 
     if frame_yielded:
@@ -1679,7 +1705,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_") :]
+                    rp = key[len("role_perm_"):]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
