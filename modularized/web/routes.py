@@ -48,7 +48,7 @@ from werkzeug.security import generate_password_hash
 
 from shared.mqtt_client import MQTTClient
 
-from shared.config import LF_CAMERA_PER_PAGE
+from shared.config import LF_CAMERA_PER_PAGE, FINC_CAMERA_PER_PAGE
 
 # Silence Watchdog debug spam.
 logging.getLogger("watchdog").setLevel(logging.WARNING)
@@ -184,24 +184,30 @@ def index():
     total_pages = 0
     if lab_name:
         # Get total number of cameras for pagination.
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT COUNT(*) FROM Camera c
             JOIN Lab l ON c.camera_lab_id = l.LabId
             WHERE l.lab_name = %s
-        """, (lab_name,), )
+        """,
+            (lab_name,),
+        )
 
         total_cameras = cursor.fetchone()["count"]
         total_pages = math.ceil(total_cameras / per_page)
 
         # Get paginated cameras
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT c.CameraId as camera_id, c.name
             FROM Camera c
             JOIN Lab l ON c.camera_lab_id = l.LabId
             WHERE l.lab_name = %s
             ORDER BY c.name
             LIMIT %s OFFSET %s
-        """, (lab_name, per_page, offset), )
+        """,
+            (lab_name, per_page, offset),
+        )
         cameras = cursor.fetchall()
 
     conn.close()
@@ -457,7 +463,7 @@ def all_incompliance():
     # Current page number from query params, default to 1
     current_page = request.args.get("page", default=1, type=int)
     # Number of results per page
-    page_size = 9
+    page_size = FINC_CAMERA_PER_PAGE
 
     # Redirect if either lab or camera not specified
     if not lab_name or not camera_name:
@@ -2019,3 +2025,29 @@ def mqtt_test():
         return jsonify({"status": "success", "message": "MQTT message sent!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+
+
+@app.route("/latest_incompliance")
+@login_required
+def latest_incompliance():
+    import glob, os
+
+    # Use Flask's static folder
+    base_dir = "web/static/incompliances/"
+    pattern = os.path.join(base_dir, "*", "*.jpg")
+    print(pattern)
+    files = glob.glob(pattern)
+    print(files)
+    files.sort(key=os.path.getmtime, reverse=True)
+
+    latest_image = files[0] if files else None
+
+    print(latest_image)
+
+    # Convert file path to URL for static serving
+    image_url = None
+    if latest_image:
+        # Remove 'static/' prefix for url_for
+        image_url = latest_image.replace("web/static/", "")
+
+    return render_template("latest_incompliance.html", image_url=image_url)

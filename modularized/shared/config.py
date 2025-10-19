@@ -11,3 +11,5 @@ MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
 
 # --- Live Feed Pagination page ---
 LF_CAMERA_PER_PAGE = 1
+
+FINC_CAMERA_PER_PAGE = 3

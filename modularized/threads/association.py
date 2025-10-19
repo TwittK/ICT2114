@@ -269,7 +269,7 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    # mocked_date = datetime(2025, 2, 28)
+                    # mocked_date = datetime(2025, 10, 20)
                     # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     local_tz = ZoneInfo("Asia/Singapore")
