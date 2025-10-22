@@ -20,13 +20,13 @@ class LabDAO:
         except psycopg2.Error:
             return None
 
-    def insert_lab(self, lab_name, lab_safety_email):
+    def insert_lab(self, lab_name, lab_safety_email, lab_safety_telegram):
         """Insert a new lab"""
         try:
             with self._get_conn() as conn, conn.cursor() as cursor:
                 cursor.execute(
-                    "INSERT INTO lab (lab_name, lab_safety_email) VALUES (%s, %s)",
-                    (lab_name, lab_safety_email),
+                    "INSERT INTO lab (lab_name, lab_safety_email, lab_safety_telegram) VALUES (%s, %s, %s)",
+                    (lab_name, lab_safety_email, lab_safety_telegram),
                 )
                 conn.commit()
                 return True
@@ -43,7 +43,7 @@ class LabDAO:
         except psycopg2.Error:
             return False
 
-    def update_lab(self, new_lab_name, new_lab_email, lab_id):
+    def update_lab(self, new_lab_name, new_lab_email, new_lab_telegram, lab_id):
         """Update lab details using id"""
         try:
             if not lab_id or not str(lab_id).isdigit():
@@ -54,8 +54,8 @@ class LabDAO:
             with self._get_conn() as conn, conn.cursor() as cursor:
                 print("[DEBUG] labid: %s", lab_id)
                 cursor.execute(
-                    "UPDATE lab SET lab_name = %s, lab_safety_email = %s WHERE labid = %s",
-                    (new_lab_name, new_lab_email, lab_id),
+                    "UPDATE lab SET lab_name = %s, lab_safety_email = %s, lab_safety_telegram = %s WHERE labid = %s",
+                    (new_lab_name, new_lab_email, new_lab_telegram, lab_id),
                 )
                 conn.commit()
                 return True

@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS Lab (
     LabId SERIAL PRIMARY KEY,
     lab_name TEXT UNIQUE NOT NULL,
-    lab_safety_email TEXT NOT NULL
+    lab_safety_email TEXT NOT NULL,
+    lab_safety_telegram TEXT UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS Camera (

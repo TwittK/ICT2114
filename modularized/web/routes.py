@@ -1767,16 +1767,18 @@ def labs():
         if action == "add_lab":
             lab_name = request.form.get("lab_name")
             lab_safety_email = request.form.get("lab_safety_email")
+            lab_safety_telegram = request.form.get("lab_safety_telegram")
 
             # Validate and sanitize input
             try:
                 lab_name = validate_and_sanitize_text(lab_name)
                 lab_safety_email = validate_and_sanitize_text(lab_safety_email)
+                lab_safety_telegram = validate_and_sanitize_text(lab_safety_telegram)
             except ValueError as e:
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
-            success = dao.insert_lab(lab_name, lab_safety_email)
+            success = dao.insert_lab(lab_name, lab_safety_email, lab_safety_telegram)
 
             (
                 flash(f"New lab created.", "success")
@@ -1798,16 +1800,18 @@ def labs():
             lab_id = request.form.get("lab_id")
             new_lab_name = request.form.get("new_lab_name")
             new_lab_email = request.form.get("new_lab_email")
+            new_lab_telegram = request.form.get("new_lab_telegram")
 
             # Validate and sanitize string input
             try:
                 new_lab_name = validate_and_sanitize_text(new_lab_name)
                 new_lab_email = validate_and_sanitize_text(new_lab_email)
+                new_lab_telegram = validate_and_sanitize_text(new_lab_telegram)
             except ValueError as e:
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
-            success = dao.update_lab(new_lab_name, new_lab_email, lab_id)
+            success = dao.update_lab(new_lab_name, new_lab_email, new_lab_telegram, lab_id)
 
             (
                 flash(f"Lab details updated succesfully.", "success")

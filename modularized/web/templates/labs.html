@@ -21,6 +21,9 @@
 
         <label for="new_lab_email" class="my-2">Lab Safety Email:</label>
         <input type="email" class="form-control" name="lab_safety_email" id="new_lab_email" required>
+
+        <label for="new_lab_telegram" class="my-2">Lab Safety Telegram:</label>
+        <input type="telegram" class="form-control" name="lab_safety_telegram" id="new_lab_telegram">
       </div>
       <button type="submit" class="btn btn-primary mt-2">Add Lab</button>
     </form>
@@ -34,6 +37,7 @@
       <th scope="col">ID</th>
       <th scope="col">Lab Name</th>
       <th scope="col">Lab Safety Email</th>
+      <th scope="col">Lab Safety Telegram</th>
       <th scope="col">Update</th>
       <th scope="col">Delete</th>
     </tr>
@@ -51,6 +55,11 @@
         <td>
           <div class="form-group">
             <input type="email" name="new_lab_email" class="form-control" value="{{ lab.lab_safety_email }}">
+          </div>
+        </td>
+        <td>
+          <div class="form-group">
+            <input type="telegram" name="new_lab_telegram" class="form-control" value="{{ lab.lab_safety_telegram }}">
           </div>
         </td>
         <td>

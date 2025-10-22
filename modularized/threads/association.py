@@ -331,6 +331,7 @@ def association(context: Camera):
 
                         # Incompliance on the same date
                         else:
+                            notifier.send_incompliance_telegram(person_name=f"Person {person_id}", camera_id=context.camera_id)
                             print(
                                 "[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring."
                             )
@@ -365,6 +366,9 @@ def association(context: Camera):
                         cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 1)
                         cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
                         context.manager.saver.save_img(clone, str(person_id), today)
+
+                        notifier.send_incompliance_telegram(person_name=f"Person {person_id}", camera_id=context.camera_id)
+
 
                         print(
                             "[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅"

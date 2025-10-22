@@ -198,7 +198,7 @@ def create_test_lab_and_camera():
         create_camera("test", 1, 1, "101")
 
 
-def create_lab(lab_name, lab_safety_email):
+def create_lab(lab_name, lab_safety_email, lab_safety_telegram):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
 
@@ -207,10 +207,10 @@ def create_lab(lab_name, lab_safety_email):
     try:
         cursor.execute(
             """
-                       INSERT INTO Lab (lab_name, lab_safety_email)
-                       VALUES (%s, %s)
+                       INSERT INTO Lab (lab_name, lab_safety_email, lab_safety_telegram)
+                       VALUES (%s, %s, %s)
                        """,
-            (lab_name, lab_safety_email),
+            (lab_name, lab_safety_email, lab_safety_telegram),
         )
 
         conn.commit()
