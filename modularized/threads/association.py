@@ -6,7 +6,7 @@ import cv2
 from zoneinfo import ZoneInfo
 
 import time
-from threads.emailservice import EmailService
+from threads.notificationservice import NotificationService
 from threads.nvr import NVR
 from threads.process_incompliance import ProcessIncompliance
 from shared.camera import Camera
@@ -132,7 +132,7 @@ def flag_track_id(context, track_id):
 
 # Mapping detected food/ drinks to person
 def association(context: Camera):
-    email_service = EmailService()
+    notifier = NotificationService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance(db_params, context.camera_id)
     # process_incompliance = ProcessIncompliance(DATABASE, context.camera_id)
@@ -314,9 +314,8 @@ def association(context: Camera):
                                 # Split lab emails saved with commas as delimiter and send to all emails
                                 lab_emails_list = lab_emails.replace(" ", "").split(",")
                                 for email in lab_emails_list:
-                                    email_service.send_incompliance_email(
-                                        email, f"Person {person_id}"
-                                    )
+                                    notifier.send_incompliance_email(email, f"Person {person_id}")
+                                    notifier.send_incompliance_telegram(person_name=f"Person {person_id}", camera_id=context.camera_id)
 
                             # Publish MQTT message
                             if mqtt_client:
