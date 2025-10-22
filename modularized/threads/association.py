@@ -11,6 +11,7 @@ from threads.nvr import NVR
 from threads.process_incompliance import ProcessIncompliance
 from shared.camera import Camera
 from database import get_lab_safety_email_by_camera_id
+from database import get_lab_safety_telegram_by_camera_id
 
 from shared.mqtt_client import MQTTClient
 
@@ -310,12 +311,15 @@ def association(context: Camera):
                             lab_emails = get_lab_safety_email_by_camera_id(
                                 context.camera_id
                             )
+                            lab_telegram = get_lab_safety_telegram_by_camera_id(
+                                context.camera_id
+                            )
                             if lab_emails:
                                 # Split lab emails saved with commas as delimiter and send to all emails
                                 lab_emails_list = lab_emails.replace(" ", "").split(",")
                                 for email in lab_emails_list:
                                     notifier.send_incompliance_email(email, f"Person {person_id}")
-                                    notifier.send_incompliance_telegram(person_name=f"Person {person_id}", camera_id=context.camera_id)
+                                    notifier.send_incompliance_telegram(lab_telegram, person_name=f"Person {person_id}", camera_id=context.camera_id)
 
                             # Publish MQTT message
                             if mqtt_client:
@@ -366,9 +370,6 @@ def association(context: Camera):
                         cv2.rectangle(clone, (fx1, fy1), (fx2, fy2), (0, 0, 255), 1)
                         cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
                         context.manager.saver.save_img(clone, str(person_id), today)
-
-                        notifier.send_incompliance_telegram(person_name=f"Person {person_id}", camera_id=context.camera_id)
-
 
                         print(
                             "[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅"

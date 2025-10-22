@@ -302,6 +302,28 @@ def get_lab_safety_email_by_camera_id(camera_id):
     return result[0] if result else None
 
 
+def get_lab_safety_telegram_by_camera_id(camera_id):
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(**DB_PARAMS)
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT Lab.lab_safety_telegram
+        FROM camera
+        JOIN Lab ON camera.camera_lab_id = lab.labId
+        WHERE camera.cameraid = %s
+    """,
+        (camera_id,),
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result else None
+
+
 def create_new_camera(
     name,
     camera_user_id,
