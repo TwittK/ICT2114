@@ -69,7 +69,7 @@ class NotificationService:
         except requests.exceptions.RequestException as e:
             print(f"❌ Error sending Telegram message: {e}")
 
-    def send_incompliance_telegram(self, person_name, camera_id):
+    def send_incompliance_telegram(self, telegram, person_name, camera_id):
         message = (
             f"🚨 *Incompliance Detected*\n"
             f"👤 Person: {person_name}\n"
