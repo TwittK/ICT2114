@@ -61,3 +61,16 @@ class LabDAO:
                 return True
         except psycopg2.Error:
             return False
+        
+    def update_lab_telegram(self, lab_id, telegram_username):
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE lab SET lab_safety_telegram = %s WHERE labid = %s",
+                    (telegram_username, lab_id),
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"[ERROR] DB update failed: {e}")
+            return False

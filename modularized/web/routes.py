@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from functools import wraps
 import pytz
+import time
 
 import cv2
 import os, hmac, hashlib
@@ -15,6 +16,7 @@ from data_source.class_labels import ClassLabelRepository
 from data_source.lab_dao import LabDAO
 from data_source.role_dao import RoleDAO
 from data_source.user_dao import UserDAO
+from urllib.parse import parse_qs, unquote
 from database import (
     verify_user,
     update_last_login,
@@ -32,7 +34,7 @@ from flask import (
     flash,
     Response,
     jsonify,
-    redirect
+    redirect,
 )
 from psycopg2.extras import RealDictCursor
 from requests.auth import HTTPDigestAuth
@@ -701,7 +703,7 @@ def generate_video_stream(detection_id):
         if not frame_yielded:
             frame_yielded = True
         yield (
-                b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
         )
 
     if frame_yielded:
@@ -1714,7 +1716,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_"):]
+                    rp = key[len("role_perm_") :]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1772,6 +1774,11 @@ def labs():
             lab_safety_email = request.form.get("lab_safety_email")
             lab_safety_telegram = request.form.get("lab_safety_telegram")
 
+            if not lab_safety_telegram and "telegram_username" in session:
+                lab_safety_telegram = session.pop("telegram_username")
+            else:
+                session.pop("telegram_username", None)
+
             # Validate and sanitize input
             try:
                 lab_name = validate_and_sanitize_text(lab_name)
@@ -1814,7 +1821,9 @@ def labs():
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
-            success = dao.update_lab(new_lab_name, new_lab_email, new_lab_telegram, lab_id)
+            success = dao.update_lab(
+                new_lab_name, new_lab_email, new_lab_telegram, lab_id
+            )
 
             (
                 flash(f"Lab details updated succesfully.", "success")
@@ -2059,32 +2068,67 @@ def latest_incompliance():
 
     return render_template("latest_incompliance.html", image_url=image_url)
 
-# Telegram Login Integration
-BOT_TOKEN = os.getenv("8272893365:AAGUVKaxPHvgD970Xbv_VGeS31RxAnM9nUE")
 
-def check_telegram_auth(data: dict, bot_token: str):
-    auth_data = data.copy()
-    hash_to_check = auth_data.pop("hash")
-    sorted_data = sorted([f"{k}={v}" for k, v in auth_data.items()])
-    data_check_string = "\n".join(sorted_data)
+bot_token = os.getenv("BOT_TOKEN", "").strip()
 
+
+def check_telegram_auth(auth_data, bot_token):
+    # Create data check string in correct order
+    data_check_arr = []
+    for key in sorted(auth_data.keys()):
+        if key != "hash":
+            value = auth_data[key]
+            data_check_arr.append(f"{key}={value}")
+    data_check_string = "\n".join(data_check_arr)
+
+    # Telegram's secret key generation
     secret_key = hashlib.sha256(bot_token.encode()).digest()
-    hmac_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
-    return hmac_hash == hash_to_check
+    # Correct hash
+    expected_hash = hmac.new(
+        secret_key, data_check_string.encode(), hashlib.sha256
+    ).hexdigest()
+
+    print("🔐 Data check string:", data_check_string)
+    print("🔐 Expected hash:", expected_hash)
+    print("🔐 Provided hash:", auth_data.get("hash"))
+
+    if not hmac.compare_digest(expected_hash, auth_data.get("hash")):
+        print("❌ Hash mismatch!")
+        return False
+
+    auth_date = int(auth_data.get("auth_date", "0"))
+    if time.time() - auth_date > 86400:
+        print("❌ Login expired!")
+        return False
+
+    return True
+
 
 @app.route("/telegram_callback")
 def telegram_callback():
-    data = request.args.to_dict()
-    if not check_telegram_auth(data, BOT_TOKEN):
+    raw_query = unquote(request.query_string.decode("utf-8"))
+    data = {k: v[0] for k, v in parse_qs(raw_query).items()}
+
+    print("Raw query string:", raw_query)
+    print("Loaded BOT_TOKEN:", repr(bot_token))
+
+    if not check_telegram_auth(data, bot_token):
         return "⚠️ Invalid Telegram login", 403
 
-    # You now have access to:
-    chat_id = data["id"]  # This is the unique chat_id
+    # --- Extract Telegram info
+    telegram_id = data.get("id")
     username = data.get("username", "")
-    first_name = data.get("first_name", "")
 
-    # ✅ Save chat_id to your database against the logged-in user (or session user)
-    # Example: update_lab_safety_user(user_id=session["user_id"], telegram_id=chat_id)
+    print(f"✅ Telegram login success: @{username} (ID: {telegram_id})")
 
-    return redirect("/dashboard")  # or wherever appropriate
+    # --- Store into session or redirect with a lab_id (depending on your flow)
+    lab_id = session.get("pending_lab_id")  # OR hardcode for now e.g., lab_id = 1
+
+    if lab_id:
+        dao = LabDAO(DB_PARAMS)
+        dao.update_lab_telegram(lab_id=lab_id, telegram_username=username)
+        
+    session["lab_safety_telegram"] = telegram_id
+
+    return redirect("/")
