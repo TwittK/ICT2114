@@ -7,7 +7,7 @@ from functools import wraps
 import pytz
 
 import cv2
-import os
+import os, hmac, hashlib
 import psycopg2
 import requests
 from data_source.camera_dao import CameraDAO
@@ -32,6 +32,7 @@ from flask import (
     flash,
     Response,
     jsonify,
+    redirect
 )
 from psycopg2.extras import RealDictCursor
 from requests.auth import HTTPDigestAuth
@@ -49,6 +50,8 @@ from werkzeug.security import generate_password_hash
 from shared.mqtt_client import MQTTClient
 
 from shared.config import LF_CAMERA_PER_PAGE, FINC_CAMERA_PER_PAGE
+
+from urllib.parse import urlencode
 
 # Silence Watchdog debug spam.
 logging.getLogger("watchdog").setLevel(logging.WARNING)
@@ -2055,3 +2058,33 @@ def latest_incompliance():
         image_url = latest_image.replace("web/static/", "")
 
     return render_template("latest_incompliance.html", image_url=image_url)
+
+# Telegram Login Integration
+BOT_TOKEN = os.getenv("8272893365:AAGUVKaxPHvgD970Xbv_VGeS31RxAnM9nUE")
+
+def check_telegram_auth(data: dict, bot_token: str):
+    auth_data = data.copy()
+    hash_to_check = auth_data.pop("hash")
+    sorted_data = sorted([f"{k}={v}" for k, v in auth_data.items()])
+    data_check_string = "\n".join(sorted_data)
+
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
+    hmac_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    return hmac_hash == hash_to_check
+
+@app.route("/telegram_callback")
+def telegram_callback():
+    data = request.args.to_dict()
+    if not check_telegram_auth(data, BOT_TOKEN):
+        return "⚠️ Invalid Telegram login", 403
+
+    # You now have access to:
+    chat_id = data["id"]  # This is the unique chat_id
+    username = data.get("username", "")
+    first_name = data.get("first_name", "")
+
+    # ✅ Save chat_id to your database against the logged-in user (or session user)
+    # Example: update_lab_safety_user(user_id=session["user_id"], telegram_id=chat_id)
+
+    return redirect("/dashboard")  # or wherever appropriate

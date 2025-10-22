@@ -314,12 +314,20 @@ def association(context: Camera):
                             lab_telegram = get_lab_safety_telegram_by_camera_id(
                                 context.camera_id
                             )
+
+                            # Email
                             if lab_emails:
-                                # Split lab emails saved with commas as delimiter and send to all emails
                                 lab_emails_list = lab_emails.replace(" ", "").split(",")
                                 for email in lab_emails_list:
                                     notifier.send_incompliance_email(email, f"Person {person_id}")
-                                    notifier.send_incompliance_telegram(lab_telegram, person_name=f"Person {person_id}", camera_id=context.camera_id)
+
+                            # Telegram
+                            if lab_telegram:
+                                notifier.send_incompliance_telegram(
+                                    telegram=lab_telegram,
+                                    person_name=f"Person {person_id}",
+                                    camera_id=context.camera_id
+                                )
 
                             # Publish MQTT message
                             if mqtt_client:

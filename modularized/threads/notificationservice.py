@@ -58,9 +58,12 @@ class NotificationService:
         self.send_email(to_email, subject, body)
 
     # ---------- TELEGRAM ----------
-    def send_telegram_message(self, message):
+    def send_telegram_message(self, message,  chat_id=None):
+        if not chat_id:
+            chat_id = self.telegram_chat_id
+
         url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
-        payload = {"chat_id": self.telegram_chat_id, "text": message}
+        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
 
         try:
             response = requests.post(url, data=payload)
@@ -76,4 +79,4 @@ class NotificationService:
             f"📍 Camera ID: {camera_id}\n"
             f"🕒 Please check the dashboard for full details."
         )
-        self.send_telegram_message(message)
+        self.send_telegram_message(message, chat_id=telegram)
