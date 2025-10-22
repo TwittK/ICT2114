@@ -1438,18 +1438,51 @@ def video_feed(camera_id):
     print(f"[STREAM] Client connected to /video_feed/{camera_id}.")
 
     def generate_stream():
+        frame_buffer = []
+        expected_seq = 0
+        BUFFER_SIZE = 5  # You can tune this for latency vs smoothness
+
         while camera.running:
             try:
-                frame = (camera.display_queue).get()
+                display_item = camera.display_queue.get(timeout=1)
             except queue.Empty:
                 continue
 
-            ret, buffer = cv2.imencode(".jpg", frame)
-            if not ret:
-                continue
+            frame_buffer.append(display_item)
+            # Sort buffer by sequence number
+            frame_buffer.sort(key=lambda x: x["seq"])
 
-            frame = buffer.tobytes()
-            yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+            # Yield frames in order
+            while frame_buffer and frame_buffer[0]["seq"] == expected_seq:
+                frame = frame_buffer.pop(0)["frame"]
+                ret, buffer = cv2.imencode(".jpg", frame)
+                if not ret:
+                    continue
+                frame_bytes = buffer.tobytes()
+                yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n")
+                expected_seq += 1
+
+            # Optionally, drop frames that are too late
+            while frame_buffer and frame_buffer[0]["seq"] < expected_seq:
+                frame_buffer.pop(0)
+
+            # Keep buffer size under control
+            if len(frame_buffer) > BUFFER_SIZE:
+                frame_buffer.pop(0)
+
+    # def generate_stream():
+    #     while camera.running:
+    #         try:
+    #             frame = (camera.display_queue).get()
+    #         except queue.Empty:
+    #             continue
+
+    #         ret, buffer = cv2.imencode(".jpg", frame)
+    #         if not ret:
+    #             continue
+
+    #         frame = buffer.tobytes()
+    #         yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
 
     return Response(
         generate_stream(), mimetype="multipart/x-mixed-replace; boundary=frame"

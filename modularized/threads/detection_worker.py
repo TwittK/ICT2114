@@ -69,7 +69,7 @@ class DetectionWorker:
         while self.running.is_set():
 
             try:
-                frame, context = self.queue.get(timeout=1)
+                frame_info, context = self.queue.get(timeout=1)
 
             except queue.Empty:
                 continue
@@ -77,10 +77,21 @@ class DetectionWorker:
             if frame is None or frame.size == 0:
                 continue
 
+            frame = frame_info["frame"]
+            seq = frame_info["seq"]
+            timestamp = frame_info["timestamp"]
+
             # perform image processing here
             frame_copy = (
                 frame.copy()
             )  # copy frame for drawing bounding boxes, ids and conf scores.
+
+            # When putting into display_queue, include seq and timestamp
+            display_item = {
+                "frame": frame_copy,
+                "seq": seq,
+                "timestamp": timestamp
+            }
 
             # Food/Drink detection
             drink_boxes = object_detection_model.detect(frame)
@@ -175,13 +186,13 @@ class DetectionWorker:
 
             # Put into queue to display frames in dashboard
             if not context.display_queue.full():
-                context.display_queue.put(frame_copy)
+                context.display_queue.put(display_item)
             else:
                 try:
                     context.display_queue.get_nowait()
                 except queue.Empty:
                     pass
-                context.display_queue.put(frame_copy)
+                context.display_queue.put(display_item)
 
     def stop(self):
         """

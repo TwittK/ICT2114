@@ -50,6 +50,7 @@ def read_frames(context: Camera):
 
     consecutive_failures = 0
     current_delay = retry_delay
+    frame_seq = 0
 
     while context.running.is_set():
         ret, frame = (context.cap).read()
@@ -117,7 +118,13 @@ def read_frames(context: Camera):
             current_delay = retry_delay
 
         if not (context.frame_queue).full():
-            context.manager.detection_manager.submit(frame, context)
+            frame_info = {
+                "frame": frame,
+                "seq": frame_seq,
+                "timestamp": time.time()
+            }
+            context.manager.detection_manager.submit(frame_info, context)
+            frame_seq += 1
             # (context.frame_queue).put(frame)
         time.sleep(0.01)
 
