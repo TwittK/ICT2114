@@ -74,3 +74,12 @@ class LabDAO:
         except psycopg2.Error as e:
             print(f"[ERROR] DB update failed: {e}")
             return False
+
+    def get_lab_by_id(self, lab_id):
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM lab WHERE labid = %s", (lab_id,))
+                return cursor.fetchone()
+        except psycopg2.Error as e:
+            print(f"[DB ERROR] Failed to fetch lab by ID: {e}")
+            return None

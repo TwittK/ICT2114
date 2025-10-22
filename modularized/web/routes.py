@@ -1757,6 +1757,7 @@ def role_management():
 @login_required
 @require_permission("camera_management")
 def labs():
+    print("Current session:", dict(session))
     role = session.get("role")
     if role is None:
         return redirect(url_for("index"))
@@ -1835,11 +1836,14 @@ def labs():
 
     all_lab_details = dao.get_all_labs()
 
+    lab_safety_telegram = session.pop("lab_safety_telegram", "")
+
     return render_template(
         "labs.html",
         all_lab_details=all_lab_details,
         cam_management=cam_management,
         user_role_management=user_role_management,
+        lab_safety_telegram=lab_safety_telegram
     )
 
 
@@ -2128,7 +2132,7 @@ def telegram_callback():
     if lab_id:
         dao = LabDAO(DB_PARAMS)
         dao.update_lab_telegram(lab_id=lab_id, telegram_username=username)
-        
+
     session["lab_safety_telegram"] = telegram_id
 
     return redirect("/")

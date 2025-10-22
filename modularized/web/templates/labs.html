@@ -24,7 +24,7 @@
 
         <label for="new_lab_telegram" class="my-2">Lab Safety Telegram:</label>
         <input type="telegram" class="form-control" name="lab_safety_telegram" id="new_lab_telegram"
-          value="{{ session.telegram_username if session.telegram_username else ''}}">
+          value="{{ lab_safety_telegram }}">
         <div class="mt-3">
           <h5>Login with Telegram</h5>
           <div id="telegram-login-button">

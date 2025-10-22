@@ -5,9 +5,10 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import os
 
+
 class NotificationService:
     def __init__(self):
-        
+
         # Email Setup
         self.gmail_smtp_host = "smtp.gmail.com"
         self.gmail_smtp_port = 587
@@ -16,19 +17,18 @@ class NotificationService:
 
         # Telegram Setup
         self.telegram_bot_token = "8272893365:AAGUVKaxPHvgD970Xbv_VGeS31RxAnM9nUE"
-        self.telegram_chat_id = "307852371"
 
     # ---------- EMAIL ----------
     def send_email(self, to_email, subject, body):
         try:
             # Setup the MIME
             msg = MIMEMultipart()
-            msg['From'] = self.sender_email
-            msg['To'] = to_email
-            msg['Subject'] = subject
+            msg["From"] = self.sender_email
+            msg["To"] = to_email
+            msg["Subject"] = subject
 
             # Add body content to email
-            msg.attach(MIMEText(body, 'plain'))
+            msg.attach(MIMEText(body, "plain"))
 
             # Set up the server
             server = smtplib.SMTP(self.gmail_smtp_host, self.gmail_smtp_port)
@@ -58,7 +58,7 @@ class NotificationService:
         self.send_email(to_email, subject, body)
 
     # ---------- TELEGRAM ----------
-    def send_telegram_message(self, message,  chat_id=None):
+    def send_telegram_message(self, message, chat_id=None):
         if not chat_id:
             chat_id = self.telegram_chat_id
 
@@ -72,11 +72,20 @@ class NotificationService:
         except requests.exceptions.RequestException as e:
             print(f"❌ Error sending Telegram message: {e}")
 
-    def send_incompliance_telegram(self, telegram, person_name, camera_id):
+    def send_incompliance_telegram(self, lab_id, person_name, camera_id):
+        # Step 1: Fetch the chat_id from database using lab_id
+        lab_info = self.dao.get_lab_by_id(lab_id)
+        if not lab_info or not lab_info.get("lab_safety_telegram"):
+            print("❌ No Telegram ID found for lab.")
+            return
+
+        chat_id = lab_info["lab_safety_telegram"]
+
+        # Step 2: Compose and send message
         message = (
             f"🚨 *Incompliance Detected*\n"
             f"👤 Person: {person_name}\n"
             f"📍 Camera ID: {camera_id}\n"
             f"🕒 Please check the dashboard for full details."
         )
-        self.send_telegram_message(message, chat_id=telegram)
+        self.send_telegram_message(message, chat_id=chat_id)
