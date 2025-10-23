@@ -42,8 +42,8 @@
     <div class="col-md-4 mb-4">
         <div class="card shadow-sm">
             <img src="{{ url_for('static', filename=row[3].replace('static/', '')) }}" class="card-img-top snapshot-img"
-                alt="Snapshot" style="cursor: pointer;" data-label="{{ row[1] }}" data-confidence="{{ row[2] }}"
-                data-date="{{ row[0] }}" data-incompliance-id="{{ row[4] }}">
+                 alt="Snapshot" style="cursor: pointer;" data-label="{{ row[1] }}" data-confidence="{{ row[2] }}"
+                 data-date="{{ row[0] }}" data-incompliance-id="{{ row[4] }}">
             <div class="card-body">
                 <h6 class="card-title">
                     {{ row[1] }}
@@ -65,18 +65,21 @@
     <ul class="pagination justify-content-end">
         <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
             <a class="page-link"
-                href="?lab={{ lab_name }}&camera={{ camera_name }}&page={{ current_page - 1 }}">Previous</a>
+               href="?lab={{ lab_name }}&camera={{ camera_name }}&page={{ current_page - 1 }}&date={{ selected_date }}&object_type={{ selected_object_type }}">Previous</a>
         </li>
 
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == current_page %}active{% endif %}">
-            <a class="page-link" href="?lab={{ lab_name }}&camera={{ camera_name }}&page={{ p }}">{{ p }}</a>
+            <a class="page-link"
+               href="?lab={{ lab_name }}&camera={{ camera_name }}&page={{ p }}&date={{selected_date}}&object_type={{selected_object_type}}">{{
+                p }}
+            </a>
         </li>
         {% endfor %}
 
         <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
             <a class="page-link"
-                href="?lab={{ lab_name }}&camera={{ camera_name }}&page={{ current_page + 1 }}">Next</a>
+               href="?lab={{ lab_name }}&camera={{ camera_name }}&page={{ current_page + 1 }}&date={{ selected_date }}&object_type={{ selected_object_type }}">Next</a>
         </li>
     </ul>
 </nav>

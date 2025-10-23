@@ -189,12 +189,12 @@ def association(context: Camera):
                 area_food_drinks = abs(x1 - x2) * abs(y1 - y2)
                 area_head = abs(fx1 - fx2) * abs(fy1 - fy2)
                 area_check = (
-                    area_food_drinks >= area_head * 4
-                    or area_food_drinks < area_head * 0.1
+                        area_food_drinks >= area_head * 4
+                        or area_food_drinks < area_head * 0.1
                 )
                 height_check = (
-                    abs(y1 - y2) >= abs(fy1 - fy2) * 2.85
-                    or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
+                        abs(y1 - y2) >= abs(fy1 - fy2) * 2.85
+                        or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
                 )
                 if area_check or height_check:
                     # print("🔶Food/ drink not at the same depth as person, ignoring.")
@@ -269,12 +269,12 @@ def association(context: Camera):
                     continue
 
                 try:
-                    # Mock next day
-                    mocked_date = datetime(2025, 10, 28)
-                    current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
+                    # # Mock next day
+                    # mocked_date = datetime(2025, 10, 28)
+                    # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     local_tz = ZoneInfo("Asia/Singapore")
-                    # current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
                     print(current_date)
                     today = current_date[:10]
 

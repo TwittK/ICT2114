@@ -497,9 +497,9 @@ def all_incompliance():
         selected_date = request.form.get("date", "")
         selected_object_type = request.form.get("object_type", "")
     else:
-        # On GET request, use empty filters to show all results
-        selected_date = ""
-        selected_object_type = ""
+        # On GET request, get filters from query parameters if present, else empty string
+        selected_date = request.args.get("date", "")
+        selected_object_type = request.args.get("object_type", "")
 
     # Retrieve all labels for dropdown
     all_labels = label_repo.get_all_labels()
@@ -703,7 +703,7 @@ def generate_video_stream(detection_id):
         if not frame_yielded:
             frame_yielded = True
         yield (
-            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
         )
 
     if frame_yielded:
@@ -1716,7 +1716,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_") :]
+                    rp = key[len("role_perm_"):]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
