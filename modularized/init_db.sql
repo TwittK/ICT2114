@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS Lab (
 
 CREATE TABLE IF NOT EXISTS LabSafetyStaff (
     LabSafetyId SERIAL PRIMARY KEY,
-    lab_safety_email TEXT NOT NULL,
-    lab_safety_telegram TEXT NOT NULL,
+    lab_safety_email TEXT,
+    lab_safety_telegram TEXT,
     lab_id INTEGER,
     FOREIGN KEY (lab_id) REFERENCES Lab(LabId) ON DELETE CASCADE
 );

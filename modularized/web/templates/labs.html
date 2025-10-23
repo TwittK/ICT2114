@@ -21,8 +21,8 @@
                 <label for="new_lab">Lab Name:</label>
                 <input type="text" class="form-control" name="lab_name" id="new_lab" required>
 
-                <label for="new_lab_email" class="my-2">Lab Safety Email:</label>
-                <input type="email" class="form-control" name="lab_safety_email" id="new_lab_email" required>
+                <!-- <label for="new_lab_email" class="my-2">Lab Safety Email:</label>
+                <input type="email" class="form-control" name="lab_safety_email" id="new_lab_email" required> -->
 
                 <!--                <label for="new_lab_telegram" class="my-2">Lab Safety Telegram:</label>-->
                 <!--                <input type="telegram" class="form-control" name="lab_safety_telegram" id="new_lab_telegram"-->
@@ -47,56 +47,97 @@
 </div>
 
 {% if all_lab_details %}
-<table class="table">
-    <thead>
-    <tr>
-        <th scope="col">ID</th>
-        <th scope="col">Lab Name</th>
-        <th scope="col" colspan="2">Lab Safety Staff (Email & Telegram)</th>
-        <th scope="col">Update</th>
-        <th scope="col">Delete</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for lab in all_lab_details %}
-    <form method="post" action="{{ url_for('labs') }}">
+    {% for labid, lab in all_lab_details.items() %}
+    <h3>Lab: {{ lab.lab_name }}</h3>
+    <table class="table">
+        <thead>
         <tr>
-            <td>{{ lab.labid }}</td>
-            <td>
-                <input type="text" name="new_lab_name" class="form-control" value="{{ lab.lab_name }}">
-            </td>
-            <td colspan="2">
-                {% for staff in lab.safety_staff %}
-                <input type="hidden" name="staff_ids" value="{{ staff.labsafetyid }}">
-                <input type="email" name="staff_email_{{ staff.labsafetyid }}" class="form-control"
-                       value="{{ staff.lab_safety_email }}" required>
-                <input type="text" name="staff_telegram_{{ staff.labsafetyid }}" class="form-control"
-                       value="{{ staff.lab_safety_telegram }}" required>
-                <label><input type="checkbox" name="delete_staff_{{ staff.labsafetyid }}"> Delete</label>
-                {% endfor %}
-
-                <!-- Add new staff inputs container -->
-                <div id="new-staff-container-{{ lab.labid }}"></div>
-                <button type="button" onclick="addNewStaff({{ lab.labid }})">+ Add Safety Staff</button>
-            </td>
-            <td>
-                <input type="hidden" name="action" value="update">
-                <input type="hidden" name="lab_id" value="{{ lab.labid }}">
-                <button type="submit" class="btn btn-primary">Update</button>
-            </td>
+            <th scope="col">ID</th>
+            <th scope="col">Lab Name</th>
+            <th scope="col">Update</th>
+            <th scope="col">Delete</th>
         </tr>
-    </form>
+        </thead>
+        <tbody>
+        <form method="post" action="{{ url_for('labs') }}">
+            <tr>
+                <td>{{ lab.labid }}</td>
+                <td>
+                    <input type="text" name="new_lab_name" class="form-control" value="{{ lab.lab_name }}">
+                </td>
+                <td>
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="lab_id" value="{{ lab.labid }}">
+                    <button type="submit" class="btn btn-primary">Update</button>
+                </td>
+                <form method="post" action="{{ url_for('labs') }}"
+                    onsubmit="return confirm('WARNING: Are you sure you want to delete this lab? This action cannot be undone.')">
+                    <td>
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="lab_id" value="{{ lab.labid }}">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                    </td>
+                </form>
+            </tr>
+        </form>
+        </tbody>
 
-    <!-- Separate form for delete -->
-    <form method="post" action="{{ url_for('labs') }}" onsubmit="return confirm('Are you sure?')">
-        <input type="hidden" name="action" value="delete">
+    </table>
+    
+    {% if all_lab_emails[labid] %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th scope="col">Email</th>
+            <th scope="col">Telegram</th>
+            <th scope="col">Update</th>
+            <th scope="col">Delete</th>
+        </tr>
+        </thead>
+        {% for staffid, email, telegram in all_lab_emails[labid] %}
+        <tbody>
+            <form method="post" action="{{ url_for('labs') }}">
+            <tr>
+                <td>
+                    <input type="hidden" name="staffid" value="{{ staffid }}">
+                    
+                    <input type="email" name="email" value="{{ email }}" required class="form-control">
+                    <input type="hidden" name="original_email" value="{{ email }}">
+                    
+                </td>
+                <td>
+                    <input type="text" name="telegram" value="{{ telegram }}" required class="form-control">
+                    <input type="hidden" name="original_telegram" value="{{ telegram }}">
+                </td>
+                <td>
+                    <button type="submit" name="action" value="update_lab_staff" class="btn btn-primary btn-sm">Update</button>
+                </td>
+                <td>
+                    <button type="submit" name="action" value="delete_lab_staff" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this lab staff?');">Delete</button>
+                </td>
+            </tr>
+            </form>
+
+        </tbody>
+        {% endfor %}
+    </table>
+    {% else %}
+        <p>No safety contacts found.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('labs') }}">
+        <input type="hidden" name="action" value="add_lab_staff">
         <input type="hidden" name="lab_id" value="{{ lab.labid }}">
-        <button type="submit" class="btn btn-danger">Delete</button>
+        <div id="new-staff-container-{{ lab.labid }}"></div>
+        <button type="button" onclick="addNewStaff({{ labid }})">+ Add Safety Staff</button>
+        <button disabled type="submit" id="add-staff-btn-{{ lab.labid }}" class="btn btn-success btn-sm">Add Staff</button>
     </form>
-    {% endfor %}
-    </tbody>
 
-</table>
+
+    <br>
+    <br>
+    <hr>
+    {% endfor %}
+
 
 {% else %}
 <p>No labs.</p>
@@ -106,6 +147,7 @@
 <script>
     function addNewStaff(labId) {
       const container = document.getElementById(`new-staff-container-${labId}`);
+      const addBtn = document.getElementById(`add-staff-btn-${labId}`);
 
       const div = document.createElement('div');
       div.classList.add('d-flex', 'mb-2', 'align-items-center');
@@ -121,12 +163,18 @@
       removeBtn.type = 'button';
       removeBtn.classList.add('btn', 'btn-danger', 'btn-sm');
       removeBtn.textContent = 'Remove';
-      removeBtn.onclick = () => div.remove();
+      removeBtn.onclick = () => {
+        div.remove();
+        if (container.children.length === 0) {
+            addBtn.disabled = true; // Only enable add button if there is at least 1 input entry
+        }
+      }
 
       div.appendChild(emailInput);
       div.appendChild(removeBtn);
 
       container.appendChild(div);
+      addBtn.disabled = false;
   }
 
 </script>

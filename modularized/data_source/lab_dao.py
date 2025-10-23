@@ -21,7 +21,17 @@ class LabDAO:
                 return all_lab_details
         except psycopg2.Error:
             return None
-
+        
+    def get_all_labs_safety_email(self):
+        """Return all labs as list of dicts"""
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM lab JOIN LabSafetyStaff ON lab.LabId = LabSafetyStaff.lab_id")
+                all_lab_details = cursor.fetchall()
+                return all_lab_details
+        except psycopg2.Error:
+            return None
+        
     # def insert_lab(self, lab_name, lab_safety_email, lab_safety_telegram):
     #     """Insert a new lab"""
     #     try:
@@ -150,7 +160,7 @@ class LabDAO:
                     SET lab_safety_email = %s, lab_safety_telegram = %s
                     WHERE labsafetyid = %s
                     """,
-                    (email, "telegram", staff_id),
+                    (email, telegram, staff_id),
                 )
                 conn.commit()
                 return True

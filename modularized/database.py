@@ -288,10 +288,12 @@ def get_lab_safety_email_by_camera_id(camera_id):
 
     cursor.execute(
         """
-        SELECT Lab.lab_safety_email
+        SELECT LabSafetyStaff.lab_safety_email
         FROM camera
         JOIN Lab ON camera.camera_lab_id = lab.labId
+        JOIN LabSafetyStaff ON LabSafetyStaff.lab_id = lab.LabId
         WHERE camera.cameraid = %s
+        AND LabSafetyStaff.lab_safety_email IS NOT NULL;
     """,
         (camera_id,),
     )
@@ -310,10 +312,12 @@ def get_lab_safety_telegram_by_camera_id(camera_id):
 
     cursor.execute(
         """
-        SELECT Lab.lab_safety_telegram
+        SELECT LabSafetyStaff.lab_safety_telegram
         FROM camera
-        JOIN Lab ON camera.camera_lab_id = lab.labId
+        JOIN lab ON camera.camera_lab_id = lab.labid
+        JOIN LabSafetyStaff ON LabSafetyStaff.lab_id = lab.labid
         WHERE camera.cameraid = %s
+        AND LabSafetyStaff.lab_safety_telegram IS NOT NULL;
     """,
         (camera_id,),
     )

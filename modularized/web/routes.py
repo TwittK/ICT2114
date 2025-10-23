@@ -1766,25 +1766,15 @@ def labs():
 
         if action == "add_lab":
             lab_name = request.form.get("lab_name")
-            lab_safety_email = request.form.get("lab_safety_email")
-            # lab_safety_telegram = request.form.get("lab_safety_telegram")
-
-            # if not lab_safety_telegram and "telegram_username" in session:
-            #     lab_safety_telegram = session.pop("telegram_username")
-            # else:
-            #     session.pop("telegram_username", None)
 
             # Validate and sanitize input
             try:
                 lab_name = validate_and_sanitize_text(lab_name)
-                lab_safety_email = validate_and_sanitize_text(lab_safety_email)
-                # lab_safety_telegram = validate_and_sanitize_text(lab_safety_telegram)
             except ValueError as e:
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
             lab_id = dao.insert_lab(lab_name)
-            dao.insert_lab_safety_staff(lab_id, lab_safety_email, "telegram")
             if lab_id:
                 flash("New lab created.", "success")
             else:
@@ -1858,14 +1848,43 @@ def labs():
             else:
                 flash("Failed to update lab details.", "danger")
 
+        elif action == "update_lab_staff":
+            staffid = request.form.get("staffid")
+            updated_telegram = request.form.get("telegram")
+            updated_email = request.form.get("email")
+
+            success = dao.update_lab_safety_staff(staffid, updated_email, updated_telegram)
+            if success:
+                flash("Lab staff details updated successfully.", "success")
+            else:
+                flash("Failed to update lab staff details.", "danger")
+
+        elif action == "delete_lab_staff":
+            print("delete lab staff")
+
+        elif action == "add_lab_staff":
+            print("add lab staff")
+
         return redirect(url_for("labs"))
 
     all_lab_details = dao.get_all_labs()
+    all_emails = dao.get_all_labs_safety_email()
     lab_safety_telegram = session.pop("lab_safety_telegram", "")
+    lab_id_to_lab = {lab['labid']: lab for lab in all_lab_details}
+    lab_to_contacts = {lab['labid']: [] for lab in all_lab_details}
+
+    # Prepare lab and contact details in format for display
+    for contact in all_emails:
+        lab_id = contact['lab_id']
+        staffid = contact['labsafetyid']
+        email = contact.get('lab_safety_email', '')
+        phone = contact.get('lab_safety_telegram', '')
+        lab_to_contacts[lab_id].append((staffid, email, phone))
 
     return render_template(
         "labs.html",
-        all_lab_details=all_lab_details,
+        all_lab_details=lab_id_to_lab,
+        all_lab_emails=lab_to_contacts,
         cam_management=cam_management,
         user_role_management=user_role_management,
         lab_safety_telegram=lab_safety_telegram
