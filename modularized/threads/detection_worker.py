@@ -61,7 +61,7 @@ class DetectionWorker:
             gpu_id (int): The ID of the GPU device used for inference.
         """
 
-        object_detection_model = ObjectDetectionModel("yolo11m.pt", gpu_device=gpu_id)
+        object_detection_model = ObjectDetectionModel("yolo11x.pt", gpu_device=gpu_id)
         pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.8, 0.7)
         classif_model = ImageClassificationModel("yolov8n-cls.pt")
         last_cleared = datetime.min

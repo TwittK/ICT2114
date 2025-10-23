@@ -72,20 +72,11 @@ class NotificationService:
         except requests.exceptions.RequestException as e:
             print(f"❌ Error sending Telegram message: {e}")
 
-    def send_incompliance_telegram(self, lab_id, person_name, camera_id):
-        # Step 1: Fetch the chat_id from database using lab_id
-        lab_info = self.dao.get_lab_by_id(lab_id)
-        if not lab_info or not lab_info.get("lab_safety_telegram"):
-            print("❌ No Telegram ID found for lab.")
-            return
-
-        chat_id = lab_info["lab_safety_telegram"]
-
-        # Step 2: Compose and send message
+    def send_incompliance_telegram(self, telegram, person_name, camera_id):
         message = (
             f"🚨 *Incompliance Detected*\n"
             f"👤 Person: {person_name}\n"
             f"📍 Camera ID: {camera_id}\n"
             f"🕒 Please check the dashboard for full details."
         )
-        self.send_telegram_message(message, chat_id=chat_id)
+        self.send_telegram_message(message, chat_id=telegram)

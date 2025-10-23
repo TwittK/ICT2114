@@ -197,7 +197,7 @@ def association(context: Camera):
                     or abs(y1 - y2) < abs(fy1 - fy2) * 0.35
                 )
                 if area_check or height_check:
-                    print("🔶Food/ drink not at the same depth as person, ignoring.")
+                    # print("🔶Food/ drink not at the same depth as person, ignoring.")
                     continue
 
                 # Filter out poses that are too far away
@@ -235,11 +235,11 @@ def association(context: Camera):
 
                 context.wrist_proximity_history[track_id].append(now)
 
-                # Logging detection frame per track_Id
-                for track_id, timestamps in context.wrist_proximity_history.items():
-                    print(
-                        f"Track ID {track_id} has {len(timestamps)} proximity detections"
-                    )
+                # # Logging detection frame per track_Id
+                # for track_id, timestamps in context.wrist_proximity_history.items():
+                #     print(
+                #         f"Track ID {track_id} has {len(timestamps)} proximity detections"
+                #     )
 
                 # Keep only timestamps within the last 2 seconds
                 recent_times = [
@@ -270,11 +270,11 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    # mocked_date = datetime(2025, 10, 20)
-                    # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
+                    mocked_date = datetime(2025, 10, 28)
+                    current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     local_tz = ZoneInfo("Asia/Singapore")
-                    current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    # current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
                     print(current_date)
                     today = current_date[:10]
 
@@ -297,6 +297,7 @@ def association(context: Camera):
                             face_crop,
                             current_date,
                         )
+                        time.sleep(3)
 
                         # Incompliance on different date
                         if person_id is not None:
@@ -319,14 +320,16 @@ def association(context: Camera):
                             if lab_emails:
                                 lab_emails_list = lab_emails.replace(" ", "").split(",")
                                 for email in lab_emails_list:
-                                    notifier.send_incompliance_email(email, f"Person {person_id}")
+                                    notifier.send_incompliance_email(
+                                        email, f"Person {person_id}"
+                                    )
 
                             # Telegram
                             if lab_telegram:
                                 notifier.send_incompliance_telegram(
                                     telegram=lab_telegram,
                                     person_name=f"Person {person_id}",
-                                    camera_id=context.camera_id
+                                    camera_id=context.camera_id,
                                 )
 
                             # Publish MQTT message
@@ -343,7 +346,7 @@ def association(context: Camera):
 
                         # Incompliance on the same date
                         else:
-                            notifier.send_incompliance_telegram(person_name=f"Person {person_id}", camera_id=context.camera_id)
+
                             print(
                                 "[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring."
                             )

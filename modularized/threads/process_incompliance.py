@@ -2,10 +2,11 @@ import cv2 as cv
 from data_source.snapshot_dao import SnapshotDAO
 from data_source.person_dao import PersonDAO
 
+
 class ProcessIncompliance:
     """
-    Handles processing of food/ drink incompliance detections.  
-    
+    Handles processing of food/ drink incompliance detections.
+
     Interacts with DAOs to store new snapshots, and update person records.
     Also manages face data in the NVR face database.
     """
@@ -35,11 +36,19 @@ class ProcessIncompliance:
         """
         return str(current_date)[:10]
 
-    def match_found_new_incompliance(self, matches_found, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
+    def match_found_new_incompliance(
+        self,
+        matches_found,
+        nvr,
+        local_detected_food_drinks,
+        track_id,
+        face_crop,
+        current_date,
+    ):
         """
-        Handle a case where a face match is found in the existing incompliance records.  
-        This method checks if the matched person already has a previous incompliance record.  
-        If the last incompliance occurred on a different date, it updates the person's record, inserts the new face into the NVR database, and logs the incompliance.  
+        Handle a case where a face match is found in the existing incompliance records.
+        This method checks if the matched person already has a previous incompliance record.
+        If the last incompliance occurred on a different date, it updates the person's record, inserts the new face into the NVR database, and logs the incompliance.
 
         Parameters:
             matches_found (tuple): Tuple containing match status and snapshot ID.
@@ -58,14 +67,23 @@ class ProcessIncompliance:
         if result:
             person_id, last_incompliance = result
 
+            print(f"Last incompliance for {person_id}: {last_incompliance}")
+
             # Extract the date part only from the timestamp
-            last_date = (str(last_incompliance)[:10] if last_incompliance else None)
+            last_date = str(last_incompliance)[:10] if last_incompliance else None
 
             # Current incompliance must happen on a different date
             today = self._get_date(current_date)
             if last_date != today and last_date is not None:
 
-                face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
+                face_crop = cv.resize(
+                    face_crop,
+                    (
+                        face_crop.shape[1] * 5,
+                        face_crop.shape[0] * 5,
+                    ),
+                    cv.INTER_LINEAR,
+                )
                 snapshot_id = nvr.insert_into_face_db(face_crop, person_id)
 
                 if snapshot_id:
@@ -75,12 +93,14 @@ class ProcessIncompliance:
                     self.person_dao.update_last_incompliance(person_id, current_date)
                     self.snapshot_dao.insert_snapshot(
                         str(snapshot_id),
-                        local_detected_food_drinks[track_id][2], # confidence value
+                        local_detected_food_drinks[track_id][2],  # confidence value
                         current_date,
-                        str(local_detected_food_drinks[track_id][3]),  # detected object class id
+                        str(
+                            local_detected_food_drinks[track_id][3]
+                        ),  # detected object class id
                         f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
                         person_id,
-                        self.camera_id
+                        self.camera_id,
                     )
                     updated_count = self.person_dao.get_incompliance_count(person_id)
 
@@ -94,12 +114,14 @@ class ProcessIncompliance:
 
         return None
 
-    def no_match_new_incompliance(self, nvr, local_detected_food_drinks, track_id, face_crop, current_date):
+    def no_match_new_incompliance(
+        self, nvr, local_detected_food_drinks, track_id, face_crop, current_date
+    ):
         """
-        Handle a case where no face match is found. (A new person committing incompliance)  
-        This method inserts a new person into the database, saves their face in the NVR face database, and logs the incompliance.  
-        It returns the new person ID after the operation.  
-        
+        Handle a case where no face match is found. (A new person committing incompliance)
+        This method inserts a new person into the database, saves their face in the NVR face database, and logs the incompliance.
+        It returns the new person ID after the operation.
+
         Parameters:
             nvr (NVR): NVR object for NVR face database operations.
             local_detected_food_drinks (dict): Detection results containing confidence and class ID.
@@ -114,7 +136,14 @@ class ProcessIncompliance:
         person_id = self.person_dao.insert_new_person(current_date)
 
         # Save face into NVR face library
-        face_crop = cv.resize(face_crop, (face_crop.shape[1] * 5, face_crop.shape[0] * 5,), cv.INTER_LINEAR)
+        face_crop = cv.resize(
+            face_crop,
+            (
+                face_crop.shape[1] * 5,
+                face_crop.shape[0] * 5,
+            ),
+            cv.INTER_LINEAR,
+        )
         snapshot_id = nvr.insert_into_face_db(face_crop, person_id)
 
         # Save incompliance snapshot and record details under a new person in database
@@ -122,12 +151,13 @@ class ProcessIncompliance:
             print("[INFO] 🔴 Inserted face into NVR Face Database")
             self.snapshot_dao.insert_snapshot(
                 str(snapshot_id),
-                local_detected_food_drinks[track_id][2], # confidence value
+                local_detected_food_drinks[track_id][2],  # confidence value
                 current_date,
-                str(local_detected_food_drinks[track_id][3]),  # detected object class id
+                str(
+                    local_detected_food_drinks[track_id][3]
+                ),  # detected object class id
                 f"incompliances/{person_id}/Person_{person_id}_{today}.jpg",
                 person_id,
-                self.camera_id
+                self.camera_id,
             )
         return person_id
-
