@@ -13,7 +13,7 @@ services:
     #    runtime: nvidia
     container_name: lab-monitoring-app
     ports:
-      - "5001:5000"
+      - "5003:5000"
     volumes:
       - ./:/app # mount everything inside modularized (keep for developement)
       - ./web/static/incompliances:/app/web/static/incompliances
@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+        [ "CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}" ]
       interval: 10s
       retries: 5
       timeout: 5s

@@ -1,3 +1,5 @@
+import traceback
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -20,13 +22,55 @@ class LabDAO:
         except psycopg2.Error:
             return None
 
-    def insert_lab(self, lab_name, lab_safety_email, lab_safety_telegram):
-        """Insert a new lab"""
+    # def insert_lab(self, lab_name, lab_safety_email, lab_safety_telegram):
+    #     """Insert a new lab"""
+    #     try:
+    #         with self._get_conn() as conn, conn.cursor() as cursor:
+    #             cursor.execute(
+    #                 "INSERT INTO lab (lab_name, lab_safety_email, lab_safety_telegram) VALUES (%s, %s, %s)",
+    #                 (lab_name, lab_safety_email, lab_safety_telegram),
+    #             )
+    #             conn.commit()
+    #             return True
+    #     except psycopg2.Error:
+    #         return False
+
+    def insert_lab(self, lab_name):
         try:
             with self._get_conn() as conn, conn.cursor() as cursor:
                 cursor.execute(
-                    "INSERT INTO lab (lab_name, lab_safety_email, lab_safety_telegram) VALUES (%s, %s, %s)",
-                    (lab_name, lab_safety_email, lab_safety_telegram),
+                    'INSERT INTO lab (lab_name) VALUES (%s) RETURNING labid',
+                    (lab_name,),
+                )
+                row = cursor.fetchone()
+                print(f"DEBUG: Row fetched from insert: {row!r}")
+
+                if row is None:
+                    print("No row returned from insert query.")
+                    return None
+
+                # Use the correct key - lowercase 'labid'
+                lab_id = row['labid']
+
+                conn.commit()
+                return lab_id
+        except Exception as e:
+            print(f"insert_lab error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def insert_lab_safety_staff(self, lab_id, email, telegram):
+        """Insert a new safety staff for a lab"""
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO LabSafetyStaff
+                    (lab_safety_email, lab_safety_telegram, lab_id) 
+                    VALUES (%s, %s, %s)
+                    """,
+                    (email, telegram, lab_id),
                 )
                 conn.commit()
                 return True
@@ -61,7 +105,7 @@ class LabDAO:
                 return True
         except psycopg2.Error:
             return False
-        
+
     def update_lab_telegram(self, lab_id, telegram_username):
         try:
             with self._get_conn() as conn, conn.cursor() as cursor:
@@ -83,3 +127,33 @@ class LabDAO:
         except psycopg2.Error as e:
             print(f"[DB ERROR] Failed to fetch lab by ID: {e}")
             return None
+
+    def update_lab_name(self, lab_id, new_lab_name):
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE lab SET lab_name = %s WHERE labid = %s",
+                    (new_lab_name, lab_id)
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error updating lab name: {e}")
+            return False
+
+    def update_lab_safety_staff(self, staff_id, email, telegram):
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE LabSafetyStaff
+                    SET lab_safety_email = %s, lab_safety_telegram = %s
+                    WHERE labsafetyid = %s
+                    """,
+                    (email, "telegram", staff_id),
+                )
+                conn.commit()
+                return True
+        except psycopg2.Error as e:
+            print(f"Error updating staff {staff_id}: {e}")
+            return False

@@ -1767,29 +1767,29 @@ def labs():
         if action == "add_lab":
             lab_name = request.form.get("lab_name")
             lab_safety_email = request.form.get("lab_safety_email")
-            lab_safety_telegram = request.form.get("lab_safety_telegram")
+            # lab_safety_telegram = request.form.get("lab_safety_telegram")
 
-            if not lab_safety_telegram and "telegram_username" in session:
-                lab_safety_telegram = session.pop("telegram_username")
-            else:
-                session.pop("telegram_username", None)
+            # if not lab_safety_telegram and "telegram_username" in session:
+            #     lab_safety_telegram = session.pop("telegram_username")
+            # else:
+            #     session.pop("telegram_username", None)
 
             # Validate and sanitize input
             try:
                 lab_name = validate_and_sanitize_text(lab_name)
                 lab_safety_email = validate_and_sanitize_text(lab_safety_email)
-                lab_safety_telegram = validate_and_sanitize_text(lab_safety_telegram)
+                # lab_safety_telegram = validate_and_sanitize_text(lab_safety_telegram)
             except ValueError as e:
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
-            success = dao.insert_lab(lab_name, lab_safety_email, lab_safety_telegram)
+            lab_id = dao.insert_lab(lab_name)
+            dao.insert_lab_safety_staff(lab_id, lab_safety_email, "telegram")
+            if lab_id:
+                flash("New lab created.", "success")
+            else:
+                flash("Error creating new lab.", "danger")
 
-            (
-                flash(f"New lab created.", "success")
-                if success
-                else flash(f"Error creating new lab.", "danger")
-            )
 
         elif action == "delete":
             lab_id = request.form.get("lab_id")
@@ -1804,32 +1804,63 @@ def labs():
         elif action == "update":
             lab_id = request.form.get("lab_id")
             new_lab_name = request.form.get("new_lab_name")
-            new_lab_email = request.form.get("new_lab_email")
-            new_lab_telegram = request.form.get("new_lab_telegram")
 
-            # Validate and sanitize string input
+            # Validate and sanitize the lab name
             try:
                 new_lab_name = validate_and_sanitize_text(new_lab_name)
-                new_lab_email = validate_and_sanitize_text(new_lab_email)
-                new_lab_telegram = validate_and_sanitize_text(new_lab_telegram)
             except ValueError as e:
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
-            success = dao.update_lab(
-                new_lab_name, new_lab_email, new_lab_telegram, lab_id
-            )
+            # Proces existing staff updates/deletes
+            staff_ids = request.form.getlist("staff_ids")
+            for staff_id in staff_ids:
+                email_key = f"staff_email_{staff_id}"
+                telegram_key = f"staff_telegram_{staff_id}"
+                delete_key = f"delete_staff_{staff_id}"
 
-            (
-                flash(f"Lab details updated succesfully.", "success")
-                if success
-                else flash(f"Failed to update lab details.", "danger")
-            )
+                staff_email = request.form.get(email_key)
+                staff_telegram = request.form.get(telegram_key)
+                to_delete = request.form.get(delete_key)
+
+                try:
+                    staff_email = validate_and_sanitize_text(staff_email)
+                    staff_telegram = validate_and_sanitize_text(staff_telegram)
+                except ValueError as e:
+                    flash(f"Validation error for staff {staff_id}: {e}", "danger")
+                    return redirect(request.url)
+
+                if to_delete:
+                    dao.delete_lab_safety_staff(staff_id)
+                else:
+                    dao.update_lab_safety_staff(staff_id, staff_email, staff_telegram)
+
+            # Process new safety staff addition
+            new_staff_emails = request.form.getlist("new_staff_email[]")
+            # If you uncomment telegram inputs, get them similarly (with array)
+            # new_staff_telegrams = request.form.getlist("new_staff_telegram[]")
+
+            for email in new_staff_emails:
+                try:
+                    email = validate_and_sanitize_text(email)
+                    # telegram = validate_and_sanitize_text(corresponding telegram)
+                except ValueError as e:
+                    flash(f"Validation error for new staff: {e}", "danger")
+                    return redirect(request.url)
+
+                dao.insert_lab_safety_staff(lab_id, email, "telegram")  # Adjust telegram param as needed
+
+            # Finally update the lab name
+            success = dao.update_lab_name(lab_id, new_lab_name)
+
+            if success:
+                flash("Lab details updated successfully.", "success")
+            else:
+                flash("Failed to update lab details.", "danger")
 
         return redirect(url_for("labs"))
 
     all_lab_details = dao.get_all_labs()
-
     lab_safety_telegram = session.pop("lab_safety_telegram", "")
 
     return render_template(
