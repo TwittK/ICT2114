@@ -51,7 +51,7 @@ from werkzeug.security import generate_password_hash
 
 from shared.mqtt_client import MQTTClient
 
-from shared.config import LF_CAMERA_PER_PAGE, FINC_CAMERA_PER_PAGE
+from shared.config import LF_CAMERA_PER_PAGE, FINC_CAMERA_PER_PAGE, SINC_CAMERA_PER_PAGE
 
 from urllib.parse import urlencode
 
@@ -265,7 +265,7 @@ def index():
     )
 
 
-@app.route("/second-incompliance", methods=["GET", "POST"])
+@app.route("/second-incompliance", methods=["GET"])
 @login_required
 def second_incompliance():
     lab_dao = LabDAO(DB_PARAMS)
@@ -277,7 +277,7 @@ def second_incompliance():
     # Current page number from query params, default to 1
     current_page = request.args.get("page", default=1, type=int)
     # Number of results per page.
-    page_size = 9
+    page_size = SINC_CAMERA_PER_PAGE
 
     # Redirect if either lab or camera not specified.
     if not lab_name or not camera_name:
@@ -303,26 +303,16 @@ def second_incompliance():
             flash("No labs or cameras configured.", "danger")
             return redirect(url_for("index"))
 
-    # Get filters from POST form or use defaults
-    if request.method == "POST":
-        selected_date = request.form.get("date", "")
-        selected_object_type = request.form.get("object_type", "")
-    else:
-        # On GET request, use empty filters to show all results
-        selected_date = ""
-        selected_object_type = ""
+    # Get filters using GET
+    selected_date = request.args.get("date", "")
+    selected_object_type = request.args.get("object_type", "")
 
     # Retrieve all labels for dropdown
     all_labels = label_repo.get_all_labels()
 
-    # User role and camera management
-    cam_management = None
-    user_role_management = None
-
     results = []
 
     try:
-        conn = psycopg2.connect(**DB_PARAMS)
         conn = psycopg2.connect(**DB_PARAMS, cursor_factory=RealDictCursor)
         cursor = conn.cursor()
 
@@ -353,24 +343,28 @@ def second_incompliance():
 
         all_cameras = [row["name"] for row in cursor.fetchall()]
 
-        # SQL query to find repeated incompliances for specific lab and camera
-        # MOVED OUTSIDE OF if request.method == "POST" block
+        # SQL query to retrieves all snapshots after the first violation for persons
+        # with two or more incompliance violations, filtered by a specific lab and camera.
         query = """
                 SELECT s.DetectionId, s.time_generated, s.object_detected, s.confidence, s.imageURL
                 FROM Snapshot s
-                         JOIN (SELECT person_id, MIN(time_generated) AS first_time
-                               FROM Snapshot
-                               WHERE person_id IS NOT NULL
-                               GROUP BY person_id
-                               HAVING COUNT(*) > 1) repeats
-                              ON s.person_id = repeats.person_id
+                JOIN Person p ON s.person_id = p.PersonId
+                 JOIN (
+                    SELECT person_id, MIN(time_generated) AS first_time
+                    FROM Snapshot
+                    WHERE person_id IS NOT NULL
+                    GROUP BY person_id
+                    HAVING COUNT(*) > 1) repeats ON s.person_id = repeats.person_id
                 WHERE s.time_generated > repeats.first_time
-                  AND EXISTS(SELECT 1
-                             FROM Camera c
-                                      JOIN Lab l ON c.camera_lab_id = l.LabId
-                             WHERE c.CameraId = s.camera_id
-                               AND l.lab_name = %s
-                               AND c.name = %s) \
+                    AND p.incompliance_count >= 2
+                    AND EXISTS (
+                        SELECT 1
+                        FROM Camera c
+                        JOIN Lab l ON c.camera_lab_id = l.LabId
+                        WHERE c.CameraId = s.camera_id
+                            AND l.lab_name = %s
+                            AND c.name = %s
+                    )                               
                 """
 
         params = [lab_name, camera_name]

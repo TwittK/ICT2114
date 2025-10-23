@@ -9,7 +9,7 @@ MQTT_TOPIC = os.environ.get("MQTT_TOPIC", "lab/violations")
 MQTT_USERNAME = os.environ.get("MQTT_USERNAME")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
 
-# --- Live Feed Pagination page ---
+# --- Live Feed, First non-compliance, Second and more non-compliance Pagination page ---
 LF_CAMERA_PER_PAGE = 1
-
 FINC_CAMERA_PER_PAGE = 3
+SINC_CAMERA_PER_PAGE = 3
