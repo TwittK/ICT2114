@@ -45,3 +45,14 @@ class SnapshotDAO:
           ),
         )
         conn.commit()
+
+  def get_latest_snapshots(self):
+    """Retrieves the snapshots in the last 3 months"""
+
+    query = "SELECT imageURL, time_generated FROM Snapshot WHERE time_generated > CURRENT_DATE - INTERVAL '3 months'"
+    with self._get_conn() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        return results

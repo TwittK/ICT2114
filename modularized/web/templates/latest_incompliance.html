@@ -29,7 +29,9 @@
 
 <div id="latest-image-container">
     {% if image_url %}
-    <img id="latest-image" src="{{ url_for('static', filename=image_url) }}" alt="Latest incompliance">
+        {% for url, time in image_url %}
+            <img src="{{ url_for('static', filename=url) }}" alt="Latest incompliance">
+        {% endfor %}
     {% else %}
     <p style="color: white;">No incompliance images found.</p>
     {% endif %}

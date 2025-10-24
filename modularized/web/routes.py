@@ -2094,27 +2094,14 @@ def mqtt_test():
 @app.route("/latest_incompliance")
 @login_required
 def latest_incompliance():
-    import glob, os
 
-    # Use Flask's static folder
-    base_dir = "web/static/incompliances/"
-    pattern = os.path.join(base_dir, "*", "*.jpg")
-    print(pattern)
-    files = glob.glob(pattern)
-    print(files)
-    files.sort(key=os.path.getmtime, reverse=True)
+    from data_source.snapshot_dao import SnapshotDAO
 
-    latest_image = files[0] if files else None
+    snapshot_dao = SnapshotDAO(DB_PARAMS)
+    data_last_3_months = snapshot_dao.get_latest_snapshots()
+    print(data_last_3_months)
 
-    print(latest_image)
-
-    # Convert file path to URL for static serving
-    image_url = None
-    if latest_image:
-        # Remove 'static/' prefix for url_for
-        image_url = latest_image.replace("web/static/", "")
-
-    return render_template("latest_incompliance.html", image_url=image_url)
+    return render_template("latest_incompliance.html", image_url=data_last_3_months)
 
 
 bot_token = os.getenv("BOT_TOKEN", "").strip()
