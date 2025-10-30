@@ -697,7 +697,7 @@ def generate_video_stream(detection_id):
         if not frame_yielded:
             frame_yielded = True
         yield (
-                b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
         )
 
     if frame_yielded:
@@ -1710,7 +1710,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_"):]
+                    rp = key[len("role_perm_") :]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1780,7 +1780,6 @@ def labs():
             else:
                 flash("Error creating new lab.", "danger")
 
-
         elif action == "delete":
             lab_id = request.form.get("lab_id")
             success = dao.delete_lab(lab_id)
@@ -1838,7 +1837,9 @@ def labs():
                     flash(f"Validation error for new staff: {e}", "danger")
                     return redirect(request.url)
 
-                dao.insert_lab_safety_staff(lab_id, email, "telegram")  # Adjust telegram param as needed
+                dao.insert_lab_safety_staff(
+                    lab_id, email, "telegram"
+                )  # Adjust telegram param as needed
 
             # Finally update the lab name
             success = dao.update_lab_name(lab_id, new_lab_name)
@@ -1853,7 +1854,9 @@ def labs():
             updated_telegram = request.form.get("telegram")
             updated_email = request.form.get("email")
 
-            success = dao.update_lab_safety_staff(staffid, updated_email, updated_telegram)
+            success = dao.update_lab_safety_staff(
+                staffid, updated_email, updated_telegram
+            )
             if success:
                 flash("Lab staff details updated successfully.", "success")
             else:
@@ -1870,15 +1873,15 @@ def labs():
     all_lab_details = dao.get_all_labs()
     all_emails = dao.get_all_labs_safety_email()
     lab_safety_telegram = session.pop("lab_safety_telegram", "")
-    lab_id_to_lab = {lab['labid']: lab for lab in all_lab_details}
-    lab_to_contacts = {lab['labid']: [] for lab in all_lab_details}
+    lab_id_to_lab = {lab["labid"]: lab for lab in all_lab_details}
+    lab_to_contacts = {lab["labid"]: [] for lab in all_lab_details}
 
     # Prepare lab and contact details in format for display
     for contact in all_emails:
-        lab_id = contact['lab_id']
-        staffid = contact['labsafetyid']
-        email = contact.get('lab_safety_email', '')
-        phone = contact.get('lab_safety_telegram', '')
+        lab_id = contact["lab_id"]
+        staffid = contact["labsafetyid"]
+        email = contact.get("lab_safety_email", "")
+        phone = contact.get("lab_safety_telegram", "")
         lab_to_contacts[lab_id].append((staffid, email, phone))
 
     return render_template(
@@ -1887,7 +1890,7 @@ def labs():
         all_lab_emails=lab_to_contacts,
         cam_management=cam_management,
         user_role_management=user_role_management,
-        lab_safety_telegram=lab_safety_telegram
+        lab_safety_telegram=lab_safety_telegram,
     )
 
 
@@ -2094,13 +2097,23 @@ def mqtt_test():
 @app.route("/latest_incompliance")
 @login_required
 def latest_incompliance():
-
     from data_source.snapshot_dao import SnapshotDAO
 
     snapshot_dao = SnapshotDAO(DB_PARAMS)
     data_last_3_months = snapshot_dao.get_latest_snapshots()
-    print(data_last_3_months)
 
+    # Check if this is an AJAX request for JSON data
+    if (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.args.get("format") == "json"
+    ):
+        # Return JSON for API calls
+        images = []
+        for url, time in data_last_3_months:
+            images.append({"url": url, "time": time.isoformat() if time else None})
+        return jsonify({"images": images})
+
+    # Return HTML template for initial page load
     return render_template("latest_incompliance.html", image_url=data_last_3_months)
 
 
