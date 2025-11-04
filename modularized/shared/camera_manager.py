@@ -69,7 +69,9 @@ class CameraManager:
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
-      self.add_new_camera(camera_id, ip_address, True) 
+      # self.add_new_camera(camera_id, ip_address, True)
+      # Overwrite the IP cameras within the database as a test camera
+      self.add_new_camera(camera_id, ip_address, True, use_dataset=True, dataset_path="./datasets/no_bottle/")
 
     self._initialized = True
   

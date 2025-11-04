@@ -1,6 +1,6 @@
 # threads/reader.py
 import cv2
-import time
+import time, os, glob
 from shared.camera import Camera
 
 
@@ -27,6 +27,30 @@ def read_frames(context: Camera):
     max_retries = 30  # Maximum reconnection attempts
     retry_delay = 1.0  # Initial delay between retries
     max_delay = 10.0  # Maximum delay between retries
+
+    # Feed models from dataset folder if specified
+    if getattr(context, "use_dataset", False):
+        image_files = sorted(
+            glob.glob(os.path.join(context.dataset_path, '**', '*.png'), recursive=True) +
+            glob.glob(os.path.join(context.dataset_path, '**', '*.jpg'), recursive=True) +
+            glob.glob(os.path.join(context.dataset_path, '**', '*.jpeg'), recursive=True)
+        )
+        idx = 0
+        while context.running.is_set():
+            if idx >= len(image_files):
+                idx = 0  # Loop or break if you want to stop after one pass
+            img_path = os.path.join(context.dataset_path, image_files[idx])
+            frame = cv2.imread(img_path)
+            idx += 1
+            if frame is None:
+                print(f"⚠️ Failed to read image {img_path}")
+                time.sleep(0.1)
+                continue
+            if not context.frame_queue.full():
+                context.manager.detection_manager.submit(frame, context)
+            time.sleep(0.01)
+        print(f"📁 Dataset feed stopped")
+        return
 
     if context.use_ip_camera:
         # Camera config

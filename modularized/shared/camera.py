@@ -14,6 +14,8 @@ class Camera:
     use_ip_camera (bool): Indicates if the camera is an IP camera. Set to False only for testing with webcam.
     manager (CameraManager): Reference to the parent CameraManager instance.
     detection_manager: Inference manager retrieved from the camera manager.
+    use_dataset (bool): If True, feed frames from a dataset folder.
+    dataset_path (str): Path to the dataset folder containing images.
 
     frame_queue (queue.Queue): Queue for raw frames to use in object and pose detection.
     process_queue (queue.Queue): Queue for frames used in association logic (human-to-food/beverage).
@@ -38,13 +40,16 @@ class Camera:
     flagged_foodbev_lock (threading.Lock): Lock for accessing/modifying 'flagged_foodbev'.
   """
 
-  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager):
+  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager, use_dataset=False, dataset_path=None):
     
     # Store Camera details
     self.camera_id = camera_id
     self.ip_address = ip_address
     self.channel = channel
     self.use_ip_camera = use_ip_camera
+
+    self.use_dataset = use_dataset
+    self.dataset_path = dataset_path
 
     self.manager = manager
     self.detection_manager = manager.detection_manager
