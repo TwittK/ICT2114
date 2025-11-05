@@ -36,12 +36,10 @@ def read_frames(context: Camera):
             glob.glob(os.path.join(context.dataset_path, '**', '*.jpeg'), recursive=True)
         )
         idx = 0
-        while context.running.is_set():
-            if idx >= len(image_files):
-                idx = 0  # Loop or break if you want to stop after one pass
-            img_path = os.path.join(context.dataset_path, image_files[idx])
+        for img_path in image_files:  # <-- Only run once through all images
+            if not context.running.is_set():
+                break
             frame = cv2.imread(img_path)
-            idx += 1
             if frame is None:
                 print(f"⚠️ Failed to read image {img_path}")
                 time.sleep(0.1)
@@ -49,7 +47,7 @@ def read_frames(context: Camera):
             if not context.frame_queue.full():
                 context.manager.detection_manager.submit(frame, context)
             time.sleep(0.01)
-        print(f"📁 Dataset feed stopped")
+        print(f"📁 Dataset feed stopped after one pass")
         return
 
     if context.use_ip_camera:
