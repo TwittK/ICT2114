@@ -133,6 +133,12 @@ def flag_track_id(context, track_id):
 
 # Mapping detected food/ drinks to person
 def association(context: Camera):
+    # Logging for dataset testing
+    frame_count = 0
+    total_detections = 0
+    total_confidence = 0.0
+    total_associations = 0
+
     notifier = NotificationService()
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance(db_params, context.camera_id)
@@ -152,6 +158,39 @@ def association(context: Camera):
         with context.detected_incompliance_lock, context.pose_points_lock:
             local_pose_points = list(context.pose_points)
             local_detected_food_drinks = dict(context.detected_incompliance)
+
+        ### FOR TESTING AND LOGGING PURPOSES ###
+        # Count detections and sum confidence scores for this frame
+        frame_detections = len(local_detected_food_drinks)
+        frame_conf_sum = sum(
+            [v[2] for v in local_detected_food_drinks.values() if len(v) > 2]
+        )
+        total_detections += frame_detections
+        total_confidence += frame_conf_sum
+        frame_count += 1
+
+        # Count associations for this frame
+        frame_associations = 0
+        best_matches = {}
+        for track_id in local_detected_food_drinks:
+            # ...existing association logic...
+            if best_matches[track_id]["person"] is not None:
+                frame_associations += 1
+                # ...existing code...
+
+        total_associations += frame_associations
+
+        # Log every 5 frames
+        if frame_count % 5 == 0:
+            avg_conf = total_confidence / total_detections if total_detections > 0 else 0
+            print(
+                f"[STATS] Frames: {frame_count}, Total Detections: {total_detections}, "
+                f"Total Associations: {total_associations}, Avg Confidence: {avg_conf:.2f}"
+            )
+            # Reset counters for next batch
+            total_detections = 0
+            total_confidence = 0.0
+            total_associations = 0
 
         best_matches = {}
         for track_id in local_detected_food_drinks:
