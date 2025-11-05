@@ -136,7 +136,7 @@ class CameraManager:
     del self.camera_pool[camera_id]
     return True
 
-  def add_new_camera(self, camera_id, ip_address, use_ip_camera, channel="101"):
+  def add_new_camera(self, camera_id, ip_address, use_ip_camera, channel="101", use_dataset=False, dataset_path=None):
     """
     Adds a new camera and starts its associated processing/ detection threads.
 
@@ -159,7 +159,8 @@ class CameraManager:
     from shared.camera import Camera
 
     try:
-      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
+      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self,
+                      use_dataset=use_dataset, dataset_path=dataset_path)
 
       # Start all threads
       read_thread = threading.Thread(target=read_frames, args=(camera,))
