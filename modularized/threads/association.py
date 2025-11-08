@@ -14,6 +14,7 @@ from database import get_lab_safety_email_by_camera_id
 from database import get_lab_safety_telegram_by_camera_id
 
 from shared.mqtt_client import MQTTClient
+from data_source.lab_safety_staff_dao import LabSafetyStaffDAO
 
 # Constants
 REQUIRED_DURATION = 2.0  # seconds
@@ -29,6 +30,7 @@ db_params = {
 }
 
 mqtt_client = MQTTClient()
+lab_safety_staff_dao = LabSafetyStaffDAO(db_params=db_params)
 
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
@@ -269,12 +271,12 @@ def association(context: Camera):
                     continue
 
                 try:
-                    # # Mock next day
-                    # mocked_date = datetime(2025, 10, 28)
-                    # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
+                    # Mock next day
+                    mocked_date = datetime(2025, 12, 3)
+                    current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
-                    local_tz = ZoneInfo("Asia/Singapore")
-                    current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    # local_tz = ZoneInfo("Asia/Singapore")
+                    # current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
                     print(current_date)
                     today = current_date[:10]
 
@@ -309,19 +311,21 @@ def association(context: Camera):
                             context.manager.saver.save_img(clone, str(person_id), today)
 
                             # Send Email for Second Incompliance Detected
-                            lab_emails = get_lab_safety_email_by_camera_id(
-                                context.camera_id
-                            )
+                            # lab_emails = get_lab_safety_email_by_camera_id(
+                            #     context.camera_id
+                            # )
+                            lab_emails = lab_safety_staff_dao.get_email_by_camera_id(context.camera_id)
                             lab_telegram = get_lab_safety_telegram_by_camera_id(
                                 context.camera_id
                             )
 
+                            print(f"[DEBUG23] Retrieved lab emails for camera {context.camera_id}: {lab_emails}")
+
                             # Email
                             if lab_emails:
                                 for email in lab_emails:
-                                    notifier.send_incompliance_email(
-                                        email, f"Person {person_id}"
-                                    )
+                                    print(f"[DEBUG23] Sending email to: {email}")
+                                    notifier.send_incompliance_email(email, f"Person {person_id}")
 
                             # Telegram
                             if lab_telegram:
