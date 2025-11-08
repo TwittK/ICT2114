@@ -21,7 +21,7 @@ class LabDAO:
                 return all_lab_details
         except psycopg2.Error:
             return None
-        
+
     def get_all_labs_safety_email(self):
         """Return all labs as list of dicts"""
         try:
@@ -31,7 +31,7 @@ class LabDAO:
                 return all_lab_details
         except psycopg2.Error:
             return None
-        
+
     # def insert_lab(self, lab_name, lab_safety_email, lab_safety_telegram):
     #     """Insert a new lab"""
     #     try:
@@ -80,7 +80,7 @@ class LabDAO:
                     (lab_safety_email, lab_safety_telegram, lab_id) 
                     VALUES (%s, %s, %s)
                     """,
-                    (email, telegram, lab_id),
+                    (email, "telegram", lab_id),
                 )
                 conn.commit()
                 return True
@@ -166,4 +166,19 @@ class LabDAO:
                 return True
         except psycopg2.Error as e:
             print(f"Error updating staff {staff_id}: {e}")
+            return False
+
+    def delete_lab_safety_staff(self, staff_id):
+        try:
+            with self._get_conn() as conn, conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    DELETE FROM LabSafetyStaff 
+                    WHERE labsafetyid = %s
+                    """, (staff_id,), )
+                conn.commit()
+                # Return True if a row was deleted, False otherwise
+                return cursor.rowcount > 0
+        except psycopg2.Error as e:
+            print(f"Error deleting staff {staff_id}: {e}")
             return False

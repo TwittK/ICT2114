@@ -697,7 +697,7 @@ def generate_video_stream(detection_id):
         if not frame_yielded:
             frame_yielded = True
         yield (
-            b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
         )
 
     if frame_yielded:
@@ -1710,7 +1710,7 @@ def role_management():
 
             for key in request.form.keys():
                 if key.startswith("role_perm_"):
-                    rp = key[len("role_perm_") :]
+                    rp = key[len("role_perm_"):]
                     role_name, perm_name = rp.split("_", 1)
                     role_id = dao.get_role_id_by_name(role_name)
                     perm_id = dao.get_permission_id_by_name(perm_name)
@@ -1801,46 +1801,6 @@ def labs():
                 flash(f"Validation error: {e}", "danger")
                 return redirect(request.url)
 
-            # Proces existing staff updates/deletes
-            staff_ids = request.form.getlist("staff_ids")
-            for staff_id in staff_ids:
-                email_key = f"staff_email_{staff_id}"
-                telegram_key = f"staff_telegram_{staff_id}"
-                delete_key = f"delete_staff_{staff_id}"
-
-                staff_email = request.form.get(email_key)
-                staff_telegram = request.form.get(telegram_key)
-                to_delete = request.form.get(delete_key)
-
-                try:
-                    staff_email = validate_and_sanitize_text(staff_email)
-                    staff_telegram = validate_and_sanitize_text(staff_telegram)
-                except ValueError as e:
-                    flash(f"Validation error for staff {staff_id}: {e}", "danger")
-                    return redirect(request.url)
-
-                if to_delete:
-                    dao.delete_lab_safety_staff(staff_id)
-                else:
-                    dao.update_lab_safety_staff(staff_id, staff_email, staff_telegram)
-
-            # Process new safety staff addition
-            new_staff_emails = request.form.getlist("new_staff_email[]")
-            # If you uncomment telegram inputs, get them similarly (with array)
-            # new_staff_telegrams = request.form.getlist("new_staff_telegram[]")
-
-            for email in new_staff_emails:
-                try:
-                    email = validate_and_sanitize_text(email)
-                    # telegram = validate_and_sanitize_text(corresponding telegram)
-                except ValueError as e:
-                    flash(f"Validation error for new staff: {e}", "danger")
-                    return redirect(request.url)
-
-                dao.insert_lab_safety_staff(
-                    lab_id, email, "telegram"
-                )  # Adjust telegram param as needed
-
             # Finally update the lab name
             success = dao.update_lab_name(lab_id, new_lab_name)
 
@@ -1862,11 +1822,72 @@ def labs():
             else:
                 flash("Failed to update lab staff details.", "danger")
 
+        elif action == "add_lab_staff":
+            print("--- Add lab staff ---")
+
+            lab_id = request.form.get("lab_id")
+            new_staff_emails = request.form.getlist("new_staff_email[]")
+            print(f"Add lab staff for lab_id: {lab_id}")
+            print(f"New staff emails: {new_staff_emails}")
+
+            if not lab_id or not new_staff_emails:
+                flash("No lab selected or no staff emails provided.", "warning")
+                return redirect(request.url)
+
+            # Optional: If you have Telegram inputs
+            # new_staff_telegrams = request.form.getlist("new_staff_telegram[]")
+            # If not using Telegram yet, just use a placeholder
+            new_staff_telegrams = ["telegram"] * len(new_staff_emails)
+
+            success_count = 0
+            for email, telegram in zip(new_staff_emails, new_staff_telegrams):
+                try:
+                    email = validate_and_sanitize_text(email)
+                    telegram = validate_and_sanitize_text(telegram)
+                except ValueError as e:
+                    flash(f"Validation error for {email}: {e}", "danger")
+                    # Skip invalid emails but continue with others.
+                    continue
+
+                inserted = dao.insert_lab_safety_staff(
+                    lab_id=lab_id,
+                    email=email,
+                    telegram=telegram
+                )
+
+                if inserted:
+                    success_count += 1
+
+            if success_count:
+                flash(f"Added {success_count} new staff to lab {lab_id}.", "success")
+            else:
+                flash("No new staff were added.", "danger")
+
+            return redirect(url_for("labs"))
+
         elif action == "delete_lab_staff":
             print("delete lab staff")
 
-        elif action == "add_lab_staff":
-            print("add lab staff")
+            staff_id = request.form.get("staffid")
+
+            if not staff_id:
+                flash("No staff selected for deletion.", "warning")
+                return redirect(request.url)
+
+            try:
+                staff_id = validate_and_sanitize_text(staff_id)
+            except ValueError as e:
+                flash(f"Invalid staff ID: {e}", "danger")
+                return redirect(request.url)
+
+            deleted = dao.delete_lab_safety_staff(staff_id)
+
+            if deleted:
+                flash("Lab staff deleted successfully.", "success")
+            else:
+                flash("Failed to delete lab staff. Staff may not exist.", "danger")
+
+            return redirect(url_for("labs"))
 
         return redirect(url_for("labs"))
 
@@ -2104,8 +2125,8 @@ def latest_incompliance():
 
     # Check if this is an AJAX request for JSON data
     if (
-        request.headers.get("X-Requested-With") == "XMLHttpRequest"
-        or request.args.get("format") == "json"
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or request.args.get("format") == "json"
     ):
         # Return JSON for API calls
         images = []
