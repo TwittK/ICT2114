@@ -13,3 +13,4 @@ database
 /modularized/web/static/incompliances/
 /modularized/users.sqlite
 /modularized/*.log
+/modularized/datasets/one_bottle/
