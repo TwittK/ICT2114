@@ -300,6 +300,7 @@ def association(context: Camera):
                                 face_crop,
                                 current_date,
                             )
+                            # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
                             time.sleep(3)
 
                         # Incompliance on different date
@@ -363,6 +364,7 @@ def association(context: Camera):
                                 face_crop,
                                 current_date,
                             )
+                            # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
                             time.sleep(3)
 
                         # Save frame locally in new folder
@@ -381,12 +383,7 @@ def association(context: Camera):
                         cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
                         context.manager.saver.save_img(clone, str(person_id), today)
 
-                        print(
-                            "[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅"
-                        )
-                        time.sleep(
-                            3
-                        )  # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
+                        print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
 
                 except Exception as e:
                     print(e)

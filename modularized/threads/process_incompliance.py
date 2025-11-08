@@ -109,6 +109,8 @@ class ProcessIncompliance:
                     #     return person_id
                     # else:
                     #     return None
+                return person_id
+            
             else:
                 # Incompliance on the same date detected, skipping
                 print("[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
