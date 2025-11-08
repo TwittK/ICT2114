@@ -102,15 +102,17 @@ class ProcessIncompliance:
                         person_id,
                         self.camera_id,
                     )
-                    updated_count = self.person_dao.get_incompliance_count(person_id)
+                    # updated_count = self.person_dao.get_incompliance_count(person_id)
 
-                    # Send email only on second and subsequent incompliances
-                    if updated_count >= 2:
-                        return person_id
-                    else:
-                        return None
+                    # # Send email only on second and subsequent incompliances
+                    # if updated_count >= 2:
+                    #     return person_id
+                    # else:
+                    #     return None
             else:
-                return None  # Incompliance on the same date detected, skipping
+                # Incompliance on the same date detected, skipping
+                print("[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
+                return None  
 
         return None
 
