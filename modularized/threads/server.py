@@ -15,7 +15,7 @@ def setup_app():
     init_database()
     insert_default_roles()
     create_default_admin()
-    # create_test_lab_and_camera()
+    create_test_lab_and_camera()
 
     # Auto discover cameras and add to database using NVR
     # cd = CameraDiscovery()
