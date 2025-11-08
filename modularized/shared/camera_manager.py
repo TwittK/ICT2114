@@ -66,6 +66,7 @@ class CameraManager:
     gpu_count = os.getenv("GPU_COUNT")
     self.detection_manager = DetectionManager(gpu_count)
     self.saver = Saver()
+    self.nvr_face_lock = threading.Lock()
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:

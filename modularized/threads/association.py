@@ -272,7 +272,7 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    mocked_date = datetime(2025, 12, 3)
+                    mocked_date = datetime(2025, 11, 2)
                     current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     # local_tz = ZoneInfo("Asia/Singapore")
@@ -290,16 +290,17 @@ def association(context: Camera):
                     # Match found
                     if int(matches_found[0]) >= 1:
 
-                        print("Match found")
-                        person_id = process_incompliance.match_found_new_incompliance(
-                            matches_found,
-                            nvr,
-                            local_detected_food_drinks,
-                            track_id,
-                            face_crop,
-                            current_date,
-                        )
-                        time.sleep(3)
+                        with context.manager.nvr_face_lock:
+                            print("Match found")
+                            person_id = process_incompliance.match_found_new_incompliance(
+                                matches_found,
+                                nvr,
+                                local_detected_food_drinks,
+                                track_id,
+                                face_crop,
+                                current_date,
+                            )
+                            time.sleep(3)
 
                         # Incompliance on different date
                         if person_id is not None:
@@ -311,9 +312,9 @@ def association(context: Camera):
                             context.manager.saver.save_img(clone, str(person_id), today)
 
                             # Send Email for Second Incompliance Detected
-                            # lab_emails = get_lab_safety_email_by_camera_id(
-                            #     context.camera_id
-                            # )
+                            lab_emails = get_lab_safety_email_by_camera_id(
+                                context.camera_id
+                            )
                             lab_emails = lab_safety_staff_dao.get_email_by_camera_id(context.camera_id)
                             lab_telegram = get_lab_safety_telegram_by_camera_id(
                                 context.camera_id
@@ -344,31 +345,25 @@ def association(context: Camera):
                                     details=f"Incompliance detected at camera {context.camera_id} on {current_date}",
                                 )
 
-                            print(
-                                f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅"
-                            )
-
-                        # Incompliance on the same date
-                        else:
-
-                            print(
-                                "[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring."
-                            )
+                            print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
 
                         flag_track_id(context, track_id)
 
                     # No match found
                     elif int(matches_found[0]) < 1:
-                        print("No match found")
+                        
                         flag_track_id(context, track_id)
 
-                        person_id = process_incompliance.no_match_new_incompliance(
-                            nvr,
-                            local_detected_food_drinks,
-                            track_id,
-                            face_crop,
-                            current_date,
-                        )
+                        with context.manager.nvr_face_lock:
+                            print("No match found")
+                            person_id = process_incompliance.no_match_new_incompliance(
+                                nvr,
+                                local_detected_food_drinks,
+                                track_id,
+                                face_crop,
+                                current_date,
+                            )
+                            time.sleep(3)
 
                         # Save frame locally in new folder
                         os.makedirs(
