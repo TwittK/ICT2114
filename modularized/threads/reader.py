@@ -28,27 +28,55 @@ def read_frames(context: Camera):
     retry_delay = 1.0  # Initial delay between retries
     max_delay = 10.0  # Maximum delay between retries
 
+    # Wait for system to be fully initialized before processing
+    while not context.manager.is_initialized():
+        time.sleep(0.1)
+        if not context.running.is_set():
+            return
+
     # Feed models from dataset folder if specified
     if getattr(context, "use_dataset", False):
-        image_files = sorted(
-            glob.glob(os.path.join(context.dataset_path, '**', '*.png'), recursive=True) +
-            glob.glob(os.path.join(context.dataset_path, '**', '*.jpg'), recursive=True) +
-            glob.glob(os.path.join(context.dataset_path, '**', '*.jpeg'), recursive=True)
-        )
-        idx = 0
-        while context.running.is_set():
-            if idx >= len(image_files):
-                idx = 0  # Loop or break if you want to stop after one pass
-            img_path = image_files[idx]
-            frame = cv2.imread(img_path)
-            idx += 1
-            if frame is None:
-                print(f"⚠️ Failed to read image {img_path}")
-                time.sleep(0.1)
-                continue
-            if not context.frame_queue.full():
-                context.manager.detection_manager.submit(frame, context)
-            time.sleep(0.01)
+        # Hardcoded folders to process
+        folders_to_process = ['2tiles', '3tiles', '4tiles']
+        base_path = os.path.join(context.dataset_path, 'one_bottle')
+        
+        for folder in folders_to_process:
+            print(f"Processing folder: {folder}")
+            folder_path = os.path.join(base_path, folder)
+            
+            # Get all images in the current folder
+            image_files = sorted(
+                glob.glob(os.path.join(folder_path, '*.png'), recursive=True) +
+                glob.glob(os.path.join(folder_path, '*.jpg'), recursive=True) +
+                glob.glob(os.path.join(folder_path, '*.jpeg'), recursive=True)
+            )
+            
+            idx = 0
+            processed_count = 0
+            while context.running.is_set():
+                if idx >= len(image_files):
+                    print(f"⏳ All images processed for {folder}")
+                    break
+                    
+                img_path = image_files[idx]
+                frame = cv2.imread(img_path)
+                idx += 1
+                
+                if frame is None:
+                    print(f"⚠️ Failed to read image {img_path}")
+                    time.sleep(0.1)
+                    continue
+                    
+                if not context.frame_queue.full():
+                    print(f"Reading: {img_path} ({processed_count + 1}/{len(image_files)})")
+                    context.current_tile_folder = folder  # Store current folder name
+                    context.manager.detection_manager.submit(frame, context)
+                    processed_count += 1
+                time.sleep(0.01)
+            
+            print(f"Completed processing folder: {folder}")
+            time.sleep(1)  # Brief pause between folders
+            
         print(f"📁 Dataset feed stopped")
         return
 

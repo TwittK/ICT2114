@@ -32,6 +32,7 @@ class CameraManager:
     if cls._instance is None:
       cls._instance = super(CameraManager, cls).__new__(cls)
       cls._instance._initialized = False
+      cls._instance._ready_to_process = False
     return cls._instance
   
   @classmethod
@@ -56,6 +57,7 @@ class CameraManager:
     
     self.camera_pool = {}
     self.db = psycopg2.connect(**db_params)
+    self._ready_to_process = False  # Initialize flag
 
     # Select all existing cameras
     cursor = self.db.cursor()
@@ -72,7 +74,7 @@ class CameraManager:
     for camera_id, ip_address in rows:
       # self.add_new_camera(camera_id, ip_address, True)
       # Overwrite the IP cameras within the database as a test camera
-      self.add_new_camera(camera_id, ip_address, True, use_dataset=True, dataset_path="./datasets/one_bottle/")
+      self.add_new_camera(camera_id, ip_address, True, use_dataset=True, dataset_path="./datasets/")
 
     self._initialized = True
   
@@ -182,3 +184,12 @@ class CameraManager:
 
     except Exception:
       return False
+    
+  def set_initialized(self):
+        """Signal that the system is ready to process frames"""
+        self._ready_to_process = True
+        print("[INFO] Camera Manager is now ready to process frames")
+
+  def is_initialized(self):
+      """Check if the system is ready to process frames"""
+      return self._ready_to_process

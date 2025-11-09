@@ -1,4 +1,5 @@
-import queue, time, os
+import queue, time, os, csv
+import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
 from datetime import datetime
@@ -31,6 +32,41 @@ db_params = {
 
 mqtt_client = MQTTClient()
 lab_safety_staff_dao = LabSafetyStaffDAO(db_params=db_params)
+
+def save_to_csv(frames_processed, avg_confidence, timestamp, tile_folder, total_detections, total_associations):
+    """Save metrics to CSV file with detection statistics"""
+    file_path = 'confidence_metrics.csv'
+    
+    file_exists = os.path.exists(file_path)
+    
+    with open(file_path, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow([
+                'Timestamp',
+                'Tile Configuration', 
+                'Frames Processed',
+                'Average Confidence',
+                'Total Detections',
+                'Successful Associations',
+                'False Negatives',
+                'Association Rate'
+            ])
+        
+        # Calculate false negatives (detections that should have been associated but weren't)
+        false_negatives = total_detections - total_associations
+        association_rate = (total_associations / total_detections) if total_detections > 0 else 0
+        
+        writer.writerow([
+            timestamp,
+            tile_folder,
+            frames_processed,
+            f"{avg_confidence:.3f}",
+            total_detections,
+            total_associations,
+            false_negatives,
+            f"{association_rate:.2%}"
+        ])
 
 
 def safe_crop(img, x1, y1, x2, y2, padding=0):
@@ -139,10 +175,15 @@ def association(context: Camera):
     nvr = NVR("192.168.1.63", "D3FB23C8155040E4BE08374A418ED0CA", "admin", "Sit12345")
     process_incompliance = ProcessIncompliance(db_params, context.camera_id)
     # process_incompliance = ProcessIncompliance(DATABASE, context.camera_id)
-
+    frames_processed = 0 
+    total_detections = 0
+    total_associations = 0
+    
     while context.running.is_set():
         try:
             frame = context.process_queue.get(timeout=1)
+            frames_processed += 1  # Increment counter
+            
 
         except queue.Empty:
             continue
@@ -154,6 +195,43 @@ def association(context: Camera):
         with context.detected_incompliance_lock, context.pose_points_lock:
             local_pose_points = list(context.pose_points)
             local_detected_food_drinks = dict(context.detected_incompliance)
+            # Count detections in current frame
+            total_detections += len(local_detected_food_drinks)
+
+        # Log metrics every 5 frames
+        if frames_processed % 5 == 0:
+            print(f"[INFO] Processing frame {frames_processed}")
+            confidence_scores = [
+                detection[2] 
+                for detection in local_detected_food_drinks.values()
+                if len(detection) > 2
+            ]
+            
+            if confidence_scores:
+                avg_confidence = sum(confidence_scores) / len(confidence_scores)
+                print("avg_confidence:", avg_confidence)
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                # Get exact folder name from context
+                tile_folder = getattr(context, 'current_tile_folder', 'unknown')
+                save_to_csv(
+                    frames_processed,
+                    avg_confidence,
+                    timestamp,
+                    tile_folder,
+                    total_detections,
+                    total_associations
+                )
+
+        print(f"🔄 Frame {frames_processed} | Detections: {total_detections} | Associations: {total_associations}")
+
+        if frame is None or frame.size == 0:
+            continue
+
+        best_matches = {}
+        for track_id in local_detected_food_drinks:
+            with context.flagged_foodbev_lock:
+                if track_id in context.flagged_foodbev:
+                    continue
 
         best_matches = {}
         for track_id in local_detected_food_drinks:
@@ -228,6 +306,7 @@ def association(context: Camera):
                     best_matches[track_id]["person"] = p
 
             if best_matches[track_id]["person"] is not None:
+                total_associations += 1
                 p = best_matches[track_id]["person"]
                 now = time.time()
 
