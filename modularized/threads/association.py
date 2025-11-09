@@ -272,7 +272,7 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    mocked_date = datetime(2025, 4, 3)
+                    mocked_date = datetime(2025, 4, 4)
                     current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     # local_tz = ZoneInfo("Asia/Singapore")
@@ -381,7 +381,7 @@ def association(context: Camera):
                             print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
                         
                         # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
-                        time.sleep(3)
+                        time.sleep(5)
 
                 except Exception as e:
                     print(e)
