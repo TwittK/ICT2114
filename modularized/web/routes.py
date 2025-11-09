@@ -1827,6 +1827,7 @@ def labs():
 
             lab_id = request.form.get("lab_id")
             new_staff_emails = request.form.getlist("new_staff_email[]")
+            new_staff_telegrams = request.form.getlist("new_staff_telegram[]")
             print(f"Add lab staff for lab_id: {lab_id}")
             print(f"New staff emails: {new_staff_emails}")
 
@@ -1837,7 +1838,7 @@ def labs():
             # Optional: If you have Telegram inputs
             # new_staff_telegrams = request.form.getlist("new_staff_telegram[]")
             # If not using Telegram yet, just use a placeholder
-            new_staff_telegrams = ["telegram"] * len(new_staff_emails)
+            # new_staff_telegrams = ["telegram"] * len(new_staff_emails)
 
             success_count = 0
             for email, telegram in zip(new_staff_emails, new_staff_telegrams):

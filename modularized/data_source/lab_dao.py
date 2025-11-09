@@ -80,7 +80,7 @@ class LabDAO:
                     (lab_safety_email, lab_safety_telegram, lab_id) 
                     VALUES (%s, %s, %s)
                     """,
-                    (email, "telegram", lab_id),
+                    (email, telegram, lab_id),
                 )
                 conn.commit()
                 return True
