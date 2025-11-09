@@ -9,7 +9,8 @@ from shared.model import (
 from threads.association import safe_crop
 import threading
 import queue
-
+import os
+import csv
 
 class DetectionWorker:
     """
@@ -66,6 +67,13 @@ class DetectionWorker:
         classif_model = ImageClassificationModel("yolov8n-cls.pt")
         last_cleared = datetime.min
 
+        # # before while loop
+        log_path = f"detection_confidence_worker_{gpu_id}.csv"
+        if not os.path.exists(log_path):
+            with open(log_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["timestamp", "worker_id", "track_id", "cls_id", "confidence"])
+
         while self.running.is_set():
 
             try:
@@ -110,7 +118,17 @@ class DetectionWorker:
                         confidence = float(box.conf.cpu())
                         coords = box.xyxy[0].cpu().numpy()
                         # class_name = drink_model.names[cls_id]
-                        # print(f"[Food/Drink] {class_name} (ID: {cls_id}) - {confidence:.2f}")
+                        # print(f"{confidence:.2f}")
+                        # # save to csv
+                        with open(log_path, "a", newline="") as f:
+                            writer = csv.writer(f)
+                            writer.writerow([
+                                datetime.now().isoformat(timespec="seconds"),
+                                gpu_id,
+                                track_id,
+                                cls_id,
+                                f"{confidence:.4f}"
+                            ])
 
                         x1, y1, x2, y2 = map(int, coords)
 

@@ -74,6 +74,7 @@ class CameraManager:
     for camera_id, ip_address in rows:
       # self.add_new_camera(camera_id, ip_address, True)
       # Overwrite the IP cameras within the database as a test camera
+      print(f"[INFO] Overwriting camera {camera_id} as test dataset camera.")
       self.add_new_camera(camera_id, ip_address, True, use_dataset=True, dataset_path="./datasets/")
 
     self._initialized = True
