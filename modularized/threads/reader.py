@@ -1,6 +1,6 @@
 # threads/reader.py
 import cv2
-import time, queue
+import time, queue, glob, os
 from shared.camera import Camera
 
 def read_frames(context: Camera):
@@ -31,6 +31,59 @@ def read_frames(context: Camera):
     max_retries = 30  # Maximum reconnection attempts
     retry_delay = 1.0  # Initial delay between retries
     max_delay = 10.0   # Maximum delay between retries
+
+    print("RA")
+    print("RAHH:", context)
+
+    # Feed models from dataset folder if specified
+    if getattr(context, "use_dataset", False):
+        # Hardcoded folders to process
+        folders_to_process = ['2tiles']
+        # folders_to_process = ['2tiles', '3tiles', '4tiles', '5tiles', '6tiles', '7tiles']
+        # folders_to_process = ['8tiles', '9tiles', '10tiles']
+        # folders_to_process = ['10tiles']
+        base_path = os.path.join(context.dataset_path, 'one_bottle')
+        
+        for folder in folders_to_process:
+            print(f"Processing folder: {folder}")
+            folder_path = os.path.join(base_path, folder)
+            
+            # Get all images in the current folder
+            image_files = sorted(
+                glob.glob(os.path.join(folder_path, '*.png'), recursive=True) +
+                glob.glob(os.path.join(folder_path, '*.jpg'), recursive=True) +
+                glob.glob(os.path.join(folder_path, '*.jpeg'), recursive=True)
+            )
+            
+            idx = 0
+            processed_count = 0
+            while context.running.is_set():
+                if idx >= len(image_files):
+                    print(f"⏳ All images processed for {folder}")
+                    break
+                    
+                img_path = image_files[idx]
+                frame = cv2.imread(img_path)
+                idx += 1
+                
+                if frame is None:
+                    print(f"⚠️ Failed to read image {img_path}")
+                    time.sleep(0.1)
+                    continue
+                    
+                if not context.frame_queue.full():
+                    print(f"Reading: {img_path} ({processed_count + 1}/{len(image_files)})")
+                    context.current_tile_folder = folder  # Store current folder name
+                    # context.manager.detection_manager.submit(frame, context)
+                    (context.frame_queue).put(frame)
+                    processed_count += 1
+                time.sleep(0.01)
+            
+            print(f"Completed processing folder: {folder}")
+            time.sleep(1)  # Brief pause between folders
+            
+        print(f"📁 Dataset feed stopped")
+        return
     
     if context.use_ip_camera:
         # Camera config
@@ -40,6 +93,8 @@ def read_frames(context: Camera):
 
         # Initialize IP camera
         context.cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+
+        print("RAa")
 
         # Check if camera connection is successful
         if not (context.cap).isOpened():

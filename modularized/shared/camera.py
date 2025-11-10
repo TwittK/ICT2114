@@ -26,7 +26,7 @@ class Camera:
     wrist_proximity_history (dict): Historical wrist proximity timestamps by track ID.
   """
 
-  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager: CameraManager):
+  def __init__(self, camera_id, ip_address, channel, use_ip_camera, manager: CameraManager, use_dataset=False, dataset_path=None):
 
     # Store Camera details
     self.camera_id = camera_id
@@ -34,6 +34,9 @@ class Camera:
     self.channel = channel
     self.use_ip_camera = use_ip_camera
     self.manager = manager
+
+    self.use_dataset = use_dataset
+    self.dataset_path = dataset_path
 
     self.frame_queue = queue.Queue(maxsize=10)
     self.save_queue = queue.Queue(maxsize=10)

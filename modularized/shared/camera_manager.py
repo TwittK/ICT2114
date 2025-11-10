@@ -40,7 +40,8 @@ class CameraManager:
 
     # Start detection on all cameras and add them to the camera pool
     for camera_id, ip_address in rows:
-      self.add_new_camera(camera_id, ip_address, False) 
+      # self.add_new_camera(camera_id, ip_address, False)
+      self.add_new_camera(camera_id, ip_address, False, use_dataset=True, dataset_path="./datasets/")
 
     self._initialized = True
 
@@ -99,7 +100,7 @@ class CameraManager:
     del self.camera_pool[camera_id]
     return True
 
-  def add_new_camera(self, camera_id, ip_address, use_ip_camera, channel="101"):
+  def add_new_camera(self, camera_id, ip_address, use_ip_camera, channel="101", use_dataset=False, dataset_path=None):
     """
     Adds a new camera and starts its associated processing/ detection threads.
 
@@ -124,7 +125,7 @@ class CameraManager:
     from shared.camera import Camera
 
     try:
-      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self)
+      camera = Camera(camera_id, ip_address, channel, use_ip_camera, self, use_dataset=use_dataset, dataset_path=dataset_path)
 
       # Start all threads for detection
       read_thread = threading.Thread(target=read_frames, args=(camera,))

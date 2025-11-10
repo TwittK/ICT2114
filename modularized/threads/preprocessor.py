@@ -14,7 +14,7 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
     
     models = [
         ObjectDetectionModel("yolo11n.pt", target_classes_id, conf_threshold, 0),
-        #ObjectDetectionModel("yolov8n.pt", target_classes_id, conf_threshold),
+        # ObjectDetectionModel("yolov8n.pt", target_classes_id, conf_threshold),
         #ObjectDetectionModel("yolov8s.pt", target_classes_id, conf_threshold),
     ]
 
@@ -25,12 +25,16 @@ def preprocess(context: Camera, target_classes_id, conf_threshold):
     min_votes = len(models) // 2 + 1
     collab_inference = CollaborativeInference(context, models, min_votes)
 
+    print("RAH")
+
     while context.running.is_set():
         
         try:
+            print("lah")
             frame = context.frame_queue.get(timeout=1)
 
         except queue.Empty:
+            print("dah")
             continue
 
         if frame is None or frame.size == 0:

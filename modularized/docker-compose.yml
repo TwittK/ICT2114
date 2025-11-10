@@ -13,8 +13,9 @@ services:
     runtime: nvidia
     container_name: lab-monitoring-app
     ports:
-      - "5001:5000"
+      - "5003:5000"
     volumes:
+      - ./:/app
       - ./web/static/incompliances:/app/web/static/incompliances
       - ./yolo_models:/app/yolo_models
     env_file:
