@@ -62,12 +62,12 @@ class DetectionWorker:
             gpu_id (int): The ID of the GPU device used for inference.
         """
 
-        object_detection_model = ObjectDetectionModel("yolo11x.pt", gpu_device=gpu_id)
+        object_detection_model = ObjectDetectionModel("yolo11m.pt", gpu_device=gpu_id)
         pose_model = PoseDetectionModel("yolov8n-pose.pt", 0.8, 0.7)
         classif_model = ImageClassificationModel("yolov8n-cls.pt")
         last_cleared = datetime.min
 
-        # # before while loop
+        # before while loop
         log_path = f"detection_confidence_worker_{gpu_id}.csv"
         if not os.path.exists(log_path):
             with open(log_path, "w", newline="") as f:
@@ -118,7 +118,7 @@ class DetectionWorker:
                         confidence = float(box.conf.cpu())
                         coords = box.xyxy[0].cpu().numpy()
                         # class_name = drink_model.names[cls_id]
-                        # print(f"{confidence:.2f}")
+                        print(f"{confidence:.4f}")
                         # # save to csv
                         with open(log_path, "a", newline="") as f:
                             writer = csv.writer(f)
@@ -190,6 +190,8 @@ class DetectionWorker:
 
                         except Exception as e:
                             print(f"Error putting frame into process queue: {e}")
+            else:
+                print("No drink boxes detected")
 
             # Put into queue to display frames in dashboard
             if not context.display_queue.full():

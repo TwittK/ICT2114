@@ -33,15 +33,14 @@ def read_frames(context: Camera):
         time.sleep(0.1)
         if not context.running.is_set():
             return
-        
-    print("conte")
 
     # Feed models from dataset folder if specified
     if getattr(context, "use_dataset", False):
-        print("AHHH")
         # Hardcoded folders to process
-        folders_to_process = ['2tiles', '3tiles', '4tiles', '5tiles', '6tiles', '7tiles']
-        # folders_to_process = ['1tiles']
+        folders_to_process = ['10tiles']
+        # folders_to_process = ['2tiles', '3tiles', '4tiles', '5tiles', '6tiles', '7tiles']
+        # folders_to_process = ['8tiles', '9tiles', '10tiles']
+        # folders_to_process = ['10tiles']
         base_path = os.path.join(context.dataset_path, 'one_bottle')
         
         for folder in folders_to_process:

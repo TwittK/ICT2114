@@ -306,6 +306,7 @@ def association(context: Camera):
                     best_matches[track_id]["person"] = p
 
             if best_matches[track_id]["person"] is not None:
+                print("✅ Found association for track ID:", track_id)
                 total_associations += 1
                 p = best_matches[track_id]["person"]
                 now = time.time()
