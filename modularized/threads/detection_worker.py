@@ -132,9 +132,9 @@ class DetectionWorker:
                             predicted_label = classif_model.classify(object_crop)
 
                             # Discard saving coordinates if it's a water bottle (model tends to detect some bottles as milk can also)
-                            # if predicted_label == "water_bottle" or predicted_label == "milk_can":
-                            #     print("🚫 Water bottle, skipping")
-                            #     continue
+                            if predicted_label == "water_bottle" or predicted_label == "milk_can":
+                                print("🚫 Water bottle, skipping")
+                                continue
 
                             context.detected_incompliance[track_id] = [
                                 coords,  # Coordinates of bbox
