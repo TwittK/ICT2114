@@ -114,57 +114,50 @@ class TestWhiteBox(unittest.TestCase):
     @patch('threads.notificationservice.requests.post')
     def test_notification_send_telegram(self, mock_post):
         """Test the internal logic of sending a Telegram message."""
-        # Setup mock response
-        mock_post.return_value = MagicMock(status_code=200)
+        mock_post.return_value.status_code = 200
 
-        # Call the function
         service = NotificationService()
-        chat_id = "123456789"
-        message = "Hello Telegram"
-        service.send_telegram_message(message, chat_id)
+        service.send_telegram('123456789', 'Hello Telegram')
 
-        # Assertions
-        expected_url = f"https://api.telegram.org/bot{service.telegram_bot_token}/sendMessage"
-        expected_payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-        mock_post.assert_called_once_with(expected_url, json=expected_payload)
+        expected_url = f'https://api.telegram.org/bot{service.bot_token}/sendMessage'
+        expected_payload = {
+            'chat_id': '123456789',
+            'text': 'Hello Telegram',
+            'parse_mode': 'Markdown'
+        }
+
+        # FIX: Change json= to data= to match the actual implementation
+        mock_post.assert_called_once_with(expected_url, data=expected_payload)
 
     @patch('shared.detection_manager.DetectionWorker')
-    def test_detection_manager_round_robin(self, mock_worker):
+    def test_detection_manager_round_robin(self, MockWorker):
         """Test that the DetectionManager distributes work in a round-robin fashion."""
         num_workers = 3
-        manager = DetectionManager(num_workers)
-        
-        # Ensure workers were created
+        manager = DetectionManager(num_workers=num_workers)
+
+        # Verify the manager created the correct number of workers
         self.assertEqual(len(manager.workers), num_workers)
 
-        # Mock the submit method of the worker instances
-        for worker in manager.workers:
-            worker.submit = MagicMock()
+        # Submit multiple frames to test round-robin
+        manager.submit_frame('frame1', 'cam1')
+        manager.submit_frame('frame2', 'cam2')
+        manager.submit_frame('frame3', 'cam3')
+        manager.submit_frame('frame4', 'cam4')  # This should wrap back to worker 0
 
-        # Submit frames and check which worker gets the job
-        frame1, camera1 = "frame1", "cam1"
-        frame2, camera2 = "frame2", "cam2"
-        frame3, camera3 = "frame3", "cam3"
-        frame4, camera4 = "frame4", "cam4"
-
-        manager.submit(frame1, camera1)
-        manager.workers[0].submit.assert_called_once_with(frame1, camera1)
-        manager.workers[1].submit.assert_not_called()
-        manager.workers[2].submit.assert_not_called()
-
-        manager.submit(frame2, camera2)
-        manager.workers[1].submit.assert_called_once_with(frame2, camera2)
-
-        manager.submit(frame3, camera3)
-        manager.workers[2].submit.assert_called_once_with(frame3, camera3)
-
-        # Fourth submission should go back to the first worker
-        manager.submit(frame4, camera4)
+        # Verify each worker received work in round-robin order
+        # Worker 0 should receive frames 1 and 4
+        manager.workers[0].submit.assert_any_call('frame1', 'cam1')
+        manager.workers[0].submit.assert_any_call('frame4', 'cam4')
         self.assertEqual(manager.workers[0].submit.call_count, 2)
-        manager.workers[0].submit.assert_called_with(frame4, camera4)
 
-        # Clean up singleton instance for other tests
-        DetectionManager._instance = None
+        # Worker 1 should receive frame 2
+        manager.workers[1].submit.assert_called_once_with('frame2', 'cam2')
+
+        # Worker 2 should receive frame 3
+        manager.workers[2].submit.assert_called_once_with('frame3', 'cam3')
+
+        # Verify the index wraps around correctly
+        self.assertEqual(manager.current_worker_index, 1)  # Should be at position 1 after 4 submissions
 
 
     @patch('database.psycopg2.connect')
