@@ -100,6 +100,8 @@ class WhiteBoxTestFlaskApp(unittest.TestCase):
         mock_cur.fetchall.return_value = []  # Return empty labs/cameras
         
         with self.client.session_transaction() as sess:
+            # FIX: Set 'logged_in' which is what the decorator actually checks for
+            sess['logged_in'] = True
             sess['user_id'] = 1
             sess['username'] = 'test'
             sess['role'] = 'user'
