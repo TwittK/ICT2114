@@ -222,21 +222,21 @@ def create_lab(lab_name):
 
 
 def create_camera(
-    name,
-    camera_user_id,
-    camera_lab_id,
-    channel,
-    resolution=1080,
-    frame_rate=30,
-    encoding="H.265",
-    camera_ip_type="static",
-    ip_address="192.168.1.100",
-    subnet_mask="255.255.255.0",
-    gateway="192.168.1.1",
-    timezone="Asia/Singapore",
-    sync_with_ntp=False,
-    ntp_server_address="pool.ntp.org",
-    time="2025-01-01T00:00:00",
+        name,
+        camera_user_id,
+        camera_lab_id,
+        channel,
+        resolution=1080,
+        frame_rate=30,
+        encoding="H.265",
+        camera_ip_type="static",
+        ip_address="192.168.1.64",
+        subnet_mask="255.255.255.0",
+        gateway="192.168.1.1",
+        timezone="Asia/Singapore",
+        sync_with_ntp=False,
+        ntp_server_address="pool.ntp.org",
+        time="2025-01-01T00:00:00",
 ):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -322,28 +322,28 @@ def get_lab_safety_telegram_by_camera_id(camera_id):
         (camera_id,),
     )
 
-    result = cursor.fetchone()
+    result = cursor.fetchall()
     conn.close()
 
-    return result[0] if result else None
+    return result if result else None
 
 
 def create_new_camera(
-    name,
-    camera_user_id,
-    camera_lab_id,
-    resolution,
-    frame_rate,
-    encoding,
-    camera_ip_type,
-    ip_address,
-    subnet_mask,
-    gateway,
-    timezone,
-    sync_with_ntp,
-    ntp_server_address,
-    time,
-    channel,
+        name,
+        camera_user_id,
+        camera_lab_id,
+        resolution,
+        frame_rate,
+        encoding,
+        camera_ip_type,
+        ip_address,
+        subnet_mask,
+        gateway,
+        timezone,
+        sync_with_ntp,
+        ntp_server_address,
+        time,
+        channel,
 ):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
@@ -390,7 +390,6 @@ def create_new_camera(
 
 
 def verify_user(email, password):
-
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
 
@@ -423,7 +422,6 @@ def verify_user(email, password):
 
 
 def update_last_login(user_id):
-
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()

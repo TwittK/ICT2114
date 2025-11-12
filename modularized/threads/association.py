@@ -272,7 +272,7 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    mocked_date = datetime(2025, 4, 4)
+                    mocked_date = datetime(2025, 12, 6)
                     current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
                     # local_tz = ZoneInfo("Asia/Singapore")
@@ -301,6 +301,7 @@ def association(context: Camera):
                                 current_date,
                             )
 
+                            print(f"[DEBUG]{person_id}")
                             # Incompliance on different date
                             if person_id is not None:
 
@@ -311,19 +312,18 @@ def association(context: Camera):
                                 context.manager.saver.save_img(clone, str(person_id), today)
 
                                 # Send Email for Second Incompliance Detected
-                                lab_emails = get_lab_safety_email_by_camera_id(
-                                    context.camera_id
-                                )
                                 lab_emails = lab_safety_staff_dao.get_email_by_camera_id(context.camera_id)
                                 lab_telegram = get_lab_safety_telegram_by_camera_id(
                                     context.camera_id
                                 )
-
+                                print(f"[DEBUG25]")
                                 print(f"[DEBUG23] Retrieved lab emails for camera {context.camera_id}: {lab_emails}")
 
                                 # Email
                                 if lab_emails:
-                                    for email in lab_emails:
+                                    for email_row in lab_emails:
+                                        email = email_row["lab_safety_email"]
+
                                         print(f"[DEBUG23] Sending email to: {email}")
                                         notifier.send_incompliance_email(email, f"Person {person_id}")
 
@@ -344,13 +344,14 @@ def association(context: Camera):
                                         details=f"Incompliance detected at camera {context.camera_id} on {current_date}",
                                     )
 
-                                print(f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
+                                print(
+                                    f"[ACTION] Similar face found 🟢: {person_id}. Saving incompliance snapshot and updated last incompliance date ✅")
 
                             flag_track_id(context, track_id)
 
                         # No match found
                         elif int(matches_found[0]) < 1:
-                            
+
                             flag_track_id(context, track_id)
 
                             print("No match found")
@@ -378,8 +379,9 @@ def association(context: Camera):
                             cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 1)
                             context.manager.saver.save_img(clone, str(person_id), today)
 
-                            print("[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
-                        
+                            print(
+                                "[NEW] No face found 🟡. Saving incompliance snapshot and updated last incompliance date ✅")
+
                         # Give time for the face to be modeled in NVR, prevents double inserts of same incompliances
                         time.sleep(5)
 

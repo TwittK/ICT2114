@@ -37,13 +37,13 @@ class ProcessIncompliance:
         return str(current_date)[:10]
 
     def match_found_new_incompliance(
-        self,
-        matches_found,
-        nvr,
-        local_detected_food_drinks,
-        track_id,
-        face_crop,
-        current_date,
+            self,
+            matches_found,
+            nvr,
+            local_detected_food_drinks,
+            track_id,
+            face_crop,
+            current_date,
     ):
         """
         Handle a case where a face match is found in the existing incompliance records.
@@ -102,24 +102,25 @@ class ProcessIncompliance:
                         person_id,
                         self.camera_id,
                     )
-                    # updated_count = self.person_dao.get_incompliance_count(person_id)
+                    updated_count = self.person_dao.get_incompliance_count(person_id)
 
-                    # # Send email only on second and subsequent incompliances
-                    # if updated_count >= 2:
-                    #     return person_id
-                    # else:
-                    #     return None
+                    # Send email only on second and subsequent incompliances
+                    if updated_count >= 2:
+                        return person_id
+                    else:
+                        return None
+
                 return person_id
-            
+
             else:
                 # Incompliance on the same date detected, skipping
                 print("[ACTION] 🟣🟣🟣🟣 Similar face found but incompliance on same date, ignoring.")
-                return None  
+                return None
 
         return None
 
     def no_match_new_incompliance(
-        self, nvr, local_detected_food_drinks, track_id, face_crop, current_date
+            self, nvr, local_detected_food_drinks, track_id, face_crop, current_date
     ):
         """
         Handle a case where no face match is found. (A new person committing incompliance)

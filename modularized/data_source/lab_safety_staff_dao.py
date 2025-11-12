@@ -26,8 +26,8 @@ class LabSafetyStaffDAO:
         try:
             with self._get_conn() as conn, conn.cursor() as cursor:
                 cursor.execute(query, (camera_id,))
-                result = cursor.fetchone()
-                return result[0] if result else None
+                result = cursor.fetchall()
+                return result if result else None
         except psycopg2.Error as e:
             print(f"Error fetching email for camera {camera_id}: {e}")
             return None

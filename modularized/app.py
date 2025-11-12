@@ -44,7 +44,7 @@ if __name__ == "__main__":
         print("[INFO] Flask server started and all cameras in database started detection")
 
         # Run Flask in main thread for hot reload
-        app.run(host="0.0.0.0", port=5000, debug=True)
+        app.run(host="0.0.0.0", port=5000)
 
     except KeyboardInterrupt:
         print("[INFO] Shutting down.")
