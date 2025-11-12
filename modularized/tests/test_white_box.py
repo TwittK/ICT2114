@@ -1,157 +1,138 @@
 import unittest
-import sqlite3
-import os
-import sys
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 from werkzeug.security import generate_password_hash
-from datetime import datetime
 
-# Add parent directory to path to import modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Set environment variable for test database before importing modules that use it
+import os
+os.environ['POSTGRES_DB'] = os.getenv("POSTGRES_DB_TEST", "testdb")
 
-# Import modules
-try:
-    from database import (create_user, verify_user, create_lab, create_camera, 
-                         init_database, create_default_admin, update_last_login,
-                         create_default_labs_and_cameras)
-    from app import app
-except ImportError as e:
-    print(f"Import error: {e}")
-    print("Make sure your database.py and app.py files are in the correct location")
+# Now import the modules
+from modularized.database import create_user, verify_user
+from modularized.web.routes import app
+from modularized.web.utils import login_required
 
 class WhiteBoxTestDatabase(unittest.TestCase):
-    def setUp(self):
-        """Set up test database"""
-        self.test_db = 'test_white_box.sqlite'
-        if os.path.exists(self.test_db):
-            os.remove(self.test_db)
+    """White-box tests for database functions, mocking the DB connection."""
+
+    @patch('modularized.database.psycopg2.connect')
+    def test_create_user_success(self, mock_connect):
+        """Test successful user creation by mocking the database connection."""
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cur
         
-        # Mock the init_db.sql file content
-        self.mock_sql_content = """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username VARCHAR(50) UNIQUE NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP,
-            is_active BOOLEAN DEFAULT 1
-        );
+        # Simulate role ID lookup
+        mock_cur.fetchone.return_value = (1,) 
+
+        result = create_user("testuser", "test@example.com", "password123", "user")
+
+        self.assertTrue(result)
+        mock_cur.execute.assert_any_call("SELECT id FROM Roles WHERE name = %s", ('user',))
+        mock_cur.execute.assert_any_call(
+            unittest.mock.ANY, # SQL string
+            ('testuser', 'test@example.com', unittest.mock.ANY, 1) # Params
+        )
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch('modularized.database.psycopg2.connect')
+    def test_create_user_duplicate_email(self, mock_connect):
+        """Test user creation with duplicate email by simulating an IntegrityError."""
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cur
         
-        CREATE TABLE IF NOT EXISTS Lab (
-            LabId INTEGER PRIMARY KEY AUTOINCREMENT,
-            lab_name TEXT UNIQUE NOT NULL,
-            lab_safety_email TEXT NOT NULL
-        );
-        
-        CREATE TABLE IF NOT EXISTS Camera (
-            CameraId INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(100) NOT NULL,
-            resolution INTEGER NOT NULL,
-            frame_rate INTEGER NOT NULL,
-            encoding VARCHAR(50) NOT NULL,
-            camera_ip_type VARCHAR(50) DEFAULT 'static' CHECK (camera_ip_type IN ('static', 'dhcp')),
-            ip_address VARCHAR(50) NOT NULL,
-            subnet_mask VARCHAR(50) NOT NULL,
-            gateway VARCHAR(50) NOT NULL,
-            timezone VARCHAR(100) NOT NULL,
-            sync_with_ntp INTEGER NOT NULL DEFAULT 0,
-            ntp_server_address VARCHAR(100) DEFAULT NULL,
-            time DATETIME NOT NULL,
-            camera_user_id INTEGER NOT NULL,
-            camera_lab_id INTEGER NOT NULL,
-            FOREIGN KEY (camera_user_id) REFERENCES users (id) ON DELETE CASCADE,
-            FOREIGN KEY (camera_lab_id) REFERENCES Lab (LabId) ON DELETE CASCADE
-        );
-        """
-    
-    def tearDown(self):
-        """Clean up test database"""
-        if os.path.exists(self.test_db):
-            os.remove(self.test_db)
+        # Simulate role ID lookup
+        mock_cur.fetchone.return_value = (1,)
+        # Simulate a database integrity error (e.g., unique constraint violation)
+        mock_cur.execute.side_effect = [None, psycopg2.IntegrityError]
 
-    def test_create_user_success(self):
-        """Test successful user creation"""
-        with patch('database.sqlite3.connect') as mock_connect:
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_connect.return_value = mock_conn
-            mock_conn.cursor.return_value = mock_cursor
-            
-            result = create_user("testuser", "test@test.com", "password123")
-            
-            mock_cursor.execute.assert_called_once()
-            mock_conn.commit.assert_called_once()
-            self.assertTrue(result)
+        result = create_user("testuser", "test@example.com", "password123", "user")
 
-    def test_create_user_duplicate_email(self):
-        """Test user creation with duplicate email"""
-        with patch('database.sqlite3.connect') as mock_connect:
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_connect.return_value = mock_conn
-            mock_conn.cursor.return_value = mock_cursor
-            mock_cursor.execute.side_effect = sqlite3.IntegrityError("UNIQUE constraint failed")
-            
-            result = create_user("testuser", "test@test.com", "password123")
-            
-            self.assertFalse(result)
+        self.assertFalse(result)
+        mock_conn.rollback.assert_called_once()
+        mock_conn.close.assert_called_once()
 
-    def test_verify_user_valid_credentials(self):
-        """Test user verification with valid credentials"""
-        with patch('database.sqlite3.connect') as mock_connect:
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_connect.return_value = mock_conn
-            mock_conn.cursor.return_value = mock_cursor
-            
-            password_hash = generate_password_hash("password123")
-            mock_cursor.fetchone.return_value = (1, "test@test.com", "testuser", password_hash, "user", 1)
-            
-            result = verify_user("test@test.com", "password123")
-            self.assertIsNotNone(result)
-            self.assertEqual(result['username'], "testuser")
+    @patch('modularized.database.psycopg2.connect')
+    @patch('modularized.database.check_password_hash')
+    def test_verify_user_valid_credentials(self, mock_check_password, mock_connect):
+        """Test user verification with valid credentials."""
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cur
 
-    def test_verify_user_invalid_credentials(self):
-        """Test user verification with invalid credentials"""
-        with patch('database.sqlite3.connect') as mock_connect:
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_connect.return_value = mock_conn
-            mock_conn.cursor.return_value = mock_cursor
-            mock_cursor.fetchone.return_value = None
-            
-            result = verify_user("nonexistent@test.com", "password123")
-            self.assertIsNone(result)
+        # Mock return value for the user query
+        mock_user_data = (1, 'test@example.com', 'testuser', 'hashed_pass', 'user', True)
+        mock_cur.fetchone.return_value = mock_user_data
+        # Mock password check to return True
+        mock_check_password.return_value = True
+
+        user = verify_user('test@example.com', 'password123')
+
+        self.assertIsNotNone(user)
+        self.assertEqual(user['email'], 'test@example.com')
+        mock_check_password.assert_called_with('hashed_pass', 'password123')
+        mock_conn.close.assert_called_once()
+
+    @patch('modularized.database.psycopg2.connect')
+    @patch('modularized.database.check_password_hash')
+    def test_verify_user_invalid_credentials(self, mock_check_password, mock_connect):
+        """Test user verification with invalid credentials."""
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cur
+
+        mock_user_data = (1, 'test@example.com', 'testuser', 'hashed_pass', 'user', True)
+        mock_cur.fetchone.return_value = mock_user_data
+        # Mock password check to return False
+        mock_check_password.return_value = False
+
+        user = verify_user('test@example.com', 'wrongpassword')
+
+        self.assertIsNone(user)
+        mock_check_password.assert_called_with('hashed_pass', 'wrongpassword')
+        mock_conn.close.assert_called_once()
 
 class WhiteBoxTestFlaskApp(unittest.TestCase):
-    def setUp(self):
-        app.config['TESTING'] = True
-        app.config['WTF_CSRF_ENABLED'] = False
-        self.client = app.test_client()
-        self.ctx = app.app_context()
-        self.ctx.push()
+    """White-box tests for the Flask application logic."""
 
-    def tearDown(self):
-        self.ctx.pop()
+    def setUp(self):
+        """Set up a test client for the Flask app."""
+        app.config['TESTING'] = True
+        app.config['SECRET_KEY'] = 'test-secret-key'
+        self.client = app.test_client()
 
     def test_login_required_decorator_redirect(self):
-        """Test login_required decorator redirects when not logged in"""
-        response = self.client.get('/')
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('/login', response.location)
+        """Test login_required decorator redirects when not logged in."""
+        # A dummy route protected by the decorator
+        @app.route('/protected')
+        @login_required
+        def protected_view():
+            return "You should not see this"
+
+        response = self.client.get('/protected', follow_redirects=True)
+        self.assertIn(b'Please log in to access this page', response.data)
+        self.assertEqual(response.status_code, 200) # After redirect
 
     def test_login_required_decorator_allows_access(self):
-        """Test login_required decorator allows access when logged in"""
-        with self.client.session_transaction() as sess:
-            sess['logged_in'] = True
-            sess['user_id'] = 1
-            sess['role'] = 'admin'
-        
-        with patch('app.sqlite3.connect'):
-            response = self.client.get('/')
+        """Test login_required decorator allows access when logged in."""
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess['user'] = {'id': 1, 'username': 'test', 'role': 'user'}
+            
+            # Dummy route
+            @app.route('/protected_access')
+            @login_required
+            def protected_view_access():
+                return "Access Granted"
+
+            response = c.get('/protected_access')
             self.assertEqual(response.status_code, 200)
+            self.assertIn(b'Access Granted', response.data)
 
 if __name__ == '__main__':
     unittest.main()
