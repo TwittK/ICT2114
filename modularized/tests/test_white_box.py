@@ -121,11 +121,16 @@ class TestWhiteBox(unittest.TestCase):
         self.assertIn('does not exist', str(context.exception))
         mock_conn.close.assert_called_once()
 
-    @patch('threads.detection_worker.DetectionWorker')
+    @patch('shared.detection_manager.DetectionWorker')
     def test_detection_manager_round_robin(self, MockWorker):
         """Test that the DetectionManager distributes work in a round-robin fashion."""
-        # Create mock worker instances
-        mock_workers = [MagicMock() for _ in range(3)]
+        # Create mock worker instances with submit method
+        mock_workers = []
+        for i in range(3):
+            mock_worker = MagicMock()
+            mock_worker.submit = MagicMock()
+            mock_workers.append(mock_worker)
+        
         MockWorker.side_effect = mock_workers
         
         num_workers = 3
@@ -135,6 +140,10 @@ class TestWhiteBox(unittest.TestCase):
 
         # Verify the manager created the correct number of workers
         self.assertEqual(len(manager.workers), num_workers)
+        
+        # Verify that the workers in the manager are our mocks
+        for i in range(num_workers):
+            self.assertIs(manager.workers[i], mock_workers[i])
 
         # Submit frames
         manager.submit('frame1', 'cam1')
@@ -143,13 +152,20 @@ class TestWhiteBox(unittest.TestCase):
         manager.submit('frame4', 'cam4')
 
         # Verify round-robin distribution
+        # Worker 0 should get frames 1 and 4
+        self.assertEqual(mock_workers[0].submit.call_count, 2)
         mock_workers[0].submit.assert_any_call('frame1', 'cam1')
         mock_workers[0].submit.assert_any_call('frame4', 'cam4')
-        self.assertEqual(mock_workers[0].submit.call_count, 2)
 
-        mock_workers[1].submit.assert_called_once_with('frame2', 'cam2')
-        mock_workers[2].submit.assert_called_once_with('frame3', 'cam3')
+        # Worker 1 should get frame 2
+        self.assertEqual(mock_workers[1].submit.call_count, 1)
+        mock_workers[1].submit.assert_called_with('frame2', 'cam2')
 
+        # Worker 2 should get frame 3
+        self.assertEqual(mock_workers[2].submit.call_count, 1)
+        mock_workers[2].submit.assert_called_with('frame3', 'cam3')
+
+        # Verify the index wrapped around correctly
         self.assertEqual(manager.next_worker_index, 1)
 
 
