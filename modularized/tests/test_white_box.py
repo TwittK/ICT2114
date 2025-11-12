@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from werkzeug.security import generate_password_hash
+import psycopg2  # <-- FIX 1: Import psycopg2
 
 # Set environment variable for test database before importing modules that use it
 import os
@@ -10,6 +11,19 @@ os.environ['POSTGRES_DB'] = os.getenv("POSTGRES_DB_TEST", "testdb")
 from modularized.database import create_user, verify_user
 from modularized.web.routes import app
 from modularized.web.utils import login_required
+
+# FIX 3: Define test routes outside the test class
+# This ensures the app is configured before any test client makes a request.
+@app.route('/protected')
+@login_required
+def protected_view():
+    return "You should not see this"
+
+@app.route('/protected_access')
+@login_required
+def protected_view_access():
+    return "Access Granted"
+
 
 class WhiteBoxTestDatabase(unittest.TestCase):
     """White-box tests for database functions, mocking the DB connection."""
@@ -44,10 +58,11 @@ class WhiteBoxTestDatabase(unittest.TestCase):
         mock_connect.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cur
         
-        # Simulate role ID lookup
-        mock_cur.fetchone.return_value = (1,)
-        # Simulate a database integrity error (e.g., unique constraint violation)
-        mock_cur.execute.side_effect = [None, psycopg2.IntegrityError]
+        # Simulate role ID lookup and then a database integrity error
+        mock_cur.execute.side_effect = [
+            (1,),  # First call for role lookup succeeds
+            psycopg2.IntegrityError("duplicate key value violates unique constraint") # Second call for INSERT fails
+        ]
 
         result = create_user("testuser", "test@example.com", "password123", "user")
 
@@ -108,28 +123,21 @@ class WhiteBoxTestFlaskApp(unittest.TestCase):
 
     def test_login_required_decorator_redirect(self):
         """Test login_required decorator redirects when not logged in."""
-        # A dummy route protected by the decorator
-        @app.route('/protected')
-        @login_required
-        def protected_view():
-            return "You should not see this"
-
         response = self.client.get('/protected', follow_redirects=True)
+        # After redirecting, the user should be on the login page
+        # and see the flash message.
         self.assertIn(b'Please log in to access this page', response.data)
-        self.assertEqual(response.status_code, 200) # After redirect
+        self.assertEqual(response.status_code, 200) # Status code of the final page
 
     def test_login_required_decorator_allows_access(self):
         """Test login_required decorator allows access when logged in."""
         with self.client as c:
             with c.session_transaction() as sess:
-                sess['user'] = {'id': 1, 'username': 'test', 'role': 'user'}
+                # FIX 2: Set 'user_id' directly in the session
+                sess['user_id'] = 1
+                sess['username'] = 'test'
+                sess['role'] = 'user'
             
-            # Dummy route
-            @app.route('/protected_access')
-            @login_required
-            def protected_view_access():
-                return "Access Granted"
-
             response = c.get('/protected_access')
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'Access Granted', response.data)
