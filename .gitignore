@@ -14,3 +14,5 @@ database
 /modularized/users.sqlite
 /modularized/*.log
 /modularized/datasets/one_bottle/
+/modularized/datasets/different_colours/
+confidence_metrics.csv
