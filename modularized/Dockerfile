@@ -24,6 +24,10 @@ RUN pip install --upgrade pip
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy and install test requirements
+COPY tests/requirements-test.txt ./tests/
+RUN pip install --no-cache-dir -r tests/requirements-test.txt
+
 # Uninstall incompatible version of torch for CUDA Version 12.4
 RUN pip uninstall -y torch
 
