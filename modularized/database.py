@@ -394,12 +394,13 @@ def verify_user(email, password):
     # Connect to PostgreSQL
     conn = psycopg2.connect(**DB_PARAMS)
 
-    cursor = conn.cursor()
+    # Use RealDictCursor to get results as dictionaries
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     cursor.execute(
         """
         SELECT u.id, u.email, u.username, u.password_hash,
-               r.name AS role_name, u.is_active
+               r.name AS role, u.is_active
         FROM users u
         JOIN Roles r ON u.role = r.id
         WHERE u.email = %s
@@ -411,12 +412,15 @@ def verify_user(email, password):
     user = cursor.fetchone()
     conn.close()
 
-    if user and check_password_hash(user[3], password):
+    # Access data by key, not by index
+    if user and check_password_hash(user['password_hash'], password):
+        # The user object is already a dictionary, but we'll create a new one
+        # to ensure only the necessary fields are returned.
         return {
-            "id": user[0],
-            "email": user[1],
-            "username": user[2],
-            "role": user[4],
+            "id": user['id'],
+            "email": user['email'],
+            "username": user['username'],
+            "role": user['role'],
         }
 
     return None
