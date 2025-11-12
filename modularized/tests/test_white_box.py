@@ -65,22 +65,39 @@ class WhiteBoxTestFlaskApp(unittest.TestCase):
         app.config['SECRET_KEY'] = 'test-secret-key'
         app.config['WTF_CSRF_ENABLED'] = False
         self.client = app.test_client()
+        self.app_context = app.app_context()
+        self.app_context.push()
 
-    # FIX 1: Mock the context processor that connects to the DB
-    @patch('web.routes.inject_labs_with_cameras', return_value={})
-    def test_login_required_decorator_redirect(self, mock_inject_labs):
+    def tearDown(self):
+        self.app_context.pop()
+
+    @patch('psycopg2.connect')
+    def test_login_required_decorator_redirect(self, mock_connect):
         """Test login_required decorator redirects when not logged in."""
+        # Mock the database connection for the context processor
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cur
+        mock_cur.fetchall.return_value = []  # Return empty labs/cameras
+        
         response = self.client.get('/protected', follow_redirects=True)
         
         self.assertIn(b'Please log in to access this page', response.data)
         self.assertEqual(response.status_code, 200)
-        mock_inject_labs.assert_called() # Verify the mock was used
 
-    def test_login_required_decorator_allows_access(self):
+    @patch('psycopg2.connect')
+    def test_login_required_decorator_allows_access(self, mock_connect):
         """Test login_required decorator allows access when logged in."""
+        # Mock the database connection for the context processor
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cur
+        mock_cur.fetchall.return_value = []  # Return empty labs/cameras
+        
         with self.client as c:
             with c.session_transaction() as sess:
-                # FIX 2: Set 'user_id' directly in the session
                 sess['user_id'] = 1
                 sess['username'] = 'test'
                 sess['role'] = 'user'
