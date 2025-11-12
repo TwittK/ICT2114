@@ -81,10 +81,13 @@ class WhiteBoxTestFlaskApp(unittest.TestCase):
         mock_conn.cursor.return_value = mock_cur
         mock_cur.fetchall.return_value = []  # Return empty labs/cameras
         
-        response = self.client.get('/protected', follow_redirects=True)
+        # Don't follow redirects so we can check the redirect happened
+        response = self.client.get('/protected', follow_redirects=False)
         
-        self.assertIn(b'Please log in to access this page', response.data)
-        self.assertEqual(response.status_code, 200)
+        # Check that we got a redirect response
+        self.assertEqual(response.status_code, 302)
+        # Check that the redirect is to the login page
+        self.assertIn('/login', response.location)
 
     @patch('psycopg2.connect')
     def test_login_required_decorator_allows_access(self, mock_connect):
@@ -96,15 +99,14 @@ class WhiteBoxTestFlaskApp(unittest.TestCase):
         mock_conn.cursor.return_value = mock_cur
         mock_cur.fetchall.return_value = []  # Return empty labs/cameras
         
-        with self.client as c:
-            with c.session_transaction() as sess:
-                sess['user_id'] = 1
-                sess['username'] = 'test'
-                sess['role'] = 'user'
-            
-            response = c.get('/protected')
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'Access Granted', response.data)
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'test'
+            sess['role'] = 'user'
+        
+        response = self.client.get('/protected')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Access Granted', response.data)
 
 if __name__ == '__main__':
     unittest.main()
