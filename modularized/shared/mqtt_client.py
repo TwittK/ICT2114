@@ -43,7 +43,9 @@ class MQTTClient:
 
         sgt = pytz.timezone("Asia/Singapore")
         timestamp = datetime.now(sgt).strftime("%d %b %Y %I:%M %p")
+        print(f"MQTT {timestamp}")
         payload = f"[{timestamp}]\nUser: {user}\nEvent: {event}\nDetails: {details}"
+        print(f"MQTT payload {payload}")
 
         try:
             self.client.publish(self.topic, payload)

@@ -12,8 +12,8 @@ class NotificationService:
         # Email Setup
         self.gmail_smtp_host = "smtp.gmail.com"
         self.gmail_smtp_port = 587
-        self.sender_email = "sitlabincompliance@gmail.com"  # Replace with your Gmail
-        self.sender_password = "drky unyj nmxu zqeb"  # Use App Password from Google
+        self.sender_email = "anonconfessionwall@gmail.com"  # Replace with your Gmail
+        self.sender_password = "clwe ophr jtwt jcss"  # Use App Password from Google
 
         # Telegram Setup
         self.telegram_bot_token = "8272893365:AAGUVKaxPHvgD970Xbv_VGeS31RxAnM9nUE"
