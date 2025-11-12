@@ -42,7 +42,7 @@ class MQTTClient:
         """Publish a violation message to the MQTT broker."""
 
         sgt = pytz.timezone("Asia/Singapore")
-        timestamp = datetime.now(sgt).strftime("%d %b %Y %I:%M %p")
+        timestamp = datetime.now(pytz.utc).astimezone(sgt).strftime("%d %b %Y %I:%M %p")
         print(f"MQTT {timestamp}")
         payload = f"[{timestamp}]\nUser: {user}\nEvent: {event}\nDetails: {details}"
         print(f"MQTT payload {payload}")

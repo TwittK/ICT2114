@@ -4,6 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import os
+from shared.config import GMAIL_PASSKEY, BOT_TOKEN
 
 
 class NotificationService:
@@ -13,10 +14,10 @@ class NotificationService:
         self.gmail_smtp_host = "smtp.gmail.com"
         self.gmail_smtp_port = 587
         self.sender_email = "anonconfessionwall@gmail.com"  # Replace with your Gmail
-        self.sender_password = "clwe ophr jtwt jcss"  # Use App Password from Google
+        self.sender_password = GMAIL_PASSKEY  # Use App Password from Google
 
         # Telegram Setup
-        self.telegram_bot_token = "8272893365:AAGUVKaxPHvgD970Xbv_VGeS31RxAnM9nUE"
+        self.telegram_bot_token = BOT_TOKEN
 
     # ---------- EMAIL ----------
     def send_email(self, to_email, subject, body):

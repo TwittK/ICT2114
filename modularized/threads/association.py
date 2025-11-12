@@ -272,11 +272,11 @@ def association(context: Camera):
 
                 try:
                     # Mock next day
-                    mocked_date = datetime(2025, 12, 10)
-                    current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
+                    # mocked_date = datetime(2025, 12, 15)
+                    # current_date = mocked_date.strftime("%Y-%m-%d %H:%M:%S")
 
-                    # local_tz = ZoneInfo("Asia/Singapore")
-                    # current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    local_tz = ZoneInfo("Asia/Singapore")
+                    current_date = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
                     print(current_date)
                     today = current_date[:10]
 
@@ -341,7 +341,7 @@ def association(context: Camera):
                                     mqtt_client.publish_violation(
                                         user=str(person_id),
                                         event="lab_safety_violation",
-                                        details=f"Incompliance detected at camera {context.camera_id} on {current_date}",
+                                        details=f"Incompliance detected at camera {context.camera_id}",
                                     )
 
                                 print(
