@@ -43,7 +43,7 @@ class ObjectDetectionModel(BaseModel):
       frame,
       persist=True, # Enable to track objects across frames.
       classes=[39, 40, 41, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55],
-      conf=0.3,
+      conf=0.7,
       verbose=False,
       device=torch.device(device_str)
     )
