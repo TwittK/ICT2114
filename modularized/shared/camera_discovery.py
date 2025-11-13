@@ -1,3 +1,4 @@
+# shared/camera_discovery.py
 import requests, psycopg2, os
 from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET

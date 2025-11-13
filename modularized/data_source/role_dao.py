@@ -1,37 +1,79 @@
+# Filename: data_source/role_dao.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 
 class RoleDAO:
+    """
+    Data Access Object for role and permission records.
+
+    This class wraps common database operations related to roles,
+    permissions, and their mappings. It is responsible for opening
+    connections (using provided db_params), executing queries, and
+    returning structured results.
+
+    Attributes:
+        db_params (dict): Keyword arguments passed to psycopg2.connect()
+            to establish a database connection (host, port, user, password,
+            database, etc.).
+    """
+
     def __init__(self, db_params):
+        """Initialise the DAO with database connection parameters.
+
+        Parameters:
+            db_params (dict): Parameters forwarded to psycopg2.connect().
+        """
         self.db_params = db_params
 
     def _get_conn(self):
-        """Helper to return a new connection with dict-style rows."""
+        """Open and return a new database connection.
+
+        Returns:
+            connection: A psycopg2 connection configured to return rows as dicts.
+        """
         return psycopg2.connect(**self.db_params, cursor_factory=RealDictCursor)
 
     def get_all_roles(self):
-        """Return roles in list of dicts"""
+        """Return all roles as a list of dictionaries.
+
+        Returns:
+            list[dict]: List of role records.
+        """
         with self._get_conn() as conn, conn.cursor() as cursor:
             cursor.execute("SELECT * FROM roles")
             return cursor.fetchall()
 
     def get_all_permissions(self):
-        """Return permissions in list of dicts"""
+        """Return all permissions as a list of dictionaries.
+
+        Returns:
+            list[dict]: List of permission records.
+        """
         with self._get_conn() as conn, conn.cursor() as cursor:
             cursor.execute("SELECT * FROM permission")
             return cursor.fetchall()
 
     def get_all_rolepermissions(self):
-        """Return list of tuples (role_id, permission_id)"""
+        """Return all role-permission mappings as a list of tuples.
+
+        Returns:
+            list[tuple]: List of (role_id, permission_id) tuples.
+        """
         with self._get_conn() as conn, conn.cursor() as cursor:
             cursor.execute("SELECT * FROM rolepermission")
             rows = cursor.fetchall()
-            # rows will be list of dicts (with RealDictCursor)
             return [(row["role_id"], row["permission_id"]) for row in rows]
 
     def insert_new_role(self, role_name):
-        """Creates a new role with no permissions."""
+        """Create a new role with no permissions.
+
+        Parameters:
+            role_name (str): The name of the role to insert.
+
+        Returns:
+            bool: True if inserted successfully, False otherwise.
+        """
         try:
             with self._get_conn() as conn, conn.cursor() as cursor:
                 cursor.execute("INSERT INTO roles (name) VALUES (%s)", (role_name,))
@@ -41,7 +83,14 @@ class RoleDAO:
             return False
 
     def delete_role(self, role_name):
-        """Deletes a role using its name. Update all affected users' roles to default 'user' role."""
+        """Delete a role by its name and update affected users to the default 'user' role.
+
+        Parameters:
+            role_name (str): The name of the role to delete.
+
+        Returns:
+            bool: True if deleted successfully, False otherwise.
+        """
         try:
             with self._get_conn() as conn, conn.cursor() as cursor:
                 # Get the ID of the 'user' role (default role)
@@ -76,7 +125,12 @@ class RoleDAO:
     def update_role_permissions(self, permissions_map):
         """
         Transaction to update role to permission mappings.
-        permissions_map: set of (role_id, perm_id) tuples
+
+        Parameters:
+            permissions_map (set[tuple]): Set of (role_id, perm_id) tuples.
+
+        Returns:
+            None
         """
         with self._get_conn() as conn, conn.cursor() as cursor:
             try:
@@ -95,14 +149,28 @@ class RoleDAO:
                 raise
 
     def get_role_id_by_name(self, role_name):
-        """Returns role ID using role name."""
+        """Return role ID using role name.
+
+        Parameters:
+            role_name (str): The name of the role to look up.
+
+        Returns:
+            int | None: The role ID if found, else None.
+        """
         with self._get_conn() as conn, conn.cursor() as cursor:
             cursor.execute("SELECT id FROM roles WHERE name = %s", (role_name,))
             row = cursor.fetchone()
             return row["id"] if row else None
 
     def get_permission_id_by_name(self, permission_name):
-        """Returns permission ID using permission name."""
+        """Return permission ID using permission name.
+
+        Parameters:
+            permission_name (str): The name of the permission to look up.
+
+        Returns:
+            int | None: The permission ID if found, else None.
+        """
         with self._get_conn() as conn, conn.cursor() as cursor:
             cursor.execute(
                 "SELECT id FROM permission WHERE name = %s", (permission_name,)

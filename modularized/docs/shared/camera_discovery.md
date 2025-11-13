@@ -1,4 +1,3 @@
-
 # CameraDiscovery
 
 ::: camera_discovery.CameraDiscovery
@@ -13,4 +12,3 @@
         - _get_ntp_info
         - scan_network_for_cameras
         - auto_populate_database
-

@@ -3,24 +3,36 @@ nav:
   - Home: index.md
   - 'User Guide': user-guide.md
   - 'Overview': overview.md
-  - 'Camera':
-    - 'CameraDiscovery': camera/camera_discovery.md
-    - 'CameraManagery': camera/camera_manager.md
-    - 'Camera': camera/camera.md
-  - 'Detection':
-    - 'DetectionManager': detection/detection_manager.md
-    - 'DetectionWorker': detection/detection_worker.md
-    - 'Model': detection/model.md
-    - 'read_frames': detection/reader.md
-  - 'Incompliance':
-    - 'ProcessIncompliance': incompliance/process_incompliance.md
-    - 'NVR': incompliance/nvr.md
-    - 'EmailService': incompliance/emailservice.md
-    - 'Saver': incompliance/saver.md
+  - 'Data Source':
+      - 'CameraDAO': data_source/camera_dao.md
+      - 'ClassLabelRepository': data_source/class_labels.md
+      - 'LabDAO': data_source/lab_dao.md
+      - 'LabSafetyStaffDAO': data_source/lab_safety_staff_dao.md
+      - 'PersonDAO': data_source/person_dao.md
+      - 'RoleDAO': data_source/role_dao.md
+      - 'SnapshotDAO': data_source/snapshot_dao.md
+      - 'UserDAO': data_source/user_dao.md
+  - 'Shared':
+      - 'CameraDiscovery': shared/camera_discovery.md
+      - 'CameraManager': shared/camera_manager.md
+      - 'Camera': shared/camera.md
+      - 'Config': shared/config.md
+      - 'DetectionManager': shared/detection_manager.md
+      - 'Model': shared/model.md
+      - 'MQTTClient': shared/mqtt_client.md
+  - 'Threads':
+      - 'Association': threads/association.md
+      - 'DetectionWorker': threads/detection_worker.md
+      - 'NotificationService': threads/notificationservice.md
+      - 'NVR': threads/nvr.md
+      - 'ProcessIncompliance': threads/process_incompliance.md
+      - 'Reader': threads/reader.md
+      - 'Saver': threads/saver.md
+      - 'Server': threads/server.md
 plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [shared, threads]
+          paths: [shared, threads, data_source]
           options:
             show_root_toc_entry: false

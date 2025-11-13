@@ -9,7 +9,21 @@ from shared.config import MQTT_BROKER, MQTT_PORT, MQTT_TOPIC, MQTT_USERNAME, MQT
 
 
 class MQTTClient:
-    """Simple MQTT client to publish lab violation messages."""
+    """
+    Simple MQTT client to publish lab violation messages.
+
+    This class wraps connection setup and message publishing for MQTT.
+    It supports TLS, username/password authentication, and publishes
+    formatted violation messages to a configured topic.
+
+    Attributes:
+        broker (str): MQTT broker address.
+        port (int): MQTT broker port.
+        topic (str): MQTT topic to publish to.
+        username (str): Username for MQTT authentication.
+        password (str): Password for MQTT authentication.
+        client (mqtt.Client): The underlying paho-mqtt client instance.
+    """
 
     def __init__(
             self,
@@ -19,6 +33,16 @@ class MQTTClient:
             username=MQTT_USERNAME,
             password=MQTT_PASSWORD
     ):
+        """
+        Initialise the MQTT client and connect to the broker.
+
+        Parameters:
+            broker (str): MQTT broker address.
+            port (int): MQTT broker port.
+            topic (str): MQTT topic to publish to.
+            username (str): Username for MQTT authentication.
+            password (str): Password for MQTT authentication.
+        """
         self.broker = broker
         self.port = port
         self.topic = topic
@@ -39,8 +63,17 @@ class MQTTClient:
             print(f"📝 Failed to connect to MQTT broker: {e}")
 
     def publish_violation(self, user, event, details=""):
-        """Publish a violation message to the MQTT broker."""
+        """
+        Publish a violation message to the MQTT broker.
 
+        Parameters:
+            user (str): Username or identifier of the violator.
+            event (str): Description of the violation event.
+            details (str, optional): Additional details about the violation.
+
+        Returns:
+            None
+        """
         sgt = pytz.timezone("Asia/Singapore")
         timestamp = datetime.now(pytz.utc).astimezone(sgt).strftime("%d %b %Y %I:%M %p")
         print(f"MQTT {timestamp}")

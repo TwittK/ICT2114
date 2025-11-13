@@ -1,3 +1,4 @@
+# shared/camera.py
 import threading
 import queue
 

@@ -21,10 +21,10 @@ This diagram represents the logical components of the dashboard and detection co
 
 ## **Detection Pipeline: Step-by-Step**
 ### 1. Reading Frames from Camera Stream
-Each camera’s video stream is continuosly read via RTSP protocol, then the frames are submitted to the [Detection Manager](./detection/detection_manager.md).
+Each camera’s video stream is continuosly read via RTSP protocol, then the frames are submitted to the [Detection Manager](shared/detection_manager.md).
 
 ### 2. YOLO Detction
-Detection Manager dispatch the frames to [Detection Workers](./detection/detection_worker.md) using a _round robin scheduling_ approach. The Detection Workers run the YOLO object detection model inference to detect food or drinks. <br><br>
+Detection Manager dispatch the frames to [Detection Workers](shared/detection_worker.md) using a _round robin scheduling_ approach. The Detection Workers run the YOLO object detection model inference to detect food or drinks. <br><br>
 Each Detection Worker runs a YOLO object detection model to check for any visible food or drinks.
 
 - If food or drinks are detected, the system stores:  
@@ -38,7 +38,7 @@ Each Detection Worker runs a YOLO object detection model to check for any visibl
 
 
 - If at least one food/drink and one person are detected:  
-    - The frame is added to the [Camera's](./camera/camera.md) processing queue.  
+    - The frame is added to the [Camera's](shared/camera.md) processing queue.  
 
 
 Regardless of detections, all frames are also sent to the dashboard display queue so they can be viewed in the live video feed.
@@ -56,7 +56,7 @@ To avoid false alarms like someone walking by, the system waits until the person
 
 ### 4. Saving Incompliance Snapshots
 When an incompliance is confirmed:  
-The face area is cropped and sent to the [NVR](./incompliance/nvr.md) for facial recognition.  
+The face area is cropped and sent to the [NVR](threads/nvr.md) for facial recognition.  
 
 - If a **match is found** on a **different date**:
     - This means that the person has at least 1 previous incompliance
@@ -65,7 +65,7 @@ The face area is cropped and sent to the [NVR](./incompliance/nvr.md) for facial
 
     - The face crop is saved in the NVR's face database (under the name "Incompliance") for future use
 
-    - Frame pushed to queue in [Saver](./incompliance/saver.md) and saved in web/static/incompliances/
+    - Frame pushed to queue in [Saver](threads/saver.md) and saved in web/static/incompliances/
 
 - If a **match is found** on the **same date**:
     - The system will disregard it

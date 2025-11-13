@@ -1,9 +1,10 @@
-
 # CameraManager
 
 ::: camera_manager.CameraManager
     members:
         - __init__
-        - shutdown_all_cameras
+        - add_camera
         - remove_camera
-        - add_new_camera
+        - get_camera
+        - list_cameras
+        - update_camera

@@ -1,3 +1,4 @@
+# Filename: data_source/camera_dao.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from database import create_camera, create_new_camera
@@ -8,12 +9,42 @@ LAB_NOT_FOUND = "Lab not found"
 
 
 class CameraDAO:
+    """
+    Data Access Object for camera records.
+
+    This class wraps common database operations related to cameras and
+    labs. It is responsible for opening connections (using provided
+    db_params), executing queries and returning structured results.
+
+    Attributes:
+        db_params (dict): Keyword arguments passed to psycopg2.connect()
+            to establish a database connection (host, port, user, password,
+            database, etc.).
+    """
+
     def __init__(self, db_params):
+        """Initialise the DAO with database connection parameters.
+
+        Parameters:
+            db_params (dict): Parameters forwarded to psycopg2.connect().
+        """
         self.db_params = db_params
 
     @contextmanager
     def get_cursor(self):
-        """Yield a cursor with an automatically closed connection."""
+        """Yield a cursor with an automatically-closed connection.
+
+        The yielded cursor uses RealDictCursor so fetched rows are
+        dict-like. The connection is committed after the context exits.
+
+        Usage:
+            with dao.get_cursor() as cursor:
+                cursor.execute(...)
+                results = cursor.fetchall()
+
+        Yields:
+            psycopg2 cursor: A cursor bound to an open connection.
+        """
         conn = psycopg2.connect(**self.db_params, cursor_factory=RealDictCursor)
         try:
             cursor = conn.cursor()
@@ -24,11 +55,22 @@ class CameraDAO:
             conn.close()
 
     def _get_conn(self):
-        """Helper to open a new connection with dict-style rows."""
+        """Open and return a new database connection.
+
+        Returns:
+            connection: A psycopg2 connection configured to return rows as dicts.
+        """
         return psycopg2.connect(**self.db_params, cursor_factory=RealDictCursor)
 
     def get_lab_id(self, lab_name):
-        """Return lab ID for a given lab name."""
+        """Return lab ID for a given lab name.
+
+        Parameters:
+            lab_name (str): The human-readable name of the lab.
+
+        Returns:
+            int | None: The LabId if the lab exists, otherwise None.
+        """
         with self._get_conn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT LabId FROM Lab WHERE lab_name = %s", (lab_name,))
@@ -36,7 +78,14 @@ class CameraDAO:
                 return row["labid"] if row else None
 
     def count_cameras_in_lab(self, lab_id):
-        """Return number of cameras in a given lab."""
+        """Return number of cameras associated with a lab.
+
+        Parameters:
+            lab_id (int): The LabId to count cameras for.
+
+        Returns:
+            int: The number of Camera rows that reference the given lab.
+        """
         with self._get_conn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -46,7 +95,19 @@ class CameraDAO:
                 return cursor.fetchone()["count"]
 
     def add_default_camera(self, lab_name, user_id):
-        """Creates a default-named camera in a given lab."""
+        """Create a camera with a default name inside a lab.
+
+        The default name is generated as "Camera {n}" where n is the
+        number of existing cameras in the lab plus one.
+
+        Parameters:
+            lab_name (str): The name of the lab to add the camera to.
+            user_id (int): The user id who owns the created camera.
+
+        Returns:
+            tuple(bool, str): (success, message). On success the message
+            describes the camera added; on failure the message explains why.
+        """
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
             return False, LAB_NOT_FOUND
@@ -66,7 +127,17 @@ class CameraDAO:
             return False, "Failed to add camera"
 
     def delete_camera(self, lab_name, camera_name, user_id):
-        """Delete a camera by its name, lab name, and user ID."""
+        """Delete a camera by its name, lab name, and user ID.
+
+        Parameters:
+            lab_name (str): Name of the lab the camera belongs to.
+            camera_name (str): The name of the camera to delete.
+            user_id (int): The id of the user who owns the camera.
+
+        Returns:
+            tuple(bool, str): (success, message). Success indicates whether a
+            row was removed. Message contains a human readable result.
+        """
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
             return False, LAB_NOT_FOUND
@@ -92,7 +163,18 @@ class CameraDAO:
             return False, f"Failed to delete camera '{camera_name}'."
 
     def get_camera_id(self, lab_name, camera_name, user_id):
-        """Get a camera id by its name, lab name, and user ID."""
+        """Get a camera id by its name, lab name, and user ID.
+
+        Parameters:
+            lab_name (str): The lab name to search in.
+            camera_name (str): The camera name to search for.
+            user_id (int): The camera owner id.
+
+        Returns:
+            tuple(bool, int | None): (found, camera_id). If the lab is not
+            found returns (False, None). If the camera does not exist returns
+            (False, None). On success returns (True, camera_id).
+        """
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
             return False, None  # Lab not found
@@ -117,7 +199,20 @@ class CameraDAO:
                 return True, row["cameraid"]
 
     def add_new_camera(self, lab_name, user_id, device_info):
-        """Creates a new camera in a given lab."""
+        """Create a new camera record with extended device information.
+
+        Parameters:
+            lab_name (str): The lab to create the camera in.
+            user_id (int): The owner of the camera.
+            device_info (dict): Device properties expected to contain keys:
+                resolution, frame_rate, encoding, camera_ip_type, ip_address,
+                subnet_mask, gateway, timezone, sync_with_ntp,
+                ntp_server_address, time
+
+        Returns:
+            tuple(int | None, str): On success returns (camera_id, message).
+            On failure returns (None, error_message).
+        """
         lab_id = self.get_lab_id(lab_name)
         if lab_id is None:
             return False, LAB_NOT_FOUND
@@ -151,7 +246,14 @@ class CameraDAO:
             return None, "Failed to add camera"
 
     def get_cameras_by_lab(self, lab_name):
-        """Return all camera names in a given lab."""
+        """Return all camera names in a given lab.
+
+        Parameters:
+            lab_name (str): Lab name to query.
+
+        Returns:
+            list[str]: Ordered list of camera names for the lab. Empty list if none.
+        """
         with self.get_cursor() as cursor:
             cursor.execute(
                 """
@@ -169,6 +271,12 @@ class CameraDAO:
         """
         Returns the name of the first camera for a given lab,
         or None if no camera exists.
+
+        Parameters:
+            lab_name (str): The lab name to query. If falsy, None is returned.
+
+        Returns:
+            str | None: The name of the first camera ordered by name, or None.
         """
         if not lab_name:
             return None
