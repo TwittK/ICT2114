@@ -33,6 +33,10 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [shared, threads, data_source]
+          paths:
+            - .
+            - threads
+            - data_source
+            - shared
           options:
             show_root_toc_entry: false

@@ -60,6 +60,6 @@ Refer to .env.example to create a .env file
 cd modularized
 docker compose -f docker-compose.yml up -d
 ```
-The app should be accesible at [**http://localhost:5001**](http://localhost:5001)
+The app should be accesible at [**http://localhost:5003**](http://localhost:5003)
 
 
