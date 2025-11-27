@@ -774,8 +774,7 @@ def edit_camera(camera_id):
                     timezone           = %s,
                     sync_with_ntp      = %s,
                     ntp_server_address = %s,
-                    time               = %s,
-                    channel            = %s
+                    time               = %s
                 WHERE CameraId = %s
                 """,
                 (
@@ -791,7 +790,7 @@ def edit_camera(camera_id):
                     sync_with_ntp,
                     ntp_server_address,
                     time_value,
-                    channel,
+                    # channel,
                     camera_id,
                 ),
             )
