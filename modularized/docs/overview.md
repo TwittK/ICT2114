@@ -1,6 +1,8 @@
 # Overview
-This document provides a comprehensive overview of the inner workings of the AI Powered Lab Compliance Monitoring with Display Visualization System.
+This page provides a comprehensive overview of the AI Powered Lab Compliance Monitoring with Display Visualization System.
 This system monitors laboratories to detect food or drink consumption, using an AI-driven detection pipeline integrated with an IP camera network. The objective is to automate the detection and evidence-capturing process using surveillance infrastructure and computer vision.
+
+![Architecture Diagram](arch-diag.png)
 
 ## **Network**
 ### Hardware Components
@@ -15,11 +17,12 @@ This system monitors laboratories to detect food or drink consumption, using an 
 
 ![Network Diagram](network-diag.drawio.png)
 
-## **Logical Architecture**
+## **Tech Stack**
 This diagram represents the logical components of the dashboard and detection components and how they interact to detect/ display incompliances.
-![Logical Architecture Diagram](logical-diag.drawio.png)
+![Tech Stack](logical-diag.drawio.png)
 
 ## **Detection Pipeline: Step-by-Step**
+Refer to the flowchart below for an illustration of the detection pipeline.
 ### 1. Reading Frames from Camera Stream
 Each camera’s video stream is continuosly read via RTSP protocol, then the frames are submitted to the [Detection Manager](shared/detection_manager.md).
 
@@ -83,3 +86,40 @@ The face area is cropped and sent to the [NVR](threads/nvr.md) for facial recogn
 
 ## **Detection Pipeline Flowchart**
 ![Detection Flowchart](detection-flowchart.drawio.png)
+
+
+## **Database Design**
+![ER Diagram](erd.png)
+
+## **Sequence Diagrams**
+### **Reading Frames and YOLO Detection Logic**
+![Reading frames and YOLO detection](seq-diag-1.png)<br>
+The [READ THREAD](threads/reader.md) pulls frames from the camera and submits them to the DetectionManager with that distributes it to one of the DetectionWorker THREAD.
+Within the DetectionWorker THREAD, YOLO inference is being done using preprocess(gpu_id). 
+
+The model used for inference can be modified in [DetectionWorker](threads/detection_worker.md).
+
+If at least one food/ beverage AND a human figure is detected within the frame, it is sent to both the camera's processing queue, to match each food/ beverage to the most likely owner,
+and its display queue, for the dashboard's video feed. Otherwise, the frame is only sent to the camera's display queue.
+
+<hr>
+
+### **Noncompliance Logic**
+The incompliance logic refers to the behaviour of the system when checking whether the person is a repeated offender. This incompliance processing
+happens within the [ASSOCIATION THREAD](threads/association.md), which is after the DetectionWorker's YOLO detection.
+![Noncompliance logic](seq-diag-2.png)
+
+An incompliance is triggered when an association between a food/ beverage object and a person is made.
+The following is a breakdown of the alternate flows for the incompliance logic.
+
+- **incompliance triggered flow:** Extraction of face, proceeds to facial comparison
+    - matches found: means person has previous violation, proceed to check if the latest violation is the same as today's date.
+        - same as today's date: meaning that the violation has already been flagged for today, will ignore.
+        - different date: meaning that is a new violation, proceed to take a snapshot and save as new incompliance event, **notify lab staff**
+    - no matches found: means new violator, proceed to take a snapshot and save as new incompliance event. Does NOT notify lab staff.
+
+
+- **no incompliance triggered flow:** skips loop
+
+
+
