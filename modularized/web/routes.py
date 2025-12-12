@@ -1651,7 +1651,7 @@ def user_management():
             role_exists = cursor.fetchone()
             if role_exists:
                 cursor.execute(
-                    "UPDATE users SET role = %s WHERE id = %s", (new_role, user_id)
+                    "UPDATE users SET role = %s WHERE id = %s", (role_exists, user_id)
                 )
                 conn.commit()
                 flash("User role updated successfully.", "success")
