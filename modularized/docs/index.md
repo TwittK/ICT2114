@@ -21,6 +21,7 @@ python gpu_check.py
 - **PostgreSQL**
 - **(Optional) Docker and Docker Compose**
 
+<br>
 ## **Getting Started (Linux Ubuntu)**
 ### 1. Create Python Virtual Environment
 ```bash
